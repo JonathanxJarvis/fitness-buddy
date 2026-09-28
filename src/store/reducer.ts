@@ -2,6 +2,9 @@ import { proteinTarget } from '@/lib/nutrition';
 import type {
   AppState,
   ChatMessage,
+  Exercise,
+  Routine,
+  Workout,
   DiaryEntry,
   ExerciseEntry,
   Food,
@@ -49,6 +52,11 @@ export const initialState: AppState = {
   favorites: [],
   savedMeals: [],
   chat: [],
+  workouts: [],
+  activeWorkout: null,
+  routines: [],
+  customExercises: [],
+  restSeconds: 90,
 };
 
 export type Action =
@@ -73,6 +81,13 @@ export type Action =
   | { type: 'deleteMeal'; id: string }
   | { type: 'addChat'; message: ChatMessage }
   | { type: 'clearChat' }
+  | { type: 'setActiveWorkout'; workout: Workout | null }
+  | { type: 'finishWorkout'; workout: Workout }
+  | { type: 'deleteWorkout'; id: string }
+  | { type: 'saveRoutine'; routine: Routine }
+  | { type: 'deleteRoutine'; id: string }
+  | { type: 'saveCustomExercise'; exercise: Exercise }
+  | { type: 'setRestSeconds'; seconds: number }
   | { type: 'reset' };
 
 const MAX_CHAT = 80;
@@ -186,6 +201,38 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, chat: [...state.chat, action.message].slice(-MAX_CHAT) };
     case 'clearChat':
       return { ...state, chat: [] };
+    case 'setActiveWorkout':
+      return { ...state, activeWorkout: action.workout };
+    case 'finishWorkout': {
+      const w = action.workout;
+      // The session also shows up as an exercise entry so its calories count toward the day.
+      const minutes = Math.max(1, Math.round(((w.endedAt ?? Date.now()) - w.startedAt) / 60000));
+      return {
+        ...state,
+        activeWorkout: null,
+        workouts: [...state.workouts.filter((x) => x.id !== w.id), w].sort((a, b) => a.startedAt - b.startedAt),
+        exercises: [...state.exercises.filter((x) => x.id !== w.id), { id: w.id, date: w.date, name: w.name, minutes, calories: w.calories ?? 0 }],
+      };
+    }
+    case 'deleteWorkout':
+      return {
+        ...state,
+        workouts: state.workouts.filter((w) => w.id !== action.id),
+        exercises: state.exercises.filter((x) => x.id !== action.id),
+      };
+    case 'saveRoutine': {
+      const exists = state.routines.some((r) => r.id === action.routine.id);
+      return {
+        ...state,
+        routines: exists ? state.routines.map((r) => (r.id === action.routine.id ? action.routine : r)) : [...state.routines, action.routine],
+      };
+    }
+    case 'deleteRoutine':
+      return { ...state, routines: state.routines.filter((r) => r.id !== action.id) };
+    case 'saveCustomExercise':
+      return { ...state, customExercises: [...state.customExercises.filter((e) => e.id !== action.exercise.id), action.exercise] };
+    case 'setRestSeconds':
+      return { ...state, restSeconds: action.seconds };
     case 'reset':
       return initialState;
   }

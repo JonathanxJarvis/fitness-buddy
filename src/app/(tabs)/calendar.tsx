@@ -45,7 +45,10 @@ export default function CalendarScreen() {
 
   return (
     <Screen topInset tabs>
-      <T size={30} weight="800" style={{ marginBottom: spacing.lg }}>Diary</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.md }}>
+        <IconButton label="Back to Today" icon="chevron-back" color={colors.text} onPress={() => router.navigate('/')} />
+        <T size={26} weight="800">Diary</T>
+      </View>
 
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Card style={{ flex: 1, alignItems: 'center' }}>

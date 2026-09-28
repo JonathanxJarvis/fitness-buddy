@@ -5,6 +5,7 @@ import type { AppState, ChatMessage, Food, MealComponent, Nutrients } from './ty
 import { addDays, todayKey } from './dates';
 import { itemNutrients, servingText } from './nutrition';
 import { formatWeight } from './units';
+import { durationMinutes, findExercise } from './training';
 
 /**
  * Claude powers the Coach chat and meal-photo estimates. By default requests go
@@ -221,13 +222,29 @@ export function coachContext(state: AppState): string {
   if (week.length) lines.push(`Previous 7 days: ${week.join('; ')}.`);
   const weights = Object.entries(state.weights).sort(([a], [b]) => a.localeCompare(b)).slice(-5);
   if (weights.length > 1) lines.push(`Recent weigh-ins: ${weights.map(([d, kg]) => `${d} ${formatWeight(kg, units)}`).join(', ')}.`);
+
+  const workouts = state.workouts.slice(-5);
+  if (workouts.length) {
+    lines.push('Recent strength workouts:');
+    for (const w of workouts) {
+      const ex = w.exercises
+        .map((e) => {
+          const best = e.sets.reduce((b, s) => (s.kg * s.reps > b.kg * b.reps ? s : b), e.sets[0]);
+          const name = findExercise(e.exerciseId, state.customExercises)?.name ?? e.exerciseId;
+          return best ? `${name} ${e.sets.length}x (best ${best.kg ? formatWeight(best.kg, units, 0) + ' × ' : ''}${best.reps})` : name;
+        })
+        .join('; ');
+      lines.push(`- ${w.date} ${w.name}, ${durationMinutes(w)} min, ${w.calories ?? 0} kcal: ${ex}`);
+    }
+  }
+  if (state.activeWorkout) lines.push(`Workout in progress now: ${state.activeWorkout.name}.`);
   return lines.join('\n');
 }
 
 const COACH_SYSTEM = (context: string) =>
   `You are Coach, the friendly nutrition and fitness coach inside the Fitness Buddy app. ` +
   `You know the user's goals and today's log (below). Give specific, practical answers grounded in their numbers: ` +
-  `what to eat next to hit protein, how a meal fits their day, swaps, simple recipes, training and recovery basics. ` +
+  `what to eat next to hit protein, how a meal fits their day, swaps, simple recipes, and their strength training: progression, volume, rest and recovery, based on the logged workouts. ` +
   `When they send a meal photo, estimate calories and macros for it and say how it fits their remaining budget. ` +
   `Keep replies short and conversational for a phone screen: a few sentences or a short list, no tables, no markdown headings. ` +
   `Use the user's units (${context.includes(' lb') ? 'US: lb, oz' : 'metric: kg, g'}). ` +

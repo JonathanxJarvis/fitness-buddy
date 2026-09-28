@@ -11,10 +11,11 @@ import { useStore } from '@/store/StoreProvider';
 import { nutrientColors, useTheme } from '@/theme';
 import { glassMl } from '@/lib/units';
 import type { MealType } from '@/lib/types';
+import { useStartWorkout } from '@/lib/useStartWorkout';
 
 const TABS: Record<string, { label: string; icon: IconName; active: IconName }> = {
   index: { label: 'Today', icon: 'home-outline', active: 'home' },
-  calendar: { label: 'Diary', icon: 'calendar-clear-outline', active: 'calendar-clear' },
+  train: { label: 'Train', icon: 'barbell-outline', active: 'barbell' },
   coach: { label: 'Coach', icon: 'sparkles-outline', active: 'sparkles' },
   progress: { label: 'Progress', icon: 'stats-chart-outline', active: 'stats-chart' },
 };
@@ -71,6 +72,7 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
   const [open, setOpen] = useState(false);
   const spin = useRef(new Animated.Value(0)).current;
   const keyboard = useKeyboardVisible();
+  const startWorkout = useStartWorkout();
 
   useEffect(() => {
     Animated.spring(spin, { toValue: open ? 1 : 0, useNativeDriver: nativeDriver, speed: 16, bounciness: 10 }).start();
@@ -177,7 +179,14 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
             },
           },
-          { label: 'Log a workout', icon: 'barbell-outline', color: nutrientColors.steps, onPress: () => router.push({ pathname: '/log-exercise', params: { date } }) },
+          {
+            label: app.activeWorkout ? 'Resume workout' : 'Start a workout',
+            subtitle: 'Sets, reps, weight & rest timer',
+            icon: 'barbell',
+            color: nutrientColors.steps,
+            onPress: () => startWorkout(),
+          },
+          { label: 'Log cardio or sport', icon: 'bicycle', color: nutrientColors.fiber, onPress: () => router.push({ pathname: '/log-exercise', params: { date } }) },
           { label: 'Log weight', icon: 'scale-outline', color: nutrientColors.carbs, onPress: () => router.push({ pathname: '/log-weight', params: { date } }) },
         ]}
       />

@@ -162,6 +162,46 @@ export interface ChatMessage {
   error?: boolean;
 }
 
+export type Muscle = 'chest' | 'back' | 'shoulders' | 'arms' | 'legs' | 'glutes' | 'core' | 'cardio' | 'full';
+export type Equipment = 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight' | 'kettlebell' | 'band' | 'cardio';
+
+export interface Exercise {
+  id: string;
+  name: string;
+  muscle: Muscle;
+  equipment: Equipment;
+  /** Tracks time/distance-free "reps only" when true (push-ups, pull-ups). */
+  bodyweight?: boolean;
+}
+
+export interface WorkoutSet {
+  reps: number;
+  /** Weight in kg (0 for bodyweight). */
+  kg: number;
+  done: boolean;
+}
+
+export interface WorkoutExercise {
+  exerciseId: string;
+  sets: WorkoutSet[];
+}
+
+export interface Workout {
+  id: string;
+  date: string;
+  name: string;
+  startedAt: number;
+  endedAt?: number;
+  exercises: WorkoutExercise[];
+  calories?: number;
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  exercises: { exerciseId: string; sets: number; reps: number }[];
+}
+
 export interface AppState {
   version: 1;
   profile: Profile | null;
@@ -176,4 +216,10 @@ export interface AppState {
   favorites: Food[];
   savedMeals: SavedMeal[];
   chat: ChatMessage[];
+  workouts: Workout[];
+  activeWorkout: Workout | null;
+  routines: Routine[];
+  customExercises: Exercise[];
+  /** Rest timer length in seconds. */
+  restSeconds?: number;
 }

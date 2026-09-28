@@ -11,9 +11,11 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} />}>
       <Tabs.Screen name="index" options={{ title: 'Today' }} />
-      <Tabs.Screen name="calendar" options={{ title: 'Diary' }} />
+      <Tabs.Screen name="train" options={{ title: 'Train' }} />
       <Tabs.Screen name="coach" options={{ title: 'Coach' }} />
       <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
+      {/* Opened from Today's calendar button; not shown in the tab bar. */}
+      <Tabs.Screen name="calendar" options={{ title: 'Diary' }} />
     </Tabs>
   );
 }

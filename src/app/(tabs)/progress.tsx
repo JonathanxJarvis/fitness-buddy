@@ -8,6 +8,7 @@ import { useStore } from '@/store/StoreProvider';
 import { lastNDays, shortDate, todayKey, weekdayLetter, fromKey, addDays } from '@/lib/dates';
 import { totalsByDate } from '@/lib/selectors';
 import { waterValue, waterUnit, weightValue, weightUnit, formatWeight } from '@/lib/units';
+import { workoutVolume } from '@/lib/training';
 import { DAILY_TIPS, tipForDate } from '@/lib/tips';
 import { nutrientColors, spacing, useTheme } from '@/theme';
 
@@ -48,11 +49,24 @@ export default function ProgressScreen() {
     return out;
   };
 
+  // Training volume per day (sum), grouped by week on long ranges.
+  const volumeByDay: Record<string, number> = {};
+  for (const w of state.workouts) volumeByDay[w.date] = (volumeByDay[w.date] ?? 0) + weightValue(workoutVolume(w), units);
+  const sessions = state.workouts.filter((w) => w.date >= days[0]).length;
+  const totalVolume = days.reduce((s, d) => s + (volumeByDay[d] ?? 0), 0);
+  const volumeBars =
+    n <= 30
+      ? days.map((d) => ({ label: label(d), value: volumeByDay[d] ?? 0 }))
+      : Array.from({ length: Math.ceil(days.length / 7) }, (_, i) => {
+          const wk = days.slice(i * 7, i * 7 + 7);
+          return { label: shortDate(wk[0]).split(' ')[1], value: wk.reduce((s, d) => s + (volumeByDay[d] ?? 0), 0) };
+        });
+
   const tips = [0, 1, 2].map((i) => tipForDate(addDays(today, i + 1)));
 
   return (
     <Screen topInset tabs>
-      <T size={30} weight="800" style={{ marginBottom: spacing.lg }}>Progress</T>
+      <T size={26} weight="800" style={{ marginBottom: spacing.md }}>Progress</T>
       <Segmented
         value={range}
         onChange={setRange}
@@ -61,7 +75,7 @@ export default function ProgressScreen() {
           { key: 'month', label: '30 days' },
           { key: 'quarter', label: '90 days' },
         ]}
-        style={{ marginBottom: spacing.lg }}
+        style={{ marginBottom: spacing.md }}
       />
 
       <FadeIn style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -106,6 +120,16 @@ export default function ProgressScreen() {
         {state.profile && (
           <T muted size={12} style={{ marginTop: 4 }}>Current: {formatWeight(state.profile.weightKg, units)}</T>
         )}
+      </Card>
+
+      <Card>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+          <T weight="700">Training volume {n > 30 ? '(per week)' : ''}</T>
+          <T muted size={13}>
+            {sessions} session{sessions === 1 ? '' : 's'} · {Math.round(totalVolume).toLocaleString()} {weightUnit(units)}
+          </T>
+        </View>
+        <BarChart key={range} data={volumeBars} color={nutrientColors.protein} height={120} format={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v)))} />
       </Card>
 
       <Card>

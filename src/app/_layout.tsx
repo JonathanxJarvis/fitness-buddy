@@ -73,6 +73,9 @@ function RootNavigator() {
         <Stack.Screen name="goals" options={{ title: 'Daily goals' }} />
         <Stack.Screen name="reminders" options={{ title: 'Reminders' }} />
         <Stack.Screen name="nutrients" options={{ title: 'Nutrients', presentation: 'modal' }} />
+        <Stack.Screen name="workout" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="exercise-picker" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="workout-detail" options={{ title: 'Workout' }} />
       </Stack>
     </ThemeProvider>
   );

@@ -278,6 +278,8 @@ export default function Today() {
           <Pressable onPress={() => setSelectedDate(todayKey())} style={{ flex: 1 }}>
             <T size={28} weight="800">{prettyDate(date)}</T>
           </Pressable>
+          <IconButton label="Open diary calendar" icon="calendar-clear-outline" color={colors.textMuted} onPress={() => router.navigate('/calendar')} />
+          <View style={{ width: 14 }} />
           <IconButton label="Previous week" icon="chevron-back" color={colors.textMuted} onPress={() => setSelectedDate(addDays(date, -7))} />
           <View style={{ width: 14 }} />
           <IconButton label="Next week" icon="chevron-forward" color={colors.textMuted} onPress={() => setSelectedDate(addDays(date, 7))} />
