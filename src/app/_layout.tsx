@@ -12,6 +12,7 @@ import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/70
 import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import { StoreProvider, useStore } from '@/store/StoreProvider';
 import { font, useTheme } from '@/theme';
+import { MascotToast } from '@/components/MascotToast';
 
 function RootNavigator() {
   const { ready } = useStore();
@@ -76,7 +77,13 @@ function RootNavigator() {
         <Stack.Screen name="workout" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="exercise-picker" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="workout-detail" options={{ title: 'Workout' }} />
+        <Stack.Screen name="rank" options={{ headerShown: false }} />
+        <Stack.Screen name="pro" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="friends" options={{ title: 'Your crew' }} />
+        <Stack.Screen name="friend/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
       </Stack>
+      <MascotToast />
     </ThemeProvider>
   );
 }

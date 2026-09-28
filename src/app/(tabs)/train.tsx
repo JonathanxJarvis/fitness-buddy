@@ -9,6 +9,9 @@ import { useStore } from '@/store/StoreProvider';
 import { addDays, fromKey, shortDate, todayKey, WEEKDAY_LETTERS } from '@/lib/dates';
 import { countPRs, durationMinutes, findExercise, personalRecords, TEMPLATES, workoutVolume } from '@/lib/training';
 import { useStartWorkout } from '@/lib/useStartWorkout';
+import { progression, STAGES } from '@/lib/progression';
+import { unreadCount } from '@/lib/social';
+import { RankBadge } from '@/components/RankBadge';
 import { formatWeight, kgToLb, weightUnit } from '@/lib/units';
 import { nutrientColors, radius, spacing, useTheme } from '@/theme';
 import type { Routine } from '@/lib/types';
@@ -72,6 +75,7 @@ export default function Train() {
   const restSeconds = state.restSeconds ?? 90;
 
   const today = todayKey();
+  const prog = useMemo(() => progression(state.workouts, state.profile?.weightKg ?? 75, state.profile?.sex ?? 'male', today), [state.workouts, state.profile, today]);
   const week = useMemo(() => {
     const startKey = addDays(today, -fromKey(today).getDay());
     return Array.from({ length: 7 }, (_, i) => addDays(startKey, i));
@@ -92,6 +96,8 @@ export default function Train() {
     [state.workouts],
   );
 
+  const unread = unreadCount(state.social, state.social?.me?.id);
+
   return (
     <Screen topInset tabs>
       <FadeIn style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
@@ -100,16 +106,51 @@ export default function Train() {
           <T size={26} weight="800">Train</T>
         </View>
         <Pressable
+          onPress={() => router.push('/friends')}
+          accessibilityLabel="Friends"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, marginRight: 6 }}
+        >
+          <Ionicons name="people" size={15} color={colors.text} />
+          <T size={13} weight="700">Friends</T>
+          {unread > 0 && (
+            <View style={{ minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 }}>
+              <T size={10} weight="800" color="#fff">{unread}</T>
+            </View>
+          )}
+        </Pressable>
+        <Pressable
           onPress={() => setRestOpen(true)}
           accessibilityLabel="Rest timer length"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill }}
         >
           <Ionicons name="timer-outline" size={15} color={colors.text} />
-          <T size={13} weight="700">Rest {restSeconds}s</T>
+          <T size={13} weight="700">{restSeconds}s</T>
         </Pressable>
       </FadeIn>
 
       {state.activeWorkout && <ResumeBanner />}
+
+      {/* Rank & level */}
+      <FadeIn delay={30}>
+        <PressScale onPress={() => router.push('/rank')} style={{ marginBottom: spacing.md }}>
+          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: spacing.md, marginBottom: 0 }}>
+            <RankBadge stage={prog.stage} size={50} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                <T size={17} weight="800">{prog.stage.label}</T>
+                <T size={12} weight="700" color={colors.primary}>Lv {prog.level}</T>
+              </View>
+              <T size={12} muted numberOfLines={1}>
+                {STAGES[prog.stage.index + 1] ? `${Math.max(0, STAGES[prog.stage.index + 1].min - prog.score).toFixed(1)} pts to ${STAGES[prog.stage.index + 1].label}` : 'Maximum rank reached'}
+              </T>
+              <View style={{ height: 5, borderRadius: 3, backgroundColor: colors.track, marginTop: 6, overflow: 'hidden' }}>
+                <View style={{ width: `${prog.progress * 100}%`, height: 5, backgroundColor: prog.stage.tier.color }} />
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Card>
+        </PressScale>
+      </FadeIn>
 
       {/* This week */}
       <FadeIn delay={60}>

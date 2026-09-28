@@ -10,6 +10,7 @@ import { FadeIn, nativeDriver } from '@/components/motion';
 import { HealthScoreCard } from '@/components/HealthScore';
 import { mealForNow } from '@/components/TabBar';
 import { useStore } from '@/store/StoreProvider';
+import { isPro, PREVIEW } from '@/lib/pro';
 import { uid } from '@/store/reducer';
 import { aiMode, estimateMeal, estimateToFood, friendlyError, MissingKeyError, type MealEstimate } from '@/lib/ai';
 import { pickMealPhoto, type MealPhoto } from '@/lib/photos';
@@ -32,7 +33,7 @@ const SAMPLE: MealEstimate = {
   ],
   totals: { calories: 540, protein: 48, carbs: 27, fat: 27.5, fiber: 5, sugar: 4, sodium: 480 },
   confidence: 'medium',
-  notes: 'Sample result for trying the flow. Add your Claude API key in Profile to analyze your own photos.',
+  notes: 'Sample result for trying the flow. In the app, the AI analyzes your own photo.',
 };
 
 function Scanner({ uri }: { uri: string }) {
@@ -99,7 +100,8 @@ function Tile({ icon, label, value, unit, color, delay }: { icon: React.Componen
 
 export default function SnapMeal() {
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
-  const { dispatch } = useStore();
+  const { state, dispatch } = useStore();
+  const pro = isPro(state);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('pick');
@@ -118,9 +120,22 @@ export default function SnapMeal() {
     aiMode().then((m) => setHasKey(m !== null));
   }, []);
 
+  // Snap a meal is part of Pro.
+  useEffect(() => {
+    if (!pro) router.replace({ pathname: '/pro', params: { feature: 'snap' } });
+  }, [pro]);
+
   const analyze = async (p: MealPhoto) => {
     setPhase('analyzing');
     setError(null);
+    if (PREVIEW && !hasKey) {
+      // The browser preview can't reach the AI server, so it demonstrates the flow with a sample.
+      setTimeout(() => {
+        showSample();
+        setPhoto(p);
+      }, 1600);
+      return;
+    }
     try {
       const r = await estimateMeal(p.base64, hint.trim() || undefined);
       if (!r.isFood || r.items.length === 0) {

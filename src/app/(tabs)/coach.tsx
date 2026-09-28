@@ -5,21 +5,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { ActionSheet, Button, Card, IconButton, T } from '@/components/ui';
+import { ActionSheet, Card, IconButton, T } from '@/components/ui';
 import { FadeIn, PressScale, TypingDots } from '@/components/motion';
 import { tabBarHeight, useKeyboardVisible } from '@/components/TabBar';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { aiMode, askCoach, friendlyError } from '@/lib/ai';
+import { offlineReply } from '@/lib/offlineCoach';
+import { isPro, mascotSkin } from '@/lib/pro';
+import { Kettle } from '@/components/Mascot';
 import { pickMealPhoto, type MealPhoto } from '@/lib/photos';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
 import type { ChatMessage } from '@/lib/types';
 
 const SUGGESTIONS = [
-  'What should I eat to hit my protein today?',
-  'How am I doing so far today?',
-  'High-protein snacks under 200 calories',
-  'Plan tomorrow’s meals for my goal',
+  'How am I doing today?',
+  'How do I hit my protein?',
+  'What should I train today?',
+  'How do I rank up?',
+  'Plan my meals for tomorrow',
 ];
 
 /** Renders **bold** and "- " bullets, the only formatting the coach uses. */
@@ -101,6 +105,8 @@ export default function CoachScreen() {
   const [busy, setBusy] = useState(false);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [attachOpen, setAttachOpen] = useState(false);
+  const pro = isPro(state);
+  const useAi = pro && !!state.settings.coachAi && hasKey === true;
 
   useFocusEffect(
     useCallback(() => {
@@ -128,7 +134,18 @@ export default function CoachScreen() {
     setPhoto(null);
     setBusy(true);
     try {
-      const reply = await askCoach(state, [...state.chat, msg], attached);
+      let reply: string;
+      if (useAi) {
+        reply = await askCoach(state, [...state.chat, msg], attached);
+      } else {
+        // Buddy Coach answers on the phone; a short pause keeps it feeling like a chat.
+        await new Promise((res) => setTimeout(res, 450 + Math.random() * 350));
+        reply = attached
+          ? pro
+            ? 'Photo breakdowns use the AI coach. Switch the toggle at the top to AI and send it again.'
+            : 'Photo breakdowns are part of **Fitness Buddy Pro**. Meanwhile, search or scan the food and I’ll tell you how it fits your day.'
+          : offlineReply(body, state);
+      }
       dispatch({ type: 'addChat', message: { id: uid(), role: 'assistant', text: reply, createdAt: Date.now() } });
     } catch (e) {
       dispatch({ type: 'addChat', message: { id: uid(), role: 'assistant', text: friendlyError(e), createdAt: Date.now(), error: true } });
@@ -153,28 +170,36 @@ export default function CoachScreen() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* Header */}
       <View style={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <LinearGradient colors={[nutrientColors.protein, colors.hero[2]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="sparkles" size={22} color="#fff" />
-        </LinearGradient>
+        <View style={{ width: 46, height: 46, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Kettle size={42} mood={busy ? 'pumped' : 'happy'} skin={mascotSkin(state)} />
+        </View>
         <View style={{ flex: 1 }}>
           <T size={22} weight="800">Coach</T>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: hasKey ? colors.primary : colors.warning }} />
-            <T size={12} muted>{hasKey ? 'Powered by Claude · knows your goals & log' : 'AI not set up yet'}</T>
+            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} />
+            <T size={12} muted>{useAi ? 'AI coach (Pro) · knows your goals & log' : 'Buddy Coach · works offline, knows your numbers'}</T>
           </View>
         </View>
+        <Pressable
+          accessibilityLabel="Switch coach mode"
+          onPress={() => {
+            if (!pro) return router.push('/pro');
+            dispatch({ type: 'updateSettings', settings: { coachAi: !state.settings.coachAi } });
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: useAi ? nutrientColors.protein : colors.cardAlt }}
+        >
+          <Ionicons name="sparkles" size={13} color={useAi ? '#fff' : nutrientColors.protein} />
+          <T size={12} weight="800" color={useAi ? '#fff' : colors.text}>{useAi ? 'AI on' : pro ? 'AI off' : 'AI · Pro'}</T>
+        </Pressable>
         {state.chat.length > 0 && <IconButton label="Clear chat" icon="trash-outline" color={colors.textMuted} onPress={() => dispatch({ type: 'clearChat' })} />}
       </View>
 
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.sm }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {hasKey === false && (
+        {pro && state.settings.coachAi && hasKey === false && (
           <FadeIn>
             <Card style={{ borderColor: colors.warning, borderWidth: 1 }}>
-              <T weight="800">AI isn’t set up yet</T>
-              <T size={14} muted style={{ marginTop: 4, marginBottom: spacing.md }}>
-                This build isn’t connected to the Fitness Buddy AI server. Until it is, you can add your own Claude API key in your profile.
-              </T>
-              <Button title="Add API key" icon="key-outline" onPress={() => router.push('/profile')} />
+              <T weight="800">AI server not connected</T>
+              <T size={14} muted style={{ marginTop: 4 }}>This build isn’t linked to the Fitness Buddy AI server yet, so Buddy Coach answers instead. Everything else works.</T>
             </Card>
           </FadeIn>
         )}
@@ -184,7 +209,7 @@ export default function CoachScreen() {
             <View style={{ alignItems: 'flex-start', marginBottom: spacing.lg }}>
               <View style={{ backgroundColor: colors.card, borderRadius: 20, borderBottomLeftRadius: 6, padding: 14, maxWidth: '90%' }}>
                 <T size={15} style={{ lineHeight: 22 }}>
-                  Hi{state.profile?.name ? ` ${state.profile.name}` : ''}! I’m your coach. I can see today’s log and your goals ({state.goals?.calories.toLocaleString()} kcal, {state.goals?.protein} g protein). Ask me anything, or send a photo of your meal and I’ll break it down.
+                  Hi{state.profile?.name ? ` ${state.profile.name}` : ''}! I’m Buddy, your coach. I know your goals ({state.goals?.calories.toLocaleString()} kcal, {state.goals?.protein} g protein), today’s log, your workouts and your rank, and I work without internet. Ask me anything.
                 </T>
               </View>
             </View>

@@ -11,6 +11,9 @@ import { formatHeight, formatWeight } from '@/lib/units';
 import { scheduleReminders } from '@/lib/reminders';
 import { getApiKey, maskKey, setApiKey } from '@/lib/secrets';
 import { hasBuiltInAi } from '@/lib/ai';
+import { isPro, PREVIEW } from '@/lib/pro';
+import { Kettle, SKINS } from '@/components/Mascot';
+import { Pressable } from 'react-native';
 import { spacing, useTheme } from '@/theme';
 import type { FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
 
@@ -29,6 +32,9 @@ export default function ProfileScreen() {
   const [keyDraft, setKeyDraft] = useState('');
   const [editingKey, setEditingKey] = useState(false);
   const [confirmErase, setConfirmErase] = useState(false);
+  const pro = isPro(state);
+  const mascotOn = state.settings.mascot !== false;
+  const skin = state.settings.mascotSkin ?? 'classic';
 
   useEffect(() => {
     getApiKey().then(setKey);
@@ -94,9 +100,59 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
+        <ListRow
+          icon={pro ? 'diamond' : 'diamond-outline'}
+          title={pro ? (PREVIEW ? 'Pro · unlocked in preview' : 'Fitness Buddy Pro') : 'Upgrade to Pro'}
+          subtitle={pro ? 'AI coach, snap a meal, unlimited crew, Kettle outfits' : 'AI coach, snap a meal, unlimited crew and outfits'}
+          onPress={() => router.push('/pro')}
+          right={pro ? <Badge label="PRO" color={colors.primary} /> : chevron(colors.textMuted)}
+        />
+      </Card>
+
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <Kettle size={54} mood={mascotOn ? 'happy' : 'sleepy'} skin={skin} animate={mascotOn} />
+          <View style={{ flex: 1 }}>
+            <T weight="800">Kettle, your gym buddy</T>
+            <T size={13} muted>Pops up to cheer workouts, PRs and meals.</T>
+          </View>
+        </View>
+        <Segmented<'on' | 'off'>
+          value={mascotOn ? 'on' : 'off'}
+          onChange={(v) => dispatch({ type: 'updateSettings', settings: { mascot: v === 'on' } })}
+          options={[
+            { key: 'on', label: 'Cheer me on' },
+            { key: 'off', label: 'Quiet' },
+          ]}
+          style={{ marginTop: spacing.md }}
+        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
+          <T weight="700">Outfit</T>
+          {!pro && <Badge label="PRO" color={colors.warning} />}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: spacing.sm }}>
+          {Object.keys(SKINS).map((k) => {
+            const on = skin === k;
+            return (
+              <Pressable
+                key={k}
+                accessibilityLabel={`${k} outfit`}
+                onPress={() => (pro || k === 'classic' ? dispatch({ type: 'updateSettings', settings: { mascotSkin: k } }) : router.push('/pro?feature=skins'))}
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 14, borderWidth: 2, borderColor: on ? colors.primary : 'transparent', backgroundColor: colors.cardAlt, opacity: pro || k === 'classic' ? 1 : 0.55 }}
+              >
+                <Kettle size={38} mood="happy" skin={k} animate={false} />
+                <T size={10} weight="700" muted style={{ textTransform: 'capitalize' }}>{k}</T>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Card>
+
+      {pro && !PREVIEW && (
+      <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <Ionicons name="sparkles" size={18} color={colors.primary} />
-          <T weight="800" style={{ flex: 1 }}>AI Coach & meal photos</T>
+          <T weight="800" style={{ flex: 1 }}>AI server (Pro)</T>
           <Badge label={key ? 'YOUR KEY' : hasBuiltInAi ? 'READY' : 'NOT SET UP'} color={key || hasBuiltInAi ? colors.primary : colors.warning} />
         </View>
         <T size={14} muted style={{ marginBottom: spacing.md }}>
@@ -130,6 +186,7 @@ export default function ProfileScreen() {
           </>
         )}
       </Card>
+      )}
 
       <Card>
         <T weight="700" style={{ marginBottom: spacing.sm }}>Units</T>

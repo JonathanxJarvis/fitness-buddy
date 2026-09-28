@@ -1,5 +1,8 @@
 import { proteinTarget } from '@/lib/nutrition';
 import type {
+  Friend,
+  SocialMessage,
+  SocialState,
   AppState,
   ChatMessage,
   Exercise,
@@ -88,7 +91,15 @@ export type Action =
   | { type: 'deleteRoutine'; id: string }
   | { type: 'saveCustomExercise'; exercise: Exercise }
   | { type: 'setRestSeconds'; seconds: number }
+  | { type: 'setSocialMe'; me: NonNullable<SocialState['me']> }
+  | { type: 'setFriends'; friends: Friend[] }
+  | { type: 'removeFriend'; id: string }
+  | { type: 'addMessages'; friendId: string; messages: SocialMessage[] }
+  | { type: 'markRead'; friendId: string; at: number }
   | { type: 'reset' };
+
+const EMPTY_SOCIAL: SocialState = { friends: [], chats: {}, read: {} };
+const MAX_DM = 200;
 
 const MAX_CHAT = 80;
 
@@ -233,6 +244,33 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, customExercises: [...state.customExercises.filter((e) => e.id !== action.exercise.id), action.exercise] };
     case 'setRestSeconds':
       return { ...state, restSeconds: action.seconds };
+    case 'setSocialMe':
+      return { ...state, social: { ...(state.social ?? EMPTY_SOCIAL), me: action.me } };
+    case 'setFriends':
+      return { ...state, social: { ...(state.social ?? EMPTY_SOCIAL), friends: action.friends } };
+    case 'removeFriend': {
+      const soc = state.social ?? EMPTY_SOCIAL;
+      const { [action.id]: _gone, ...chats } = soc.chats;
+      return { ...state, social: { ...soc, friends: soc.friends.filter((f) => f.id !== action.id), chats } };
+    }
+    case 'addMessages': {
+      const soc = state.social ?? EMPTY_SOCIAL;
+      const had = soc.chats[action.friendId] ?? [];
+      const seen = new Set(had.map((m) => m.id));
+      const fresh = action.messages.filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
+      if (!fresh.length) return state;
+      const list = [...had, ...fresh].sort((a, b) => a.at - b.at).slice(-MAX_DM);
+      return { ...state, social: { ...soc, chats: { ...soc.chats, [action.friendId]: list } } };
+    }
+    case 'markRead': {
+      const soc = state.social ?? EMPTY_SOCIAL;
+      if ((soc.read[action.friendId] ?? 0) >= action.at) return state;
+      return { ...state, social: { ...soc, read: { ...soc.read, [action.friendId]: action.at } } };
+    }
     case 'reset':
       return initialState;
   }

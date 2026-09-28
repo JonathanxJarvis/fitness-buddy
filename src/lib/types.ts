@@ -150,6 +150,14 @@ export interface Settings {
   foodRegion: FoodRegion;
   theme: ThemePref;
   reminders: ReminderSettings;
+  /** Kettle the mascot pops up to cheer you on (default on). */
+  mascot?: boolean;
+  /** Mascot outfit (Pro). */
+  mascotSkin?: string;
+  /** Fitness Buddy Pro unlocked on this device. */
+  pro?: boolean;
+  /** Coach answers with Claude (Pro) instead of the built-in coach. */
+  coachAi?: boolean;
 }
 
 export interface ChatMessage {
@@ -222,4 +230,45 @@ export interface AppState {
   customExercises: Exercise[];
   /** Rest timer length in seconds. */
   restSeconds?: number;
+  social?: SocialState;
+}
+
+/** What friends can see about you: progression only, never food or body data. */
+export interface SocialSnapshot {
+  name: string;
+  score: number;
+  stage: number;
+  level: number;
+  xp: number;
+  /** Strength score at the end of each of the last 8 weeks. */
+  history: number[];
+  /** Level at the end of each of the last 8 weeks. */
+  levels: number[];
+  weekWorkouts: number;
+  totalWorkouts: number;
+  lastWorkout?: { name: string; date: string; sets: number };
+  skin?: string;
+  updatedAt: number;
+}
+
+export interface Friend extends SocialSnapshot {
+  id: string;
+  code: string;
+}
+
+export interface SocialMessage {
+  id: string;
+  from: string;
+  to: string;
+  text: string;
+  at: number;
+}
+
+export interface SocialState {
+  me?: { id: string; code: string; secret: string };
+  friends: Friend[];
+  /** friend id -> messages, oldest first */
+  chats: Record<string, SocialMessage[]>;
+  /** friend id -> timestamp of the last message read */
+  read: Record<string, number>;
 }

@@ -5,10 +5,15 @@ A nutrition and fitness tracker for iOS and Android, in the spirit of Yazio and 
 ## Features
 
 - **Workout tracker (Train tab)**: start an empty workout or a routine (Push, Pull, Legs, Full body templates, or your own), log sets with weight and reps, see last session's numbers beside each set, and a rest timer starts when you check a set off. 60+ exercises by muscle group plus custom exercises. Personal records use an estimated one-rep max (Epley). Finished workouts go into history, add their calories burned to the day's budget, show up as training volume in Progress, and are visible to the Coach.
+- **Ranks and the path**: your strength score (0–100) comes from your best squat, bench, deadlift, overhead press, pull-ups, dips and push-ups compared with standard strength levels for your body weight and sex. It places you on a video-game path of 25 stages, from Rookie III through Iron, Bronze, Silver, Gold, Platinum, Diamond and Champion up to Titan. Workouts also earn XP (sets, volume, PRs, 3-a-week streaks) for levels. Tap the rank card on Train for the path, your lift breakdown and 8 weeks of growth.
+- **Kettle, your gym buddy**: an animated kettlebell mascot pops up in the corner when you start a workout ("Let’s go. Be strong!"), finish sets, hit a PR, rank up, level up, log a meal or hit your protein. Turn it off or change its outfit in Profile.
+- **Your crew**: add friends by a 6-character code, see a leaderboard (strongest, fastest growing, most levels), each friend's rank, growth chart and head-to-head stats, and chat 1:1. Friends see only progression, never food, weight or photos. Runs on the small server in [server/social](server/social/README.md); without it, a demo crew is shown.
+- **Buddy Coach works offline**: the Coach answers from your own data with no AI: what to eat, protein, what to train today, how to rank up, plateaus, recovery, meal plans, in English or German. Pro users can switch on the AI coach.
+- **Fitness Buddy Pro**: the free app is complete; Pro adds Snap a meal, the AI coach, an unlimited crew (free: 3 friends) and Kettle outfits. The web preview (`EXPO_PUBLIC_PREVIEW=1`) unlocks Pro. Setting up real subscriptions: [docs/MONETIZATION.md](docs/MONETIZATION.md).
 - **Premium Today dashboard**: a greeting with your streak, a week strip with a mini calorie ring per day, a deep-green hero card with calories left (goal + exercise − food), and animated bars for protein, carbs, fat and fiber. Everything counts up and fades in.
 - **Protein at 1 g per lb of body weight** by default (editable in Daily goals). There is no water goal; water is still tracked by the glass.
-- **Snap a meal (AI)**: take or pick a photo and Claude identifies each food, estimates portions in grams and returns calories, protein, carbs, fat, fiber, sugar and sodium, with a confidence level and a health score. Adjust the portion, pick the meal and log it with the photo.
-- **Coach (AI chat)**: a chatbot that knows your goals, today's log and the last week. Ask what to eat to hit protein, how your day looks, or attach a meal photo and ask about it. "Ask Coach about this meal" hands a photo estimate straight to the chat.
+- **Snap a meal (AI, Pro)**: take or pick a photo and Claude identifies each food, estimates portions in grams and returns calories, protein, carbs, fat, fiber, sugar and sodium, with a confidence level and a health score. Adjust the portion, pick the meal and log it with the photo.
+- **AI Coach (Pro)**: a chatbot that knows your goals, today's log and the last week. Ask what to eat to hit protein, how your day looks, or attach a meal photo and ask about it. "Ask Coach about this meal" hands a photo estimate straight to the chat.
 - **Huge food database**: ~100 built-in common foods (offline), plus live search across **USDA FoodData Central** (~400,000 generic and branded foods) and **Open Food Facts** (~3 million packaged products), merged into one list.
 - **German supermarket foods**: set Food database to Germany in Profile to search de.openfoodfacts.org first with German product names.
 - **Barcode and QR scanner** backed by Open Food Facts, including GS1 QR/DataMatrix codes on newer packaging. Unknown barcodes can be saved as a custom food.
@@ -73,11 +78,14 @@ src/
     onboarding.tsx  goal setup
     add-food.tsx    search (built-in + USDA + Open Food Facts), recents, favorites, saved meals
     food.tsx        meal/food detail with health score
-    profile.tsx     profile, AI key, units, theme
+    profile.tsx     profile, Pro, Kettle, units, theme
+    rank.tsx        rank, stage path, lifts, growth
+    friends.tsx     friend code, leaderboard; friend/[id], chat/[id]
+    pro.tsx         paywall
     scan.tsx        barcode scanner
     ...
   components/       UI kit, animated rings, sheets, tab bar, charts
-  lib/              nutrition math, food databases (built-in, USDA, Open Food Facts), Claude client, tips, units, dates, reminders
+  lib/              progression (ranks, XP), offline coach, social client, Pro, nutrition math, food databases (built-in, USDA, Open Food Facts), Claude client, tips, units, dates, reminders
   store/            app state (reducer + AsyncStorage persistence)
 ```
 
