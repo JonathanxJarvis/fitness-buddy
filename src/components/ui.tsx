@@ -3,7 +3,10 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  useWindowDimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +18,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { ProMark } from './ProMark';
+import { ProMark, proOutline } from './ProMark';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -202,6 +205,7 @@ export function Button({
           borderColor: variant === 'danger' ? colors.danger : colors.primary + '40',
           overflow: 'hidden',
         },
+        pro && proOutline,
         primary && {
           shadowColor: colors.hero[1],
           shadowOpacity: dark ? 0.5 : 0.35,
@@ -533,6 +537,7 @@ export function Sheet({
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const v = useRef(new Animated.Value(0)).current;
 
@@ -551,7 +556,7 @@ export function Sheet({
   if (!mounted) return null;
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5,15,10,0.45)', opacity: v }]}>
           <Pressable accessibilityLabel="Close" style={{ flex: 1 }} onPress={onClose} />
         </Animated.View>
@@ -575,9 +580,12 @@ export function Sheet({
               {title}
             </T>
           ) : null}
-          {children}
+          {/* Tall sheets scroll instead of pushing their buttons off screen. */}
+          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: height * 0.8 - insets.top }}>
+            {children}
+          </ScrollView>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -619,7 +627,7 @@ export function ActionSheet({
               onClose();
               setTimeout(a.onPress, 180);
             }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11 }}
+            style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11 }, a.pro && { ...proOutline, borderRadius: 16, paddingHorizontal: 8, marginHorizontal: -9, marginVertical: 2 }]}
           >
             <IconTile icon={a.icon} color={color} size={42} />
             <View style={{ flex: 1 }}>

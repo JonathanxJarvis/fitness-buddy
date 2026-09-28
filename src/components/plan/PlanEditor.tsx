@@ -45,7 +45,13 @@ export function PlanEditor({ visible, onClose, initialSplit }: { visible: boolea
 
   const choices = sessionChoices({ plan: { split, week, since: '' }, routines: state.routines });
   const custom = split === 'custom';
-  const build = (params: { id?: string }) => {
+  // The split's own sessions (Push, Pull, Legs…): tap one to set its exercises.
+  const splitSessions = custom ? [] : findSplit(split).sessions.map((id) => findSession(state, id)).filter((x): x is NonNullable<typeof x> => !!x);
+  const editSession = (name: string) => {
+    const mine = state.routines.find((r) => r.name.trim().toLowerCase() === name.toLowerCase());
+    build(mine ? { id: mine.id } : { name });
+  };
+  const build = (params: { id?: string; name?: string }) => {
     parked = { split, week, name };
     onClose();
     router.push({ pathname: '/routine-builder', params });
@@ -82,6 +88,28 @@ export function PlanEditor({ visible, onClose, initialSplit }: { visible: boolea
           );
         })}
       </ScrollView>
+
+      {!custom && splitSessions.length > 0 && (
+        <View style={{ marginTop: spacing.lg }}>
+          <T size={12} weight="800" muted style={{ marginBottom: 6, letterSpacing: 1 }}>WORKOUTS IN THIS SPLIT</T>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.lg, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 6 }}>
+            {splitSessions.map((s) => (
+              <PressScale
+                key={s.id}
+                onPress={() => editSession(s.name)}
+                accessibilityLabel={`Set ${s.name} exercises`}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1.5, borderColor: s.color + '99' }}
+              >
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: s.color }} />
+                <T size={13} weight="800">{s.name}</T>
+                <T size={11} muted>{s.routine.exercises.length} ex</T>
+                <Ionicons name="create-outline" size={13} color={colors.textMuted} />
+              </PressScale>
+            ))}
+          </ScrollView>
+          <T size={12} muted style={{ marginTop: 6 }}>Tap one to choose its exercises, sets and reps.</T>
+        </View>
+      )}
 
       {custom && (
         <View style={{ marginTop: spacing.lg }}>

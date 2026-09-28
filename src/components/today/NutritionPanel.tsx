@@ -323,15 +323,8 @@ export function NutritionPanel({
   // leave the scroll view reset to the first page while the tab still said page 2).
   const pageRef = useRef(0);
   pageRef.current = page;
-  // While a tab tap scrolls the pager, ignore the in-between offsets so the label
-  // doesn't flick back to the old tab halfway through.
-  const target = useRef<number | null>(null);
   const setPageFromOffset = (offset: number) => {
     if (!w) return;
-    if (target.current !== null) {
-      if (Math.abs(offset - target.current * w) > 2) return;
-      target.current = null;
-    }
     const p = Math.max(0, Math.min(TABS.length - 1, Math.round(offset / w)));
     if (p !== pageRef.current) {
       pageRef.current = p;
@@ -351,19 +344,19 @@ export function NutritionPanel({
       return () => clearTimeout(t);
     }, [sync]),
   );
+  // Where the pager starts when it mounts; after that only scrollTo moves it,
+  // so re-renders never snap it mid-swipe.
+  const initialOffset = useRef({ x: 0, y: 0 });
+  if (w && initialOffset.current.x !== pageRef.current * w && !scroller.current) initialOffset.current = { x: pageRef.current * w, y: 0 };
 
-  const onScroll = Animated.event([{ nativeEvent: { contentOffset: { x } } }], {
-    useNativeDriver: false,
-    listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => setPageFromOffset(e.nativeEvent.contentOffset.x),
-  });
+  // The scroll position drives the underline and the tab labels on the native
+  // thread; React state only changes once a swipe or tap has settled.
+  const onScroll = Animated.event([{ nativeEvent: { contentOffset: { x } } }], { useNativeDriver: nativeDriver });
   const go = (p: number) => {
+    if (p === pageRef.current) return;
     Haptics.selectionAsync().catch(() => {});
     pageRef.current = p;
     setPage(p);
-    target.current = p;
-    setTimeout(() => {
-      if (target.current === p) target.current = null;
-    }, 700);
     scroller.current?.scrollTo({ x: p * w, animated: true });
   };
   const known = (k: NutrientKey) => entries.filter((e) => e.food.nutrients[k] !== undefined).length;
@@ -396,7 +389,21 @@ export function NutritionPanel({
         <View style={{ flexDirection: 'row' }}>
           {TABS.map((t, i) => (
             <Pressable key={t} onPress={() => go(i)} style={{ flex: 1, paddingVertical: 6 }} accessibilityRole="tab" accessibilityState={{ selected: page === i }}>
-              <T size={13} weight="800" center color={page === i ? colors.text : colors.textMuted}>{t}</T>
+              <T size={13} weight="800" center color={colors.textMuted}>{t}</T>
+              {w > 0 && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 6,
+                    opacity: x.interpolate({ inputRange: [(i - 1) * w, i * w, (i + 1) * w], outputRange: [0, 1, 0], extrapolate: 'clamp' }),
+                  }}
+                >
+                  <T size={13} weight="800" center color={colors.text}>{t}</T>
+                </Animated.View>
+              )}
             </Pressable>
           ))}
         </View>
@@ -426,8 +433,9 @@ export function NutritionPanel({
           onScroll={onScroll}
           onMomentumScrollEnd={(e) => setPageFromOffset(e.nativeEvent.contentOffset.x)}
           onLayout={sync}
-          contentOffset={{ x: page * w, y: 0 }}
+          contentOffset={initialOffset.current}
           scrollEventThrottle={16}
+          decelerationRate="fast"
           style={{ width: w }}
         >
           {/* Page 1: calories + macros */}

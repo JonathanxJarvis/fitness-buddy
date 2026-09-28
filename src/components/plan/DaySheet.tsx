@@ -1,10 +1,11 @@
 import React from 'react';
 import { View } from 'react-native';
+import { router } from 'expo-router';
 import { Button, Sheet, T } from '../ui';
 import { PressScale } from '../motion';
 import { MiniMoon } from './Glyphs';
 import { useStore } from '@/store/StoreProvider';
-import { DAY_NAMES, plannedId, sessionChoices, weekdayIndex, withDay } from '@/lib/plan';
+import { DAY_NAMES, findSession, plannedId, sessionChoices, weekdayIndex, withDay } from '@/lib/plan';
 import { prettyDate, shortDate } from '@/lib/dates';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -57,11 +58,26 @@ export function DaySheet({ date, onClose, onEditPlan }: { date: string | null; o
           );
         })}
       </View>
+      {current && findSession(state, current) ? (
+        <Button
+          title={`Edit ${findSession(state, current)!.name} exercises`}
+          icon="create-outline"
+          variant="secondary"
+          small
+          style={{ marginTop: spacing.lg }}
+          onPress={() => {
+            const s = findSession(state, current)!;
+            const mine = state.routines.find((r) => r.id === s.routine.id);
+            onClose();
+            setTimeout(() => router.push({ pathname: '/routine-builder', params: mine ? { id: mine.id } : { name: s.name } }), 220);
+          }}
+        />
+      ) : null}
       <Button
         title="Edit weekly plan"
         variant="secondary"
         small
-        style={{ marginTop: spacing.lg }}
+        style={{ marginTop: spacing.sm }}
         onPress={() => {
           onClose();
           setTimeout(onEditPlan, 220);

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ProMark } from '@/components/ProMark';
+import { ProMark, proOutline } from '@/components/ProMark';
 import { Animated, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -281,7 +281,7 @@ export default function Today() {
       <FadeIn delay={next()}>
         <Card style={{ padding: 0, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row' }}>
-            <PressScale scaleTo={0.97} onPress={() => router.push({ pathname: '/snap-meal', params: { date } })} style={{ flex: 1, padding: spacing.md, gap: 8 }}>
+            <PressScale scaleTo={0.97} onPress={() => router.push({ pathname: '/snap-meal', params: { date } })} style={{ flex: 1, padding: spacing.md - 4, gap: 8, margin: 4, borderRadius: 20, ...proOutline }}>
               <IconTile icon="camera" color={colors.primary} size={36} />
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

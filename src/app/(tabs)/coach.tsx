@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ProMark } from '@/components/ProMark';
+import { ProMark, proOutline } from '@/components/ProMark';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -188,7 +188,7 @@ export default function CoachScreen() {
             if (!pro) return router.push('/pro');
             dispatch({ type: 'updateSettings', settings: { coachAi: !state.settings.coachAi } });
           }}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: useAi ? nutrientColors.protein : colors.cardAlt }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: useAi ? nutrientColors.protein : colors.cardAlt, ...proOutline }}
         >
           <Ionicons name="sparkles" size={13} color={useAi ? '#fff' : nutrientColors.protein} />
           <T size={12} weight="800" color={useAi ? '#fff' : colors.text}>{useAi ? 'AI on' : pro ? 'AI off' : 'AI'}</T>

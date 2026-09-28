@@ -154,7 +154,7 @@ describe('daily quests', () => {
 
   it('rotates the weekly challenge between habits', () => {
     const kinds = new Set(Array.from({ length: 6 }, (_, i) => weeklyKind(addDays(today, i * 7))));
-    expect(kinds).toEqual(new Set(['train', 'protein', 'cardio', 'meals']));
+    expect(kinds).toEqual(new Set(['protein', 'cardio', 'meals']));
     const cardio = { ...base, exercises: [{ id: 'c', date: today, name: 'Run', minutes: 65, calories: 500 }] };
     const w = weeklyChallenge(cardio, today, 'cardio');
     expect(w.value).toBe(2);

@@ -2,6 +2,10 @@ import React from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
+/** Soft gold for the thin outline around Pro features. */
+export const PRO_GOLD = '#C9A24A';
+export const proOutline = { borderWidth: 1, borderColor: PRO_GOLD + 'B3' } as const;
+
 /**
  * The small cut-diamond that marks a Pro feature. Deliberately quiet: a
  * faceted gem, no label, so it reads as a hint rather than a paywall.

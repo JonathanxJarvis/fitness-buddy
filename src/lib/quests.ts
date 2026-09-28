@@ -218,9 +218,10 @@ export function questStates(state: AppState, date: string): QuestState[] {
  * train three times (gym, or 20+ min cardio).
  */
 export type WeeklyKind = 'train' | 'protein' | 'cardio' | 'meals';
-const WEEKLY_ROTATION: WeeklyKind[] = ['train', 'protein', 'train', 'cardio', 'train', 'meals'];
+// Training already has daily quests and the plan; Jonathan dropped "train N× this week".
+const WEEKLY_ROTATION: WeeklyKind[] = ['protein', 'cardio', 'meals'];
 
-/** Which challenge a week gets: training every other week, a different habit in between. */
+/** Which challenge a week gets: protein, cardio and meal logging take turns. */
 export function weeklyKind(monday: string): WeeklyKind {
   const week = Math.floor(Date.parse(monday + 'T12:00:00Z') / (7 * 86400000));
   return WEEKLY_ROTATION[((week % WEEKLY_ROTATION.length) + WEEKLY_ROTATION.length) % WEEKLY_ROTATION.length];
