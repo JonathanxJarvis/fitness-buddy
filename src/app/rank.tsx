@@ -9,7 +9,7 @@ import { FadeIn } from '@/components/motion';
 import { RankBadge } from '@/components/RankBadge';
 import { Kettle, type Species } from '@/components/Mascot';
 import { currentOffset, CHEST_XP_PATH, WorldMap } from '@/components/WorldMap';
-import * as Haptics from 'expo-haptics';
+import { useCelebrate } from '@/components/Celebrate';
 import { LineChart } from '@/components/Charts';
 import { useStore } from '@/store/StoreProvider';
 import { mascotSkin } from '@/lib/pro';
@@ -42,8 +42,9 @@ export default function RankScreen() {
   }, [width, pathTop, cur.index]);
 
   const claimed = useMemo(() => new Set((state.questLog ?? []).map((q) => q.id)), [state.questLog]);
+  const celebrate = useCelebrate();
   const openChest = (id: string) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    celebrate({ kind: 'chest', xp: CHEST_XP_PATH, title: 'World chest', color: cur.tier.color });
     dispatch({ type: 'claimReward', entry: { id, date: todayKey(), xp: CHEST_XP_PATH } });
   };
   const parts: { key: keyof typeof p.parts; label: string; icon: string; color: string; tip: string }[] = [

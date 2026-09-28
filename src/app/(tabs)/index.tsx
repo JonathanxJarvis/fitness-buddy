@@ -14,6 +14,8 @@ import { addDays, currentStreak, fromKey, prettyDate, todayKey, WEEKDAY_LETTERS 
 import { activeDays, streakInfo } from '@/lib/quests';
 import { PetCard } from '@/components/PetCard';
 import { DailyQuests } from '@/components/Quests';
+import { CelebrationDemoCard } from '@/components/Celebrate';
+import { PREVIEW } from '@/lib/pro';
 import { daySummary, loggedDays, totalsByDate } from '@/lib/selectors';
 import { itemNutrients, MEAL_SHARES } from '@/lib/nutrition';
 import { buildNudges, tipForDate } from '@/lib/tips';
@@ -302,6 +304,7 @@ export default function Today() {
 
       {isToday && (
         <FadeIn delay={next()}>
+          {PREVIEW && <CelebrationDemoCard />}
           <PetCard date={date} />
           <DailyQuests date={date} />
         </FadeIn>

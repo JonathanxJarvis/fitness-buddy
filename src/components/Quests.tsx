@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Card, T } from './ui';
 import { PressScale } from './motion';
 import { useStore } from '@/store/StoreProvider';
+import { useCelebrate } from './Celebrate';
 import { CHEST_XP, isClaimed, questStates, weeklyChallenge } from '@/lib/quests';
 import { radius, useTheme } from '@/theme';
 
@@ -32,8 +33,11 @@ export function DailyQuests({ date }: { date: string }) {
   const chestOpen = isClaimed(state.questLog, 'chest', date);
   const doneCount = quests.filter((q) => q.claimed).length;
 
+  const celebrate = useCelebrate();
   const claim = (id: string, xp: number, when = date) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (id === 'chest') celebrate({ kind: 'chest', xp, title: 'Daily chest' });
+    else if (id === 'week') celebrate({ kind: 'chest', xp, title: 'Week conquered', color: '#22B573' });
+    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     dispatch({ type: 'claimReward', entry: { id, date: when, xp } });
   };
 

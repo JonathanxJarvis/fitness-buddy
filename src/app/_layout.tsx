@@ -13,6 +13,7 @@ import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sa
 import { StoreProvider, useStore } from '@/store/StoreProvider';
 import { font, useTheme } from '@/theme';
 import { MascotToast } from '@/components/MascotToast';
+import { CelebrationProvider } from '@/components/Celebrate';
 
 function RootNavigator() {
   const { ready } = useStore();
@@ -49,6 +50,7 @@ function RootNavigator() {
   return (
     <ThemeProvider value={navTheme}>
       <StatusBar style={dark ? 'light' : 'dark'} />
+      <CelebrationProvider>
       <Stack
         screenOptions={{
           headerTintColor: colors.text,
@@ -85,6 +87,7 @@ function RootNavigator() {
         <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
       </Stack>
       <MascotToast />
+      </CelebrationProvider>
     </ThemeProvider>
   );
 }
