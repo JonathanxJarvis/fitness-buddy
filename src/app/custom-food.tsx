@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Field, Screen, T } from '@/components/ui';
+import { FoodThumb } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { mealDraft } from '@/store/session';
@@ -108,7 +109,13 @@ export default function CustomFood() {
         <Stack.Screen options={{ title: quick ? 'Quick add' : editing ? 'Edit food' : 'New food' }} />
         {params.barcode ? <T muted size={13} style={{ marginBottom: spacing.md }}>Barcode {params.barcode} will be linked to this food.</T> : null}
         <Card>
-          <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Mom’s lasagna" />
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md }}>
+            <Field style={{ flex: 1 }} label="Name" value={name} onChangeText={setName} placeholder="e.g. Mom’s lasagna" />
+            {/* The picture follows the name as you type, the same one the diary will show. */}
+            <View style={{ marginBottom: spacing.md }}>
+              <FoodThumb food={{ name: name.trim() || 'dish' }} size={48} />
+            </View>
+          </View>
           {!quick && (
             <>
               <Field label="Brand (optional)" value={brand} onChangeText={setBrand} />

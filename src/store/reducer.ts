@@ -1,5 +1,6 @@
 import { proteinTarget } from '@/lib/nutrition';
 import { claimWithLoot } from '@/lib/lootChest';
+import { reachTier } from '@/lib/loot';
 import { isPro } from '@/lib/pro';
 import type {
   QuestLogEntry,
@@ -101,6 +102,8 @@ export type Action =
   | { type: 'addMessages'; friendId: string; messages: SocialMessage[] }
   | { type: 'markRead'; friendId: string; at: number }
   | { type: 'claimReward'; entry: QuestLogEntry }
+  /** Rank tier reached (0 Rookie … 8 Titan): pets that join at that tier are added. */
+  | { type: 'reachTier'; tier: number }
   | { type: 'setPlan'; plan: TrainingPlan | null }
   | { type: 'setCheckin'; date: string; id: string; on: boolean }
   | { type: 'reset' };
@@ -285,6 +288,10 @@ export function reducer(state: AppState, action: Action): AppState {
       // Chests roll for a bonus collectible (duplicates become bonus XP).
       const won = claimWithLoot(state, e, isPro(state));
       return { ...state, questLog: [...log, won.entry], loot: won.loot };
+    }
+    case 'reachTier': {
+      const loot = reachTier(state.loot, action.tier);
+      return loot === state.loot ? state : { ...state, loot };
     }
     case 'setPlan':
       return { ...state, plan: action.plan ?? undefined };

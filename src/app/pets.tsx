@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { Card, Field, Screen, Segmented, T } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
 import { Pet, PETS, SKINS, type Mood, type Species } from '@/components/Mascot';
@@ -10,10 +11,9 @@ import { EVOLUTION } from '@/components/pet/Gear';
 import { usePetLook } from '@/components/pet/usePetLook';
 import { useStore } from '@/store/StoreProvider';
 import { isPro } from '@/lib/pro';
-import { AURAS, CATALOG, chestOdds, CHEST_LABEL, hasItem, itemById, RARITY, RARITIES, type ChestKind, type ItemKind, type LootItem } from '@/lib/loot';
-import { luckFor } from '@/lib/lootChest';
+import { AURAS, CATALOG, hasItem, itemById, RARITY, type ItemKind, type LootItem } from '@/lib/loot';
 import { TIERS } from '@/lib/progression';
-import { shortDate, todayKey } from '@/lib/dates';
+import { shortDate } from '@/lib/dates';
 import { radius, spacing, useTheme } from '@/theme';
 
 const MOODS: Mood[] = ['happy', 'pumped', 'wink', 'proud', 'hungry', 'sleepy'];
@@ -23,7 +23,15 @@ const TABS: { key: ItemKind; label: string }[] = [
   { key: 'aura', label: 'Auras' },
 ];
 
-const pct = (v: number) => (v >= 0.1 ? `${Math.round(v * 100)}%` : v >= 0.01 ? `${(v * 100).toFixed(1)}%` : `${(v * 100).toFixed(2)}%`);
+/** A few things you haven't found yet, for the teaser: chest finds only (never rank pets), pets first, mixed rarities. */
+function teaser(missing: LootItem[], n = 3): LootItem[] {
+  const order: ItemKind[] = ['pet', 'skin', 'aura'];
+  const sorted = [...missing].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+  const pick: LootItem[] = [];
+  for (const i of sorted) if (pick.length < n && !pick.some((p) => p.rarity === i.rarity)) pick.push(i);
+  for (const i of sorted) if (pick.length < n && !pick.includes(i)) pick.push(i);
+  return pick;
+}
 
 export default function PetsScreen() {
   const { state, dispatch } = useStore();
@@ -37,6 +45,7 @@ export default function PetsScreen() {
   const [moodIdx, setMoodIdx] = useState<number | null>(null);
   const [tab, setTab] = useState<ItemKind>('pet');
   const [peek, setPeek] = useState<LootItem | null>(null);
+  const [more, setMore] = useState(false);
   const on = state.settings.mascot !== false;
   const owned = state.loot?.owned ?? [];
   const mood = moodIdx === null ? care.mood : MOODS[moodIdx];
@@ -61,9 +70,9 @@ export default function PetsScreen() {
     else dispatch({ type: 'updateSettings', settings: { petAura: item.key } });
   };
 
-  const items = CATALOG.filter((i) => i.kind === tab);
-  const have = (kind: ItemKind) => CATALOG.filter((i) => i.kind === kind && hasItem(i.id, pro, owned)).length;
-  const totalHave = have('pet') + have('skin') + have('aura');
+  const got = (i: LootItem) => hasItem(i.id, pro, owned);
+  const items = CATALOG.filter((i) => i.kind === tab && got(i));
+  const hidden = teaser(CATALOG.filter((i) => !got(i) && (i.source === 'drop' || i.source === 'pro')));
 
   const careRows = [
     {
@@ -100,9 +109,6 @@ export default function PetsScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14 }}>
             <T size={11} weight="800" color="rgba(255,255,255,0.6)" style={{ letterSpacing: 1.6 }}>
               {tierDef.name.toUpperCase()} FORM
-            </T>
-            <T size={11} weight="800" color="rgba(255,255,255,0.6)" style={{ letterSpacing: 1.6 }}>
-              {totalHave}/{CATALOG.length} COLLECTED
             </T>
           </View>
           <Pressable onPress={() => setMoodIdx((m) => ((m ?? MOODS.indexOf(care.mood)) + 1) % MOODS.length)} accessibilityLabel="Tap to change mood" style={{ alignItems: 'center', paddingTop: 6 }}>
@@ -163,21 +169,57 @@ export default function PetsScreen() {
 
       <FadeIn delay={160}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-          <T size={17} weight="800">Collection</T>
-          <T size={12} muted>{have(tab)}/{items.length} {TABS.find((x) => x.key === tab)!.label.toLowerCase()}</T>
+          <T size={17} weight="800">Wardrobe</T>
+          <T size={12} muted>Tap to switch</T>
         </View>
         <Segmented<ItemKind> value={tab} onChange={(k) => { setTab(k); setPeek(null); }} options={TABS} style={{ marginBottom: 10 }} />
-        {peek && <LockedNote item={peek} onClose={() => setPeek(null)} />}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md }}>
-          {items.map((item, i) => {
-            const got = hasItem(item.id, pro, owned);
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+          {items.map((item) => {
             const equipped = (item.kind === 'pet' && item.key === species) || (item.kind === 'skin' && item.key === skin) || (item.kind === 'aura' && item.key === aura);
-            return <ItemCard key={item.id} item={item} no={i + 1} got={got} equipped={equipped} species={species} skin={skin} onPress={() => equip(item)} />;
+            return <OwnedTile key={item.id} item={item} equipped={equipped} species={species} skin={skin} onPress={() => equip(item)} />;
           })}
         </View>
+        {hidden.length > 0 && (
+          <View style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, overflow: 'hidden' }}>
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setMore((m) => !m);
+                setPeek(null);
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: more }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}
+            >
+              <View style={{ flexDirection: 'row' }}>
+                {hidden.slice(0, 3).map((h, i) => (
+                  <View key={h.id} style={{ width: 30, height: 30, borderRadius: 15, marginLeft: i ? -9 : 0, borderWidth: 2, borderColor: colors.background, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    <Pet species={(h.kind === 'pet' ? h.key : species) as Species} size={30} animate={false} silhouette={dark ? '#3A463F' : '#B9C3BC'} />
+                  </View>
+                ))}
+              </View>
+              <T size={14} weight="700" style={{ flex: 1 }}>More to discover</T>
+              <Svg width={14} height={14} viewBox="0 0 14 14" style={{ transform: [{ rotate: more ? '180deg' : '0deg' }] }}>
+                <Path d="M3 5.2 L7 9 L11 5.2" stroke={colors.textMuted} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </Pressable>
+            {more && (
+              <FadeIn offset={-6} style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+                {peek && <LockedNote item={peek} onClose={() => setPeek(null)} />}
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {hidden.map((item) => (
+                    <ItemCard key={item.id} item={item} got={false} equipped={false} species={species} skin={skin} onPress={() => equip(item)} />
+                  ))}
+                </View>
+                <T size={12} muted style={{ marginTop: 10 }}>
+                  Chests sometimes hold a new friend or look. Tap the eye on any chest to see what’s inside.
+                </T>
+              </FadeIn>
+            )}
+          </View>
+        )}
       </FadeIn>
 
-      <OddsCard />
       <RecentDrops />
 
       <Card>
@@ -206,8 +248,33 @@ function Meter({ v, color, track }: { v: number; color: string; track: string })
   );
 }
 
-/** A collectible card: rarity rail, number, preview and name. Locked items show as silhouettes. */
-function ItemCard({ item, no, got, equipped, species, skin, onPress }: { item: LootItem; no: number; got: boolean; equipped: boolean; species: Species; skin: string; onPress: () => void }) {
+/** An owned item: a small tile with a rarity rail, the preview and its name. */
+function OwnedTile({ item, equipped, species, skin, onPress }: { item: LootItem; equipped: boolean; species: Species; skin: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  const rar = RARITY[item.rarity];
+  const preview =
+    item.kind === 'pet' ? (
+      <Pet species={item.key as Species} size={52} animate={false} mood={equipped ? 'pumped' : 'happy'} />
+    ) : item.kind === 'skin' ? (
+      <Pet species={species} size={52} animate={false} skin={item.key} />
+    ) : (
+      <Pet species={species} size={52} animate={false} skin={skin} aura={item.key} />
+    );
+  return (
+    <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.name}, ${rar.label}${equipped ? ', equipped' : ''}`} style={{ width: '22.8%' }}>
+      <View style={{ borderRadius: 14, backgroundColor: equipped ? rar.color + '1F' : colors.card, borderWidth: equipped ? 1.5 : 1, borderColor: equipped ? rar.color : colors.border, alignItems: 'center', paddingTop: 5, paddingBottom: 6, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', top: 0, left: 10, right: 10, height: 2.5, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, backgroundColor: rar.color, opacity: 0.85 }} />
+        {preview}
+        <T size={11} weight="800" center numberOfLines={1} color={colors.text} style={{ paddingHorizontal: 3 }}>
+          {item.name}
+        </T>
+      </View>
+    </PressScale>
+  );
+}
+
+/** A collectible card: rarity rail, preview and name. Locked items show as silhouettes. */
+function ItemCard({ item, got, equipped, species, skin, onPress }: { item: LootItem; got: boolean; equipped: boolean; species: Species; skin: string; onPress: () => void }) {
   const { colors, dark } = useTheme();
   const rar = RARITY[item.rarity];
   const sil = dark ? '#26302B' : '#D3DAD5';
@@ -226,14 +293,13 @@ function ItemCard({ item, no, got, equipped, species, skin, onPress }: { item: L
         <View style={{ height: 3, backgroundColor: rar.color, opacity: got ? 1 : 0.4 }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, paddingTop: 6 }}>
           <T size={8.5} weight="800" color={rar.color} style={{ letterSpacing: 1 }}>{rar.label.toUpperCase()}</T>
-          <T size={8.5} weight="700" muted>{String(no).padStart(2, '0')}</T>
         </View>
         <View style={{ alignItems: 'center', marginTop: 2 }}>{preview}</View>
         <T size={12} weight="800" center numberOfLines={1} color={got ? colors.text : colors.textMuted} style={{ paddingHorizontal: 4 }}>
           {got ? item.name : '???'}
         </T>
         <T size={9.5} weight="700" center muted numberOfLines={1}>
-          {equipped ? 'EQUIPPED' : got ? (item.source === 'pro' ? 'PRO' : item.source === 'starter' ? 'STARTER' : 'COLLECTED') : item.source === 'pro' ? 'PRO OR CHEST' : 'CHEST DROP'}
+          {equipped ? 'EQUIPPED' : got ? (item.source === 'pro' ? 'PRO' : item.source === 'starter' ? 'STARTER' : 'FOUND') : item.source === 'pro' ? 'PRO OR CHEST' : 'CHEST FIND'}
         </T>
       </View>
     </PressScale>
@@ -249,7 +315,7 @@ function LockedNote({ item, onClose }: { item: LootItem; onClose: () => void }) 
       <View style={{ flex: 1 }}>
         <T size={13} weight="800">A {rar.label.toLowerCase()} {item.kind === 'skin' ? 'outfit' : item.kind} · still hidden</T>
         <T size={12} muted>
-          {blurb} {item.source === 'pro' ? 'Included with Pro, or find it in a chest.' : 'Drops from chests. Keep training and ranking up for better luck.'}
+          {blurb} {item.source === 'pro' ? 'Included with Pro, or find it in a chest.' : 'Turns up in chests now and then.'}
         </T>
       </View>
       {item.source === 'pro' && (
@@ -258,59 +324,6 @@ function LockedNote({ item, onClose }: { item: LootItem; onClose: () => void }) 
         </T>
       )}
     </Pressable>
-  );
-}
-
-/** Published odds for each chest at your current luck. */
-function OddsCard() {
-  const { state } = useStore();
-  const { colors } = useTheme();
-  const pro = isPro(state);
-  const luck = useMemo(() => luckFor(state, todayKey(), pro), [state, pro]);
-  const kinds: ChestKind[] = ['daily', 'weekly', 'world'];
-  return (
-    <Card>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <T weight="800">Chest odds</T>
-        <T size={12} muted>Every chest pays XP</T>
-      </View>
-      <T size={12} muted style={{ marginTop: 2, marginBottom: 10 }}>
-        Sometimes a chest also holds a collectible. Your rank ({TIERS[luck.tier].name}), a {luck.streak}-day streak{pro ? ', Pro' : ''}
-        {luck.dry ? ` and ${luck.dry} empty chest${luck.dry > 1 ? 's' : ''} in a row` : ''} raise the chance.
-      </T>
-      <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderColor: colors.border }}>
-        <T size={11} weight="800" muted style={{ flex: 1.4 }}>CHEST</T>
-        <T size={11} weight="800" muted style={{ flex: 1, textAlign: 'right' }}>ITEM</T>
-        {RARITIES.map((r) => (
-          <View key={r} style={{ flex: 1, alignItems: 'flex-end' }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: RARITY[r].color }} />
-          </View>
-        ))}
-      </View>
-      {kinds.map((k) => {
-        const o = chestOdds(k, luck);
-        return (
-          <View key={k} style={{ flexDirection: 'row', paddingVertical: 7, alignItems: 'center' }}>
-            <T size={12} weight="700" style={{ flex: 1.4 }}>{CHEST_LABEL[k].replace(' chest', '')}</T>
-            <T size={12} weight="800" style={{ flex: 1, textAlign: 'right' }}>{pct(o.drop)}</T>
-            {RARITIES.map((r) => (
-              <T key={r} size={11} muted style={{ flex: 1, textAlign: 'right' }}>{pct(o.rarity[r])}</T>
-            ))}
-          </View>
-        );
-      })}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
-        {RARITIES.map((r) => (
-          <View key={r} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: RARITY[r].color }} />
-            <T size={11} muted>{RARITY[r].label}</T>
-          </View>
-        ))}
-      </View>
-      <T size={11} muted style={{ marginTop: 8 }}>
-        Chests are earned by logging and training, never sold. A repeat drop turns into bonus XP.
-      </T>
-    </Card>
   );
 }
 

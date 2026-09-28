@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Badge, Button, Card, Chip, CountUp, IconButton, IconTile, Stepper, T } from '@/components/ui';
 import { FadeIn, nativeDriver } from '@/components/motion';
 import { HealthScoreCard } from '@/components/HealthScore';
+import { FoodHeroArt, FoodThumb } from '@/components/FoodThumb';
 import { mealForNow } from '@/components/TabBar';
 import { useStore } from '@/store/StoreProvider';
 import { isPro, PREVIEW } from '@/lib/pro';
@@ -296,7 +297,7 @@ export default function SnapMeal() {
             <Image source={{ uri: photo.thumb }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <LinearGradient colors={colors.hero} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="restaurant" size={72} color="rgba(255,255,255,0.85)" />
+              <FoodHeroArt food={{ name: name || e.name }} size={104} />
             </LinearGradient>
           )}
           <LinearGradient colors={['rgba(0,0,0,0.35)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 110 }} />
@@ -345,7 +346,7 @@ export default function SnapMeal() {
             <T weight="800" style={{ marginBottom: spacing.sm }}>What we spotted</T>
             {e.items.map((it, i) => (
               <FadeIn key={it.name + i} delay={300 + i * 60} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: [nutrientColors.calories, nutrientColors.protein, nutrientColors.carbs, nutrientColors.fat][i % 4] }} />
+                <FoodThumb food={{ name: it.name }} size={38} />
                 <View style={{ flex: 1 }}>
                   <T weight="700">{it.name}</T>
                   <T size={12} muted>

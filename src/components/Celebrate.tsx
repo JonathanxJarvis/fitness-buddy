@@ -11,14 +11,15 @@ import { LinearGradient as ExpoGradient } from 'expo-linear-gradient';
 import { Pet, PETS, type Species } from './Mascot';
 import { EVOLUTION } from './pet/Gear';
 import { usePetLook } from './pet/usePetLook';
-import { CATALOG, itemById, RARITY, type LootItem } from '@/lib/loot';
+import { itemById, rankRewards, RARITY, type LootItem } from '@/lib/loot';
 import type { AppState } from '@/lib/types';
 import { todayKey } from '@/lib/dates';
 
 export type Celebration =
   /** `claim` is the reward id (e.g. "path:4") so the opening can show that chest's drop; `drop` forces an item (demo). */
   | { kind: 'chest'; xp: number; title?: string; color?: string; claim?: string; drop?: string }
-  | { kind: 'rankUp'; from: number; to: number };
+  /** `joined`: item ids of pets that joined you at this rank (shown as a quiet note). */
+  | { kind: 'rankUp'; from: number; to: number; joined?: string[] };
 
 const Ctx = createContext<(c: Celebration | Celebration[]) => void>(() => {});
 
@@ -30,7 +31,7 @@ export const useCelebrate = () => useContext(Ctx);
  * queues a rank-up on its own whenever your rank climbs.
  */
 export function CelebrationProvider({ children }: { children: React.ReactNode }) {
-  const { state, ready } = useStore();
+  const { state, ready, dispatch } = useStore();
   const [queue, setQueue] = useState<Celebration[]>([]);
   const celebrate = useCallback((c: Celebration | Celebration[]) => setQueue((q) => [...q, ...(Array.isArray(c) ? c : [c])]), []);
 
@@ -44,7 +45,13 @@ export function CelebrationProvider({ children }: { children: React.ReactNode })
     if (!ready || stage === null) return;
     const p = prevStage.current;
     prevStage.current = stage;
-    if (p !== null && stage > p) celebrate({ kind: 'rankUp', from: p, to: stage });
+    // Pets that join at a rank tier are simply granted (also for tiers reached before this build).
+    const tier = Math.max(0, TIERS.findIndex((t) => t.key === STAGES[stage]?.tier.key));
+    const owned = state.loot?.owned ?? [];
+    const joined = rankRewards(tier).map((i) => i.id).filter((id) => !owned.includes(id));
+    if (joined.length || (state.loot?.peak ?? -1) < tier) dispatch({ type: 'reachTier', tier });
+    if (p !== null && stage > p) celebrate({ kind: 'rankUp', from: p, to: stage, joined: joined.length ? joined : undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, stage, celebrate]);
 
   const current = queue[0];
@@ -55,7 +62,7 @@ export function CelebrationProvider({ children }: { children: React.ReactNode })
       {children}
       <Modal visible={!!current} transparent animationType="fade" onRequestClose={next} statusBarTranslucent>
         {current?.kind === 'chest' && <ChestOpening key={queue.length + 'c'} c={current} onDone={next} />}
-        {current?.kind === 'rankUp' && <RankUp key={queue.length + 'r' + current.to} from={current.from} to={current.to} onDone={next} />}
+        {current?.kind === 'rankUp' && <RankUp key={queue.length + 'r' + current.to} from={current.from} to={current.to} joined={current.joined} onDone={next} />}
       </Modal>
     </Ctx.Provider>
   );
@@ -464,7 +471,6 @@ function DropCard({ drop, v }: { drop: Drop; v: Animated.Value }) {
     a.start();
     return () => a.stop();
   }, [fancy, sheen]);
-  const no = CATALOG.findIndex((i) => i.id === drop.item.id) + 1;
   const petDef = drop.item.kind === 'pet' ? PETS.find((p) => p.key === drop.item.key) : undefined;
   const preview =
     drop.item.kind === 'pet' ? (
@@ -493,7 +499,7 @@ function DropCard({ drop, v }: { drop: Drop; v: Animated.Value }) {
         <View style={{ alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 12 }}>
           <T size={10} weight="800" color="rgba(255,255,255,0.6)" style={{ letterSpacing: 1.6 }}>BONUS FIND</T>
           <T size={10} weight="800" color="rgba(255,255,255,0.45)" style={{ letterSpacing: 1 }}>
-            NO. {String(no).padStart(2, '0')}/{CATALOG.length}
+            {KIND_LABEL[drop.item.kind].replace('New ', '').toUpperCase()}
           </T>
         </View>
         <T size={13} weight="800" color={rar.glow} style={{ letterSpacing: 5, marginTop: 8 }}>{rar.label.toUpperCase()}</T>
@@ -564,7 +570,7 @@ function PetEvolve({ fromTier, toTier }: { fromTier: number; toTier: number }) {
   );
 }
 
-function RankUp({ from, to, onDone }: { from: number; to: number; onDone: () => void }) {
+function RankUp({ from, to, joined, onDone }: { from: number; to: number; joined?: string[]; onDone: () => void }) {
   const a = STAGES[from] ?? STAGES[0];
   const b = STAGES[to] ?? STAGES[0];
   const newTier = a.tier.key !== b.tier.key;
@@ -665,6 +671,7 @@ function RankUp({ from, to, onDone }: { from: number; to: number; onDone: () => 
               <T size={12} weight="700" color="rgba(255,255,255,0.7)" style={{ marginTop: 8 }}>New {b.tier.name} frame unlocked for your avatar</T>
             )}
             <PetEvolve fromTier={TIERS.findIndex((t) => t.key === a.tier.key)} toTier={TIERS.findIndex((t) => t.key === b.tier.key)} />
+            {joined?.length ? <Joined ids={joined} /> : null}
           </>
         ) : (
           <T size={13} color="rgba(255,255,255,0.6)" style={{ marginTop: 2 }}>Charging…</T>
@@ -672,6 +679,21 @@ function RankUp({ from, to, onDone }: { from: number; to: number; onDone: () => 
       </Animated.View>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', opacity: flash }]} />
     </Backdrop>
+  );
+}
+
+/** A quiet line under the rank-up: a pet that tagged along. */
+function Joined({ ids }: { ids: string[] }) {
+  const items = ids.map(itemById).filter((i): i is LootItem => !!i && i.kind === 'pet');
+  if (!items.length) return null;
+  const names = items.map((i) => i.name).join(' and ');
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingLeft: 4, paddingRight: 12, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+      {items.slice(0, 2).map((i) => (
+        <Pet key={i.id} species={i.key as Species} size={30} animate={false} mood="wink" />
+      ))}
+      <T size={12} weight="700" color="rgba(255,255,255,0.75)">{names} joined your pets</T>
+    </View>
   );
 }
 
@@ -684,8 +706,15 @@ export function demoCelebrations(stageIndex: number): Celebration[] {
   return [
     { kind: 'chest', xp: 100, title: 'World chest', drop: 'pet:nova' },
     { kind: 'rankUp', from, to: from + 1 },
-    { kind: 'rankUp', from: from + 1, to: from + 2 },
+    { kind: 'rankUp', from: from + 1, to: from + 2, joined: demoJoined(from + 2) },
   ];
+}
+
+/** For the demo: a rank pet, if one joins at that stage's tier, else a sample one. */
+function demoJoined(stageIndex: number): string[] {
+  const tier = TIERS.findIndex((t) => t.key === STAGES[stageIndex]?.tier.key);
+  const at = rankRewards(tier).filter((i) => i.unlockTier === tier);
+  return (at.length ? at : rankRewards(8).slice(0, 1)).map((i) => i.id);
 }
 
 /** Preview-only card that plays the chest and rank-up animations on demand. */

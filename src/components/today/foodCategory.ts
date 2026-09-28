@@ -17,6 +17,8 @@ export type FoodCategory =
   | 'apple'
   | 'banana'
   | 'berries'
+  | 'blueberry'
+  | 'grapes'
   | 'citrus'
   | 'avocado'
   | 'greens'
@@ -115,7 +117,10 @@ const RULES: Rule[] = [
   ['banana', s('banane|banana|plantain')],
   ['citrus', s('ananas|pineapple')],
   ['apple', s('apfel|äpfel|apple|birne|pear(?!l)|quitte')],
-  ['berries', s('beere|berry|berries|traube|grape(?!fruit)|kirsch|cherr|rosine|raisin')],
+  // Dark, round berries get their own bowl so blueberries don't draw a strawberry.
+  ['blueberry', s('heidelbeer|blaubeer|blueberr|brombeer|blackberr|johannisbeer|currant|cassis|aronia|acai|açaí|holunder|elderberr|cranberr|preiselbeer|lingonberr')],
+  ['grapes', s('traube|grape(?!fruit)|rosine|raisin|sultanin')],
+  ['berries', s('beere|berry|berries|kirsch|cherr')],
   ['avocado', s('avocado')],
   ['citrus', s('orange|mandarine|clementine|zitrone|lemon|limette|grapefruit|kiwi|mango|melone|melon|pfirsich|peach|nektarine|aprikose|apricot|pflaume|plum|papaya|obst|fruit|frucht')],
   ['citrus', w('lime|fig|figs|dattel|dates')],

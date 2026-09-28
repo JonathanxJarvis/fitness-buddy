@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -7,6 +7,7 @@ import { Card, T } from './ui';
 import { PressScale } from './motion';
 import { useStore } from '@/store/StoreProvider';
 import { useCelebrate } from './Celebrate';
+import { ChestEye, ChestInfo } from './pet/ChestInfo';
 import { CHEST_XP, isClaimed, questStates, weeklyChallenge, weeklyPr, type QuestState } from '@/lib/quests';
 import { planDay } from '@/lib/plan';
 import { radius, useTheme } from '@/theme';
@@ -85,6 +86,10 @@ export function DailyQuests({ date }: { date: string }) {
   const allClaimed = quests.every((q) => q.claimed);
   const chestOpen = isClaimed(state.questLog, 'chest', date);
   const doneCount = quests.filter((q) => q.claimed).length;
+  const [peek, setPeek] = useState<'daily' | 'weekly' | null>(null);
+  const toggle = (k: 'daily' | 'weekly') => setPeek((p) => (p === k ? null : k));
+  const dailyHot = allClaimed && !chestOpen;
+  const weekHot = week.done && !week.claimed;
 
   const celebrate = useCelebrate();
   const claim = (id: string, xp: number, when = date) => {
@@ -123,36 +128,52 @@ export function DailyQuests({ date }: { date: string }) {
       ))}
 
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-        <PressScale
-          disabled={!allClaimed || chestOpen}
-          onPress={() => claim('chest', CHEST_XP)}
-          accessibilityLabel="Daily chest"
-          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: radius.md, backgroundColor: allClaimed && !chestOpen ? GOLD : colors.cardAlt }}
-        >
-          <Ionicons name={chestOpen ? 'gift' : 'gift-outline'} size={20} color={allClaimed && !chestOpen ? '#3A2A00' : colors.textMuted} />
-          <View style={{ flex: 1 }}>
-            <T size={12} weight="800" color={allClaimed && !chestOpen ? '#3A2A00' : colors.text}>
-              {chestOpen ? 'Chest opened' : allClaimed ? 'Open chest!' : 'Daily chest'}
+        <View style={{ flex: 1 }}>
+          <PressScale
+            disabled={!dailyHot}
+            onPress={() => claim('chest', CHEST_XP)}
+            accessibilityLabel="Daily chest"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, paddingRight: 34, borderRadius: radius.md, backgroundColor: dailyHot ? GOLD : colors.cardAlt }}
+          >
+            <Ionicons name={chestOpen ? 'gift' : 'gift-outline'} size={20} color={dailyHot ? '#3A2A00' : colors.textMuted} />
+            <View style={{ flex: 1 }}>
+              <T size={12} weight="800" color={dailyHot ? '#3A2A00' : colors.text}>
+                {chestOpen ? 'Chest opened' : allClaimed ? 'Open chest!' : 'Daily chest'}
+              </T>
+              <T size={11} color={dailyHot ? '#3A2A00' : colors.textMuted}>{chestOpen ? `+${CHEST_XP} XP collected` : `Finish 3 · +${CHEST_XP} XP`}</T>
+            </View>
+          </PressScale>
+          {!chestOpen && (
+            <View style={{ position: 'absolute', top: 6, right: 6 }}>
+              <ChestEye open={peek === 'daily'} onPress={() => toggle('daily')} size={24} color={dailyHot ? '#3A2A00' : colors.textMuted} bg={dailyHot ? 'rgba(58,42,0,0.12)' : colors.card} label="What’s in the daily chest" />
+            </View>
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <PressScale
+            disabled={!weekHot}
+            onPress={() => claim('week', week.xp, week.monday)}
+            accessibilityLabel="Weekly challenge"
+            style={{ padding: 10, paddingRight: week.claimed ? 10 : 34, borderRadius: radius.md, backgroundColor: weekHot ? colors.primary : colors.cardAlt, gap: 5 }}
+          >
+            <T size={12} weight="800" numberOfLines={1} color={weekHot ? colors.onPrimary : colors.text}>
+              {week.claimed ? 'Week conquered' : week.done ? `Claim +${week.xp} XP` : week.title}
             </T>
-            <T size={11} color={allClaimed && !chestOpen ? '#3A2A00' : colors.textMuted}>{chestOpen ? `+${CHEST_XP} XP collected` : `Finish all 3 · +${CHEST_XP} XP`}</T>
-          </View>
-        </PressScale>
-        <PressScale
-          disabled={!week.done || week.claimed}
-          onPress={() => claim('week', week.xp, week.monday)}
-          accessibilityLabel="Weekly challenge"
-          style={{ flex: 1, padding: 10, borderRadius: radius.md, backgroundColor: week.done && !week.claimed ? colors.primary : colors.cardAlt, gap: 5 }}
-        >
-          <T size={12} weight="800" numberOfLines={1} color={week.done && !week.claimed ? colors.onPrimary : colors.text}>
-            {week.claimed ? 'Week conquered' : week.done ? `Claim +${week.xp} XP` : week.title}
-          </T>
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            {Array.from({ length: week.target }, (_, i) => (
-              <View key={i} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: i < week.value ? (week.done && !week.claimed ? colors.onPrimary : colors.primary) : colors.track }} />
-            ))}
-          </View>
-        </PressScale>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              {Array.from({ length: week.target }, (_, i) => (
+                <View key={i} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: i < week.value ? (weekHot ? colors.onPrimary : colors.primary) : colors.track }} />
+              ))}
+            </View>
+          </PressScale>
+          {!week.claimed && (
+            <View style={{ position: 'absolute', top: 6, right: 6 }}>
+              <ChestEye open={peek === 'weekly'} onPress={() => toggle('weekly')} size={24} color={weekHot ? colors.onPrimary : colors.textMuted} bg={weekHot ? 'rgba(255,255,255,0.18)' : colors.card} label="What’s in the weekly chest" />
+            </View>
+          )}
+        </View>
       </View>
+      {peek === 'daily' && !chestOpen ? <ChestInfo key="d" kind="daily" xp={CHEST_XP} onClose={() => setPeek(null)} style={{ marginTop: 8 }} /> : null}
+      {peek === 'weekly' && !week.claimed ? <ChestInfo key="w" kind="weekly" xp={week.xp} onClose={() => setPeek(null)} style={{ marginTop: 8 }} /> : null}
       {pr.done && !pr.claimed ? (
         <PressScale
           onPress={() => claim('pr-week', pr.xp, pr.monday)}

@@ -3,20 +3,22 @@ import { activeDays, streakInfo } from './quests';
 import { applyChest, chestKind, EMPTY_LOOT, rollChest, type Luck } from './loot';
 import type { AppState, QuestLogEntry } from './types';
 
-/** Your current luck: rank tier, streak, Pro and pity. */
+/** Your current luck: rank tier, level, streak, Pro and pity. */
 export function luckFor(state: AppState, date: string, pro: boolean): Luck {
   let tier = 0;
   let streak = 0;
+  let level = 1;
   if (state.profile) {
-    const key = stateProgression(state, date).stage.tier.key;
-    tier = Math.max(0, TIERS.findIndex((t) => t.key === key));
+    const p = stateProgression(state, date);
+    tier = Math.max(0, TIERS.findIndex((t) => t.key === p.stage.tier.key));
+    level = p.level;
   }
   try {
     streak = streakInfo(activeDays(state, date), date).streak;
   } catch {
     streak = 0;
   }
-  return { tier, streak, pro, dry: state.loot?.dry ?? 0 };
+  return { tier, streak, pro, dry: state.loot?.dry ?? 0, level };
 }
 
 /**

@@ -263,7 +263,9 @@ export default function FriendsScreen() {
                   <View style={{ width: 22, alignItems: 'center' }}>
                     <T size={15} weight="800" color={i < 3 ? MEDAL[i] : colors.textMuted}>{i + 1}</T>
                   </View>
-                  <Avatar person={r} stage={r.stage} pet={r.pet} skin={r.skin} size={50} />
+                  <View style={{ marginVertical: -8 }}>
+                    <Avatar person={r} stage={r.stage} pet={r.pet} skin={r.skin} size={76} frame="ornate" />
+                  </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <T size={15} weight="800" numberOfLines={1}>{r.you ? `${r.name} (you)` : r.name}</T>
                     <T size={12} muted numberOfLines={1}>{stage.label} · Lv {r.level}</T>
@@ -289,7 +291,9 @@ export default function FriendsScreen() {
           <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md }}>
             {chats.map(({ f, last, unread }, i) => (
               <Pressable key={f.id} onPress={() => router.push(`/chat/${f.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: colors.border }}>
-                <Avatar person={f} stage={f.stage} size={48} petBadge={false} />
+                <View style={{ marginVertical: -6 }}>
+                  <Avatar person={f} stage={f.stage} size={66} frame="ornate" petBadge={false} />
+                </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <T size={15} weight="800" style={{ flex: 1 }} numberOfLines={1}>{f.name}</T>

@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Button, EmptyState, Field, IconButton, ListRow, Segmented, Sheet, T } from '@/components/ui';
+import { Button, EmptyState, Field, IconButton, Segmented, Sheet, T } from '@/components/ui';
 import { PortionPicker } from '@/components/PortionPicker';
 import { gramServingIndex } from '@/lib/portion';
 import { useStore } from '@/store/StoreProvider';
@@ -13,7 +13,7 @@ import { BUILTIN_FOODS, searchLocal } from '@/lib/foodDatabase';
 import { GERMAN_FOODS } from '@/lib/germanFoods';
 import { searchFoods } from '@/lib/openFoodFacts';
 import { searchUsda } from '@/lib/usda';
-import { FoodThumb } from '@/components/FoodThumb';
+import { FoodRow, FoodThumb, MealThumb } from '@/components/FoodThumb';
 import { MEAL_SHARES, mealItemsToLog, sumItems } from '@/lib/nutrition';
 import { mealToFood, searchMeals, suggestMeals } from '@/lib/meals';
 import { daySummary } from '@/lib/selectors';
@@ -196,8 +196,9 @@ export default function AddFood() {
                 <Pressable
                   key={f.id}
                   onPress={() => openFood(f)}
-                  style={({ pressed }) => ({ width: 168, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
+                  style={({ pressed }) => ({ width: 218, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 10, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
                 >
+                  <FoodThumb food={f} size={36} />
                   <View style={{ flex: 1 }}>
                     <T size={13} weight="700" numberOfLines={2}>{f.name}</T>
                     <T size={11} muted numberOfLines={1} style={{ marginTop: 2 }}>{Math.round(f.nutrients.calories)} kcal · {Math.round(f.nutrients.protein)} g protein</T>
@@ -259,8 +260,8 @@ export default function AddFood() {
           renderItem={({ item }) => {
             const n = sumItems(mealItemsToLog(item));
             return (
-              <ListRow
-                icon={item.isRecipe ? 'book-outline' : 'fast-food-outline'}
+              <FoodRow
+                thumb={<MealThumb meal={item} size={42} />}
                 title={item.name}
                 subtitle={`${Math.round(n.calories)} kcal · ${item.isRecipe ? '1 portion' : `${item.items.length} items`}`}
                 onPress={() => logSavedMeal(item)}

@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Svg, { Circle, G, Line, Path } from 'react-native-svg';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CountUp, T } from '@/components/ui';
 import { nativeDriver, PressScale, useTween } from '@/components/motion';
@@ -317,18 +317,54 @@ export function NutritionPanel({
   const eaten = totals.calories;
   const budget = goals.calories + burned;
 
+  // `page` is the one source of truth. The pager and the underline are put back
+  // on it whenever they could have drifted: when the pager (re)mounts or resizes,
+  // and when the screen regains focus (coming back from "Full breakdown" can
+  // leave the scroll view reset to the first page while the tab still said page 2).
+  const pageRef = useRef(0);
+  pageRef.current = page;
+  // While a tab tap scrolls the pager, ignore the in-between offsets so the label
+  // doesn't flick back to the old tab halfway through.
+  const target = useRef<number | null>(null);
+  const setPageFromOffset = (offset: number) => {
+    if (!w) return;
+    if (target.current !== null) {
+      if (Math.abs(offset - target.current * w) > 2) return;
+      target.current = null;
+    }
+    const p = Math.max(0, Math.min(TABS.length - 1, Math.round(offset / w)));
+    if (p !== pageRef.current) {
+      pageRef.current = p;
+      setPage(p);
+    }
+  };
+  const sync = useCallback(() => {
+    if (!w) return;
+    const to = pageRef.current * w;
+    scroller.current?.scrollTo({ x: to, animated: false });
+    x.setValue(to);
+  }, [w, x]);
+  useEffect(sync, [sync]);
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(sync, 0);
+      return () => clearTimeout(t);
+    }, [sync]),
+  );
+
   const onScroll = Animated.event([{ nativeEvent: { contentOffset: { x } } }], {
     useNativeDriver: false,
-    listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!w) return;
-      const p = Math.round(e.nativeEvent.contentOffset.x / w);
-      if (p !== page) setPage(p);
-    },
+    listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => setPageFromOffset(e.nativeEvent.contentOffset.x),
   });
   const go = (p: number) => {
     Haptics.selectionAsync().catch(() => {});
-    scroller.current?.scrollTo({ x: p * w, animated: true });
+    pageRef.current = p;
     setPage(p);
+    target.current = p;
+    setTimeout(() => {
+      if (target.current === p) target.current = null;
+    }, 700);
+    scroller.current?.scrollTo({ x: p * w, animated: true });
   };
   const known = (k: NutrientKey) => entries.filter((e) => e.food.nutrients[k] !== undefined).length;
   const tabW = w ? (w - spacing.lg * 2) / 2 : 0;
@@ -348,7 +384,12 @@ export function NutritionPanel({
         elevation: dark ? 0 : 3,
         overflow: 'hidden',
       }}
-      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+      onLayout={(e) => {
+        // A hidden screen reports width 0; keep the last real width so the pager
+        // isn't unmounted (and reset to page 1) while another screen is on top.
+        const nw = Math.round(e.nativeEvent.layout.width);
+        if (nw > 0 && nw !== w) setW(nw);
+      }}
     >
       {/* Tabs with an indicator that follows the swipe */}
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
@@ -383,6 +424,9 @@ export function NutritionPanel({
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onScroll={onScroll}
+          onMomentumScrollEnd={(e) => setPageFromOffset(e.nativeEvent.contentOffset.x)}
+          onLayout={sync}
+          contentOffset={{ x: page * w, y: 0 }}
           scrollEventThrottle={16}
           style={{ width: w }}
         >

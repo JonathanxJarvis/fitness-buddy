@@ -10,7 +10,7 @@ import { FadeIn, PressScale } from '@/components/motion';
 import { HealthScoreCard } from '@/components/HealthScore';
 import { PortionPicker } from '@/components/PortionPicker';
 import { gramServingIndex } from '@/lib/portion';
-import { clockTime } from '@/components/FoodThumb';
+import { FoodHeroArt, clockTime } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { getCachedFood, mealDraft } from '@/store/session';
@@ -133,13 +133,11 @@ export default function FoodDetail() {
           ) : (
             <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <View style={{ position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(255,255,255,0.05)', top: -100, right: -80 }} />
-              <View style={{ width: 88, height: 88, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', marginTop: insets.top }}>
-                {food.source === 'ai' ? (
-                  <Ionicons name="sparkles" size={40} color="#fff" />
-                ) : (
-                  <T size={40} weight="800" color="#fff">{food.name.trim().charAt(0).toUpperCase()}</T>
-                )}
-              </View>
+              <FadeIn offset={14} style={{ marginTop: insets.top }}>
+                <View style={{ padding: 6, borderRadius: 38, backgroundColor: 'rgba(255,255,255,0.14)', transform: [{ rotate: '-4deg' }] }}>
+                  <FoodHeroArt food={food} size={100} />
+                </View>
+              </FadeIn>
             </LinearGradient>
           )}
           <LinearGradient colors={['rgba(0,0,0,0.3)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 110 }} />

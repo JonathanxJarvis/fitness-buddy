@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Button, Card, EmptyState, Field, IconButton, ListRow, Screen, Segmented, Stepper, T } from '@/components/ui';
+import { Button, Card, EmptyState, Field, IconButton, Screen, Segmented, Stepper, T } from '@/components/ui';
+import { FoodRow } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { mealDraft, useMealDraft } from '@/store/session';
@@ -84,8 +85,9 @@ export default function MealBuilder() {
           </View>
           {items.length === 0 && <EmptyState icon="restaurant-outline" title="No foods yet" body="Tap + to search, scan or pick from your recent foods." />}
           {items.map((it, i) => (
-            <ListRow
+            <FoodRow
               key={`${it.food.id}-${i}`}
+              food={it.food}
               title={it.food.name}
               subtitle={servingText(it)}
               right={

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
@@ -7,6 +7,7 @@ import { usePulse } from './motion';
 import { RankBadge } from './RankBadge';
 import { Pet, type Species } from './Mascot';
 import { MiniChest } from './pet/MiniChest';
+import { ChestEye, ChestInfo } from './pet/ChestInfo';
 import { EVOLUTION } from './pet/Gear';
 import type { PetCareLevels } from './Mascot';
 import { STAGES, TIERS, type Stage, type Tier } from '@/lib/progression';
@@ -322,6 +323,7 @@ export function WorldMap({
   care?: PetCareLevels;
 }) {
   const tiers = [...TIERS].reverse();
+  const [peek, setPeek] = useState<string | null>(null);
   return (
     <View style={{ borderRadius: 24, overflow: 'hidden' }}>
       {tiers.map((tier, ti) => {
@@ -344,7 +346,7 @@ export function WorldMap({
           })
           .join(' ');
         return (
-          <View key={tier.key} style={{ height: h, width }}>
+          <View key={tier.key} style={{ height: h, width, zIndex: nodes.some((n) => n.type === 'chest' && n.id === peek) ? 2 : 0 }}>
             <Svg width={width} height={h} style={{ position: 'absolute' }}>
               <Defs>
                 <SvgGradient id={`sky${tier.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -410,8 +412,8 @@ export function WorldMap({
                 const open = claimed.has(n.id);
                 const ready = current >= n.unlockAt && !open;
                 return (
+                  <React.Fragment key={i}>
                   <Pressable
-                    key={i}
                     disabled={!ready}
                     onPress={() => onChest(n.id)}
                     accessibilityLabel={open ? 'Chest opened' : ready ? `Open chest, ${CHEST_XP_PATH} XP` : 'Locked chest'}
@@ -429,6 +431,12 @@ export function WorldMap({
                       </View>
                     )}
                   </Pressable>
+                  {!open && (
+                    <View style={{ position: 'absolute', left: p.x + 16, top: p.y + 2 }}>
+                      <ChestEye open={peek === n.id} onPress={() => setPeek((c) => (c === n.id ? null : n.id))} size={22} color="#fff" bg="rgba(0,0,0,0.45)" label="What’s in this chest" />
+                    </View>
+                  )}
+                  </React.Fragment>
                 );
               }
               const beaten = current >= n.next.index;
@@ -450,6 +458,14 @@ export function WorldMap({
                 </View>
               );
             })}
+
+            {nodes.map((n, i) =>
+              n.type === 'chest' && peek === n.id && !claimed.has(n.id) ? (
+                <View key={'info' + i} style={{ position: 'absolute', left: Math.max(10, Math.min(width - 262, pts[i].x - 126)), bottom: h - pts[i].y + 30, width: 252 }}>
+                  <ChestInfo kind="world" xp={CHEST_XP_PATH} tone="dark" onClose={() => setPeek(null)} style={{ shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 }} />
+                </View>
+              ) : null,
+            )}
           </View>
         );
       })}

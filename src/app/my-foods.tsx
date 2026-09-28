@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { ActionSheet, Button, Card, EmptyState, IconButton, ListRow, Screen, Segmented, T } from '@/components/ui';
+import { ActionSheet, Button, Card, EmptyState, IconButton, Screen, Segmented, T } from '@/components/ui';
+import { FoodRow, MealThumb } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { cacheFood } from '@/store/session';
@@ -76,9 +77,9 @@ export default function MealsScreen() {
               {state.savedMeals.map((m) => {
                 const n = sumItems(mealItemsToLog(m));
                 return (
-                  <ListRow
+                  <FoodRow
                     key={m.id}
-                    icon={m.isRecipe ? 'book-outline' : 'fast-food-outline'}
+                    thumb={<MealThumb meal={m} />}
                     title={m.name}
                     subtitle={`${Math.round(n.calories)} kcal · ${m.isRecipe ? `recipe, ${m.servings} portions` : `${m.items.length} foods`}`}
                     onPress={() => router.push({ pathname: '/meal-builder', params: { editId: m.id } })}
@@ -88,7 +89,7 @@ export default function MealsScreen() {
               })}
             </Card>
           )}
-          <T muted size={13} center>Tip: on the Today screen, tap any meal’s name and choose “Save as meal”.</T>
+          <T muted size={13} center>Tip: on the Today screen, tap a meal’s + and choose “Save as meal”.</T>
         </>
       )}
 
@@ -98,8 +99,9 @@ export default function MealsScreen() {
             <EmptyState icon="heart-outline" title="No favorites yet" body="Tap the heart on any food’s details to pin it here." />
           ) : (
             state.favorites.map((f) => (
-              <ListRow
+              <FoodRow
                 key={f.id}
+                food={f}
                 title={f.name}
                 subtitle={`${f.brand ? f.brand + ' · ' : ''}${Math.round(f.nutrients.calories)} kcal · ${f.servings[0].label}`}
                 onPress={() => router.push({ pathname: '/food', params: { foodId: cacheFood(f), date: selectedDate } })}
@@ -116,8 +118,9 @@ export default function MealsScreen() {
             <EmptyState icon="create-outline" title="No custom foods" body="Add foods that aren’t in the database, like home cooking or local brands." />
           ) : (
             state.customFoods.map((f) => (
-              <ListRow
+              <FoodRow
                 key={f.id}
+                food={f}
                 title={f.name}
                 subtitle={`${Math.round(f.nutrients.calories)} kcal · ${f.servings[0].label}${f.barcode ? ' · barcode linked' : ''}`}
                 onPress={() => router.push({ pathname: '/custom-food', params: { editId: f.id } })}

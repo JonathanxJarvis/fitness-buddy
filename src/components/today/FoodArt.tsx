@@ -20,6 +20,8 @@ export const CATEGORY_TINT: Record<FoodCategory, string> = {
   apple: '#E5483F',
   banana: '#E8C22A',
   berries: '#E23F4B',
+  blueberry: '#4A5FC1',
+  grapes: '#7E4FA8',
   citrus: '#F28C28',
   avocado: '#6E9A36',
   greens: '#3E9B4F',
@@ -209,6 +211,56 @@ const ART: Record<FoodCategory, Draw> = {
       </G>
       <Path d="M24 19l-6-5.2 4.3.6L24 9l1.7 5.4 4.3-.6z" fill={LEAF} />
       <Path d="M24 18.5l-8.5-1 3.5-2M24 18.5l8.5-1-3.5-2" fill="none" stroke={LEAF} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+    </G>
+  ),
+  blueberry: () => (
+    <G>
+      <Path d="M31 12.5c3-2.8 7.4-2.6 8.6-1-2.2 2.6-5.8 3.2-8.6 1z" fill={LEAF} />
+      <Path d="M30.6 12.8c-1 1.6-1.4 3.4-1.2 5.2" stroke="#3F7F3A" strokeWidth={1.2} strokeLinecap="round" fill="none" />
+      {(
+        [
+          [17, 21, 6.4],
+          [29.5, 22, 6.2],
+          [12.5, 31.5, 6.2],
+          [24, 31, 6.8],
+          [35.5, 32, 5.8],
+          [18.5, 39.5, 5],
+          [30, 39.8, 5],
+        ] as const
+      ).map(([cx, cy, r], i) => (
+        <G key={i}>
+          <Circle cx={cx} cy={cy} r={r} fill={i % 3 === 1 ? '#3B4FA8' : '#4A5FC1'} />
+          <Circle cx={cx} cy={cy} r={r} fill="none" stroke="#2C3A80" strokeOpacity={0.35} strokeWidth={0.8} />
+          <Circle cx={cx - r * 0.38} cy={cy - r * 0.4} r={r * 0.3} fill={WHITE} fillOpacity={0.28} />
+          <Path d={`M${cx - 1.4} ${cy + r * 0.05}l1.4 -1.4 1.4 1.4M${cx} ${cy - 1.3}v2.6`} stroke="#1F2A63" strokeOpacity={0.7} strokeWidth={0.8} strokeLinecap="round" fill="none" />
+        </G>
+      ))}
+    </G>
+  ),
+  grapes: () => (
+    <G>
+      <Path d="M24 13c.3-2.6 1.6-4.6 3.6-5.8" stroke="#6B4226" strokeWidth={1.8} strokeLinecap="round" fill="none" />
+      <Path d="M25 11.5c3-3.6 8.6-3 10-.8-3 2.8-7 3-10 .8z" fill={LEAF} />
+      {(
+        [
+          [16, 17],
+          [24, 16.5],
+          [32, 17],
+          [20, 24],
+          [28, 24],
+          [16, 30.5],
+          [24, 31],
+          [32, 30.5],
+          [20, 37.5],
+          [28, 37.5],
+          [24, 43],
+        ] as const
+      ).map(([cx, cy], i) => (
+        <G key={i}>
+          <Circle cx={cx} cy={cy} r={4.6} fill={i % 2 ? '#8A58B8' : '#7244A0'} />
+          <Circle cx={cx - 1.5} cy={cy - 1.6} r={1.3} fill={WHITE} fillOpacity={0.35} />
+        </G>
+      ))}
     </G>
   ),
   citrus: () => (

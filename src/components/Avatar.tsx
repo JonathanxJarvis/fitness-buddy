@@ -4,6 +4,7 @@ import { Kettle, type Mood, type Species } from './Mascot';
 import { RankFrame } from './RankFrame';
 import { Portrait } from './people/Portrait';
 import { avatarFor } from './people/avatarConfig';
+import { demoPhoto } from './people/demoPhotos';
 import { STAGES, TIERS } from '@/lib/progression';
 import { useTheme } from '@/theme';
 import type { AvatarConfig } from '@/lib/types';
@@ -45,8 +46,9 @@ export function Avatar({
   const showPet = (petBadge ?? size >= 44) && !!pet;
   const slot = kind === 'ornate' ? size * 0.5 : kind === 'compact' ? size * 0.84 : size;
 
-  const picture = person.photo ? (
-    <Image source={{ uri: person.photo }} style={{ width: slot, height: slot }} accessibilityIgnoresInvertColors />
+  const stock = person.photo ? undefined : demoPhoto(person.code);
+  const picture = person.photo || stock ? (
+    <Image source={stock ?? { uri: person.photo }} style={{ width: slot, height: slot }} accessibilityIgnoresInvertColors />
   ) : (
     <Portrait config={avatarFor(person)} size={slot} dark={dark} />
   );

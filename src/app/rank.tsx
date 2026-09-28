@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +10,7 @@ import { RankBadge } from '@/components/RankBadge';
 import { Kettle, type Species } from '@/components/Mascot';
 import { currentOffset, CHEST_XP_PATH, WorldMap } from '@/components/WorldMap';
 import { useCelebrate } from '@/components/Celebrate';
+import { Glass } from '@/components/Glass';
 import { LineChart } from '@/components/Charts';
 import { useStore } from '@/store/StoreProvider';
 import { mascotSkin, petAura, petSpecies } from '@/lib/pro';
@@ -33,11 +34,16 @@ export default function RankScreen() {
   );
   const cur = p.stage;
   const next = STAGES[cur.index + 1];
+  // Where the map shows "You"; the jump pill scrolls here from above or below.
+  const youY = Math.max(0, pathTop + currentOffset(cur.index) - 300);
+  const [y, setY] = useState(0);
+  const far = pathTop > 0 && Math.abs(y - youY) > 350;
+  const jump = far ? { label: 'Jump to you', icon: y < youY ? 'arrow-down' : 'arrow-up', to: youY } : y > 400 ? { label: 'Back to top', icon: 'arrow-up', to: 0 } : null;
 
   // Scroll so the current stage is in view once the map has laid out.
   useEffect(() => {
     if (!width || !pathTop) return;
-    const t = setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, pathTop + currentOffset(cur.index) - 300), animated: true }), 450);
+    const t = setTimeout(() => scroll.current?.scrollTo({ y: youY, animated: true }), 450);
     return () => clearTimeout(t);
   }, [width, pathTop, cur.index]);
 
@@ -57,7 +63,7 @@ export default function RankScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scroll} onScroll={(e) => setY(e.nativeEvent.contentOffset.y)} scrollEventThrottle={64} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <LinearGradient colors={['#0B1A12', cur.tier.color]} start={{ x: 0, y: 0 }} end={{ x: 1.2, y: 1.2 }} style={{ paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -188,6 +194,16 @@ export default function RankScreen() {
           </Card>
         </View>
       </ScrollView>
+      {jump && (
+        <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom + 20, alignItems: 'center' }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={jump.label} onPress={() => scroll.current?.scrollTo({ y: jump.to, animated: true })}>
+            <Glass radius={22} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10 }}>
+              <Ionicons name={jump.icon as 'arrow-up'} size={16} color={colors.text} />
+              <T size={14} weight="800">{jump.label}</T>
+            </Glass>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

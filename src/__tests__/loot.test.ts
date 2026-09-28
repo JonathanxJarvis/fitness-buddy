@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { applyChest, CATALOG, chestKind, chestOdds, dropChance, hasItem, rarityWeights, rollChest, RARITIES, type Luck } from '@/lib/loot';
+import { applyChest, CATALOG, chestKind, chestOdds, chestPool, dropChance, hasItem, rankRewards, rarityWeights, reachTier, rollChest, RARITIES, type Luck } from '@/lib/loot';
 import { initialState, reducer } from '@/store/reducer';
 import { mascotSkin, petSpecies } from '@/lib/pro';
 import type { AppState } from '@/lib/types';
@@ -42,7 +42,7 @@ describe('rolling chests', () => {
       const r = rollChest({ claim: 'chest', date: `d${i}`, kind: 'daily', luck, owned: [] });
       if (r.item) {
         drops++;
-        expect(CATALOG.find((c) => c.id === r.item)?.source).not.toBe('starter');
+        expect(['pro', 'drop']).toContain(CATALOG.find((c) => c.id === r.item)?.source);
       }
     }
     expect(drops / n).toBeGreaterThan(0.04);
@@ -74,6 +74,59 @@ describe('rolling chests', () => {
     expect(chestKind('week')).toBe('weekly');
     expect(chestKind('path:3')).toBe('world');
     expect(chestKind('q:gym')).toBeNull();
+  });
+});
+
+describe('level-gated chest pool', () => {
+  it('holds more (and rarer) things as your level grows', () => {
+    const low = chestPool(1);
+    const high = chestPool(30);
+    expect(low.length).toBeGreaterThan(0);
+    expect(high.length).toBeGreaterThan(low.length);
+    expect(low.some((i) => i.rarity === 'legendary')).toBe(false);
+    expect(high.some((i) => i.id === 'pet:nova')).toBe(true);
+    expect(low.some((i) => i.id === 'pet:nova')).toBe(false);
+  });
+
+  it('never drops an item above your level, and odds leave out empty rarities', () => {
+    const lv: Luck = { ...luck, level: 1, dry: 8 };
+    for (let i = 0; i < 3000; i++) {
+      const r = rollChest({ claim: 'path:2', date: `l${i}`, kind: 'world', luck: lv, owned: [] });
+      if (r.item) expect((CATALOG.find((c) => c.id === r.item)?.minLevel ?? 0) <= 1).toBe(true);
+    }
+    const o = chestOdds('world', lv);
+    expect(o.rarity.legendary).toBe(0);
+    expect(RARITIES.reduce((n, r) => n + o.rarity[r], 0)).toBeCloseTo(o.drop);
+    expect(chestOdds('world', { ...lv, level: 40 }).rarity.legendary).toBeGreaterThan(0);
+  });
+});
+
+describe('rank pets', () => {
+  it('are never in a chest', () => {
+    const rank = CATALOG.filter((i) => i.source === 'rank');
+    expect(rank.length).toBeGreaterThan(0);
+    expect(chestPool(999).some((i) => i.source === 'rank')).toBe(false);
+  });
+
+  it('join you silently when you reach their tier and stay after', () => {
+    expect(rankRewards(0)).toHaveLength(0);
+    const iron = reachTier(undefined, 1)!;
+    expect(iron.owned).toEqual(rankRewards(1).map((i) => i.id));
+    expect(iron.peak).toBe(1);
+    const top = reachTier(iron, 8)!;
+    expect(top.owned).toEqual(expect.arrayContaining(rankRewards(8).map((i) => i.id)));
+    // Nothing new: same object back.
+    expect(reachTier(top, 8)).toBe(top);
+    expect(reachTier(top, 2)).toBe(top);
+    for (const i of rankRewards(8)) expect(hasItem(i.id, false, top.owned)).toBe(true);
+  });
+
+  it('is a reducer action that keeps the rest of the collection', () => {
+    const s0: AppState = { ...initialState, loot: { owned: ['pet:nova'], dry: 2 } };
+    const s1 = reducer(s0, { type: 'reachTier', tier: 3 });
+    expect(s1.loot?.owned).toEqual(expect.arrayContaining(['pet:nova', ...rankRewards(3).map((i) => i.id)]));
+    expect(s1.loot?.dry).toBe(2);
+    expect(reducer(s1, { type: 'reachTier', tier: 3 })).toBe(s1);
   });
 });
 

@@ -10,15 +10,20 @@
  * App Store note (guideline 3.1.1 / loot boxes): chests are only ever earned by
  * logging, training and ranking up. They are never sold, cannot be bought with
  * real money or any purchasable currency, and the odds are shown in the app
- * (Pets > Collection). Pro changes the odds by a small published amount only.
+ * (the eye icon next to every chest). Pro changes the odds by a small
+ * published amount only.
+ *
+ * A few pets aren't in any chest: they simply join you when you reach a rank
+ * tier (`unlockTier`). And the rarer finds only enter the chest pool once your
+ * level is high enough (`minLevel`), so chests get more interesting over time.
  *
  * Everything here is pure and seeded, so a given chest always rolls the same.
  */
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 export type ItemKind = 'pet' | 'skin' | 'aura';
-/** Starter: everyone has it. Pro: included with Pro (and can drop). Drop: chests only. */
-export type ItemSource = 'starter' | 'pro' | 'drop';
+/** Starter: everyone has it. Pro: included with Pro (and can drop). Drop: chests only. Rank: joins you at a rank tier. */
+export type ItemSource = 'starter' | 'pro' | 'drop' | 'rank';
 
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 
@@ -59,6 +64,10 @@ export interface PetDef {
   blurb: string;
   rarity: Rarity;
   source: ItemSource;
+  /** source 'rank': the tier index (1 Iron … 8 Titan) that unlocks it. */
+  unlockTier?: number;
+  /** Chest drops: the player level needed before it can drop. */
+  minLevel?: number;
 }
 
 /** Every pet you can collect, with its default name and personality. */
@@ -71,16 +80,16 @@ export const PETS: PetDef[] = [
   { key: 'dumbbell', name: 'Dumbo', kind: 'dumbbell', pro: true, rarity: 'rare', source: 'pro', blurb: 'A gentle giant who believes in balanced reps on both sides.' },
   { key: 'plate', name: 'Plato', kind: 'weight plate', pro: true, rarity: 'rare', source: 'pro', blurb: 'Deep thinker who knows every plate counts.' },
   { key: 'flame', name: 'Blaze', kind: 'fire spirit', pro: true, rarity: 'epic', source: 'pro', blurb: 'A little fire spirit that burns hot for every streak.' },
-  { key: 'bottle', name: 'Hydro', kind: 'water bottle', pro: false, rarity: 'common', source: 'drop', blurb: 'Cool-headed. Reminds you to sip between sets.' },
+  { key: 'bottle', name: 'Hydro', kind: 'water bottle', pro: false, rarity: 'common', source: 'rank', unlockTier: 1, blurb: 'Cool-headed. Reminds you to sip between sets.' },
   { key: 'berry', name: 'Bleu', kind: 'blueberry', pro: false, rarity: 'common', source: 'drop', blurb: 'Tiny, tart and quietly full of antioxidants.' },
   { key: 'brew', name: 'Brew', kind: 'espresso', pro: false, rarity: 'common', source: 'drop', blurb: 'Two shots in, zero chill. Mornings are its cardio.' },
-  { key: 'medball', name: 'Slam', kind: 'medicine ball', pro: false, rarity: 'rare', source: 'drop', blurb: 'Throws its weight around. In a good way.' },
-  { key: 'tempo', name: 'Tempo', kind: 'stopwatch', pro: false, rarity: 'rare', source: 'drop', blurb: 'Times your rest to the second. Mostly.' },
-  { key: 'kicks', name: 'Kicks', kind: 'running shoe', pro: false, rarity: 'rare', source: 'drop', blurb: 'Laces tight and always one step ahead.' },
-  { key: 'quartz', name: 'Quartz', kind: 'crystal', pro: false, rarity: 'epic', source: 'drop', blurb: 'Formed under pressure. Just like you.' },
-  { key: 'atlas', name: 'Atlas', kind: 'stone guardian', pro: false, rarity: 'epic', source: 'drop', blurb: 'Ancient, patient, carries the world on leg day.' },
-  { key: 'luna', name: 'Luna', kind: 'moon spirit', pro: false, rarity: 'epic', source: 'drop', blurb: 'Keeps watch over rest days and recovery nights.' },
-  { key: 'nova', name: 'Nova', kind: 'comet', pro: false, rarity: 'legendary', source: 'drop', blurb: 'Blazes across the sky once in a very long while.' },
+  { key: 'medball', name: 'Slam', kind: 'medicine ball', pro: false, rarity: 'rare', source: 'drop', minLevel: 5, blurb: 'Throws its weight around. In a good way.' },
+  { key: 'tempo', name: 'Tempo', kind: 'stopwatch', pro: false, rarity: 'rare', source: 'drop', minLevel: 5, blurb: 'Times your rest to the second. Mostly.' },
+  { key: 'kicks', name: 'Kicks', kind: 'running shoe', pro: false, rarity: 'rare', source: 'rank', unlockTier: 3, blurb: 'Laces tight and always one step ahead.' },
+  { key: 'quartz', name: 'Quartz', kind: 'crystal', pro: false, rarity: 'epic', source: 'drop', minLevel: 10, blurb: 'Formed under pressure. Just like you.' },
+  { key: 'atlas', name: 'Atlas', kind: 'stone guardian', pro: false, rarity: 'epic', source: 'rank', unlockTier: 5, blurb: 'Ancient, patient, carries the world on leg day.' },
+  { key: 'luna', name: 'Luna', kind: 'moon spirit', pro: false, rarity: 'epic', source: 'drop', minLevel: 10, blurb: 'Keeps watch over rest days and recovery nights.' },
+  { key: 'nova', name: 'Nova', kind: 'comet', pro: false, rarity: 'legendary', source: 'drop', minLevel: 20, blurb: 'Blazes across the sky once in a very long while.' },
 ];
 
 export interface SkinDef {
@@ -90,6 +99,7 @@ export interface SkinDef {
   dark: string;
   rarity: Rarity;
   source: ItemSource;
+  minLevel?: number;
   /** Metallic sheen over the body. */
   sheen?: boolean;
 }
@@ -106,10 +116,10 @@ export const SKINS: Record<string, SkinDef> = {
   slate: { name: 'Slate', body: '#3E4852', shade: '#76838F', dark: '#2A3138', rarity: 'common', source: 'drop' },
   ember: { name: 'Ember', body: '#7A2412', shade: '#E2622E', dark: '#50170B', rarity: 'rare', source: 'drop' },
   glacier: { name: 'Glacier', body: '#2B5874', shade: '#8CCBE8', dark: '#1B3A4E', rarity: 'rare', source: 'drop' },
-  carbon: { name: 'Carbon', body: '#1B1D21', shade: '#4A5059', dark: '#0E0F12', rarity: 'epic', source: 'drop', sheen: true },
-  aurora: { name: 'Aurora', body: '#23285E', shade: '#3FD9B4', dark: '#151839', rarity: 'epic', source: 'drop' },
-  chrome: { name: 'Chrome', body: '#7F8B97', shade: '#F1F5F9', dark: '#4A535C', rarity: 'legendary', source: 'drop', sheen: true },
-  holo: { name: 'Holo', body: '#4A3F9A', shade: '#FF9BD2', dark: '#2A2360', rarity: 'legendary', source: 'drop', sheen: true },
+  carbon: { name: 'Carbon', body: '#1B1D21', shade: '#4A5059', dark: '#0E0F12', rarity: 'epic', source: 'drop', minLevel: 8, sheen: true },
+  aurora: { name: 'Aurora', body: '#23285E', shade: '#3FD9B4', dark: '#151839', rarity: 'epic', source: 'drop', minLevel: 8 },
+  chrome: { name: 'Chrome', body: '#7F8B97', shade: '#F1F5F9', dark: '#4A535C', rarity: 'legendary', source: 'drop', minLevel: 15, sheen: true },
+  holo: { name: 'Holo', body: '#4A3F9A', shade: '#FF9BD2', dark: '#2A2360', rarity: 'legendary', source: 'drop', minLevel: 15, sheen: true },
 };
 
 export type AuraKey = 'none' | 'chalk' | 'bubbles' | 'pulse' | 'sparks' | 'frost' | 'embers' | 'orbit' | 'halo' | 'nebula';
@@ -120,6 +130,7 @@ export interface AuraDef {
   color: string;
   rarity: Rarity;
   source: ItemSource;
+  minLevel?: number;
 }
 
 /** Effects around your pet. Chest drops only. */
@@ -130,10 +141,10 @@ export const AURAS: Record<AuraKey, AuraDef> = {
   pulse: { name: 'Heartbeat', blurb: 'A calm resting pulse.', color: '#F07A8C', rarity: 'common', source: 'drop' },
   sparks: { name: 'Sparks', blurb: 'Static from a hard set.', color: '#FFD66B', rarity: 'rare', source: 'drop' },
   frost: { name: 'Ice bath', blurb: 'Cold-plunge recovery, on tap.', color: '#A9E4FF', rarity: 'rare', source: 'drop' },
-  embers: { name: 'Embers', blurb: 'Still glowing after the workout.', color: '#FF8A3D', rarity: 'epic', source: 'drop' },
-  orbit: { name: 'Orbit', blurb: 'Gravity bends a little around you.', color: '#9FB6FF', rarity: 'epic', source: 'drop' },
-  halo: { name: 'Halo', blurb: 'For the truly consistent.', color: '#FFE3A1', rarity: 'legendary', source: 'drop' },
-  nebula: { name: 'Nebula', blurb: 'A whole galaxy of gains.', color: '#C58BFF', rarity: 'legendary', source: 'drop' },
+  embers: { name: 'Embers', blurb: 'Still glowing after the workout.', color: '#FF8A3D', rarity: 'epic', source: 'drop', minLevel: 8 },
+  orbit: { name: 'Orbit', blurb: 'Gravity bends a little around you.', color: '#9FB6FF', rarity: 'epic', source: 'drop', minLevel: 8 },
+  halo: { name: 'Halo', blurb: 'For the truly consistent.', color: '#FFE3A1', rarity: 'legendary', source: 'drop', minLevel: 15 },
+  nebula: { name: 'Nebula', blurb: 'A whole galaxy of gains.', color: '#C58BFF', rarity: 'legendary', source: 'drop', minLevel: 15 },
 };
 
 export interface LootItem {
@@ -143,19 +154,36 @@ export interface LootItem {
   name: string;
   rarity: Rarity;
   source: ItemSource;
+  unlockTier?: number;
+  minLevel?: number;
 }
 
 /** Everything collectible, in display order. Item ids look like "pet:nova", "skin:chrome", "aura:halo". */
 export const CATALOG: LootItem[] = [
-  ...PETS.map((p) => ({ id: `pet:${p.key}`, kind: 'pet' as const, key: p.key, name: p.name, rarity: p.rarity, source: p.source })),
-  ...Object.entries(SKINS).map(([key, s]) => ({ id: `skin:${key}`, kind: 'skin' as const, key, name: s.name, rarity: s.rarity, source: s.source })),
-  ...(Object.entries(AURAS) as [AuraKey, AuraDef][]).map(([key, a]) => ({ id: `aura:${key}`, kind: 'aura' as const, key, name: a.name, rarity: a.rarity, source: a.source })),
+  ...PETS.map((p) => ({ id: `pet:${p.key}`, kind: 'pet' as const, key: p.key, name: p.name, rarity: p.rarity, source: p.source, unlockTier: p.unlockTier, minLevel: p.minLevel })),
+  ...Object.entries(SKINS).map(([key, s]) => ({ id: `skin:${key}`, kind: 'skin' as const, key, name: s.name, rarity: s.rarity, source: s.source, minLevel: s.minLevel })),
+  ...(Object.entries(AURAS) as [AuraKey, AuraDef][]).map(([key, a]) => ({ id: `aura:${key}`, kind: 'aura' as const, key, name: a.name, rarity: a.rarity, source: a.source, minLevel: a.minLevel })),
 ];
 
 export const itemById = (id: string): LootItem | undefined => CATALOG.find((i) => i.id === id);
 
-/** Items that can come out of a chest (everything but the starters). */
-export const DROPPABLE = CATALOG.filter((i) => i.source !== 'starter');
+/** Items that can come out of a chest at some level (not starters, not rank rewards). */
+export const DROPPABLE = CATALOG.filter((i) => i.source === 'pro' || i.source === 'drop');
+
+/** What a chest can hold at this player level. */
+export function chestPool(level: number): LootItem[] {
+  return DROPPABLE.filter((i) => (i.minLevel ?? 0) <= level);
+}
+
+/** Items that join you automatically once you reach this rank tier (all tiers up to it). */
+export function rankRewards(tier: number): LootItem[] {
+  return CATALOG.filter((i) => i.source === 'rank' && (i.unlockTier ?? 99) <= tier);
+}
+
+/** Rank rewards that unlock exactly at this tier (for the rank-up celebration). */
+export function rankRewardsAt(tier: number): LootItem[] {
+  return CATALOG.filter((i) => i.source === 'rank' && i.unlockTier === tier);
+}
 
 // ---------- ownership ----------
 
@@ -168,6 +196,8 @@ export interface LootState {
   last?: ChestResult;
   /** Item drops, newest last (capped). */
   history?: { item: string; date: string; claim: string; dup: boolean }[];
+  /** Highest rank tier reached so far (rank rewards stay once earned). */
+  peak?: number;
 }
 
 export const EMPTY_LOOT: LootState = { owned: [], dry: 0 };
@@ -177,6 +207,14 @@ export function hasItem(id: string, pro: boolean, owned: string[] = []): boolean
   const item = itemById(id);
   if (!item) return false;
   return item.source === 'starter' || (pro && item.source === 'pro') || owned.includes(id);
+}
+
+/** Record a rank tier: grants the pets that join at that tier. Returns the same object when nothing changes. */
+export function reachTier(loot: LootState | undefined, tier: number): LootState | undefined {
+  const cur = loot ?? EMPTY_LOOT;
+  const fresh = rankRewards(tier).map((i) => i.id).filter((id) => !cur.owned.includes(id));
+  if (!fresh.length && (cur.peak ?? -1) >= tier) return loot;
+  return { ...cur, owned: [...cur.owned, ...fresh], peak: Math.max(cur.peak ?? -1, tier) };
 }
 
 // ---------- odds ----------
@@ -203,6 +241,8 @@ export interface Luck {
   pro: boolean;
   /** Chests in a row that came up empty. */
   dry: number;
+  /** Player level: decides which items are in the chest pool (defaults to every item). */
+  level?: number;
 }
 
 /** Chance that a chest also drops an item (0–1). */
@@ -220,10 +260,18 @@ export function rarityWeights(tier: number): Record<Rarity, number> {
   return { common: 62 - t * 1.5, rare: 28 + t * 0.8, epic: 9 + t * 0.6, legendary: 1 + t * 0.1 };
 }
 
-/** Overall odds per rarity for one chest (0–1 each), for the odds table. */
+/** Rarity weights with rarities that have nothing to drop at this level zeroed out. */
+function poolWeights(luck: Luck): Record<Rarity, number> {
+  const w = { ...rarityWeights(luck.tier) };
+  const pool = chestPool(luck.level ?? Infinity);
+  for (const r of RARITIES) if (!pool.some((i) => i.rarity === r)) w[r] = 0;
+  return w;
+}
+
+/** Overall odds per rarity for one chest (0–1 each), for the chest info. */
 export function chestOdds(kind: ChestKind, luck: Luck): { drop: number; rarity: Record<Rarity, number> } {
   const drop = dropChance(kind, luck);
-  const w = rarityWeights(luck.tier);
+  const w = poolWeights(luck);
   const total = RARITIES.reduce((n, r) => n + w[r], 0);
   const rarity = Object.fromEntries(RARITIES.map((r) => [r, (drop * w[r]) / total])) as Record<Rarity, number>;
   return { drop, rarity };
@@ -273,7 +321,7 @@ export function rollChest(opts: { claim: string; date: string; kind: ChestKind; 
   const base: ChestResult = { claim, date, kind, bonusXp: 0, chance, at: opts.at ?? 0 };
   if (r() >= chance) return base;
 
-  const w = rarityWeights(luck.tier);
+  const w = poolWeights(luck);
   let pick = r() * RARITIES.reduce((n, k) => n + w[k], 0);
   let rarity: Rarity = 'common';
   for (const k of RARITIES) {
@@ -284,7 +332,7 @@ export function rollChest(opts: { claim: string; date: string; kind: ChestKind; 
     }
   }
   // Within a rarity, things you don't have yet are three times as likely.
-  const pool = DROPPABLE.filter((i) => i.rarity === rarity);
+  const pool = chestPool(luck.level ?? Infinity).filter((i) => i.rarity === rarity);
   const weight = (i: LootItem) => (hasItem(i.id, luck.pro, owned) ? 1 : 3);
   let n = r() * pool.reduce((s, i) => s + weight(i), 0);
   let item = pool[pool.length - 1];
@@ -305,5 +353,5 @@ export function applyChest(loot: LootState | undefined, res: ChestResult): LootS
   if (!res.item) return { ...cur, dry: cur.dry + 1, last: res };
   const owned = res.dup || cur.owned.includes(res.item) ? cur.owned : [...cur.owned, res.item];
   const history = [...(cur.history ?? []), { item: res.item, date: res.date, claim: res.claim, dup: !!res.dup }].slice(-50);
-  return { owned, dry: 0, last: res, history };
+  return { ...cur, owned, dry: 0, last: res, history };
 }
