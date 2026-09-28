@@ -1,0 +1,175 @@
+import type {
+  AppState,
+  DiaryEntry,
+  ExerciseEntry,
+  Food,
+  Goals,
+  Profile,
+  SavedMeal,
+  Settings,
+} from '@/lib/types';
+
+export const DEFAULT_SETTINGS: Settings = {
+  units: 'us',
+  theme: 'system',
+  reminders: {
+    meals: false,
+    mealTimes: { breakfast: '08:00', lunch: '12:30', dinner: '18:30' },
+    water: false,
+    waterStartHour: 9,
+    waterEndHour: 20,
+    waterEveryHours: 2,
+  },
+};
+
+export const initialState: AppState = {
+  version: 1,
+  profile: null,
+  goals: null,
+  settings: DEFAULT_SETTINGS,
+  entries: [],
+  water: {},
+  steps: {},
+  weights: {},
+  exercises: [],
+  customFoods: [],
+  favorites: [],
+  savedMeals: [],
+};
+
+export type Action =
+  | { type: 'hydrate'; state: AppState }
+  | { type: 'setProfile'; profile: Profile; goals: Goals; date: string }
+  | { type: 'updateGoals'; goals: Goals }
+  | { type: 'updateSettings'; settings: Partial<Settings> }
+  | { type: 'addEntries'; entries: DiaryEntry[] }
+  | { type: 'updateEntry'; entry: DiaryEntry }
+  | { type: 'deleteEntry'; id: string }
+  | { type: 'setWater'; date: string; ml: number }
+  | { type: 'setSteps'; date: string; steps: number }
+  | { type: 'setWeight'; date: string; kg: number }
+  | { type: 'deleteWeight'; date: string }
+  | { type: 'addExercise'; exercise: ExerciseEntry }
+  | { type: 'deleteExercise'; id: string }
+  | { type: 'saveCustomFood'; food: Food }
+  | { type: 'deleteCustomFood'; id: string }
+  | { type: 'toggleFavorite'; food: Food }
+  | { type: 'saveMeal'; meal: SavedMeal }
+  | { type: 'deleteMeal'; id: string }
+  | { type: 'reset' };
+
+function latestWeightDate(weights: Record<string, number>): string | undefined {
+  return Object.keys(weights).sort().pop();
+}
+
+export function reducer(state: AppState, action: Action): AppState {
+  switch (action.type) {
+    case 'hydrate':
+      return {
+        ...initialState,
+        ...action.state,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          ...action.state.settings,
+          reminders: { ...DEFAULT_SETTINGS.reminders, ...action.state.settings?.reminders },
+        },
+      };
+    case 'setProfile':
+      return {
+        ...state,
+        profile: action.profile,
+        goals: action.goals,
+        weights: { ...state.weights, [action.date]: action.profile.weightKg },
+      };
+    case 'updateGoals':
+      return { ...state, goals: action.goals };
+    case 'updateSettings':
+      return { ...state, settings: { ...state.settings, ...action.settings } };
+    case 'addEntries':
+      return { ...state, entries: [...state.entries, ...action.entries] };
+    case 'updateEntry':
+      return { ...state, entries: state.entries.map((e) => (e.id === action.entry.id ? action.entry : e)) };
+    case 'deleteEntry':
+      return { ...state, entries: state.entries.filter((e) => e.id !== action.id) };
+    case 'setWater':
+      return { ...state, water: { ...state.water, [action.date]: Math.max(0, Math.round(action.ml)) } };
+    case 'setSteps':
+      return { ...state, steps: { ...state.steps, [action.date]: Math.max(0, Math.round(action.steps)) } };
+    case 'setWeight': {
+      const weights = { ...state.weights, [action.date]: action.kg };
+      // Keep the profile's weight in sync with the most recent weigh-in.
+      const isLatest = latestWeightDate(weights) === action.date;
+      return {
+        ...state,
+        weights,
+        profile: state.profile && isLatest ? { ...state.profile, weightKg: action.kg } : state.profile,
+      };
+    }
+    case 'deleteWeight': {
+      const weights = { ...state.weights };
+      delete weights[action.date];
+      const latest = latestWeightDate(weights);
+      return {
+        ...state,
+        weights,
+        profile: state.profile && latest ? { ...state.profile, weightKg: weights[latest] } : state.profile,
+      };
+    }
+    case 'addExercise':
+      return { ...state, exercises: [...state.exercises, action.exercise] };
+    case 'deleteExercise':
+      return { ...state, exercises: state.exercises.filter((e) => e.id !== action.id) };
+    case 'saveCustomFood': {
+      const exists = state.customFoods.some((f) => f.id === action.food.id);
+      return {
+        ...state,
+        customFoods: exists
+          ? state.customFoods.map((f) => (f.id === action.food.id ? action.food : f))
+          : [action.food, ...state.customFoods],
+      };
+    }
+    case 'deleteCustomFood':
+      return {
+        ...state,
+        customFoods: state.customFoods.filter((f) => f.id !== action.id),
+        favorites: state.favorites.filter((f) => f.id !== action.id),
+      };
+    case 'toggleFavorite': {
+      const isFav = state.favorites.some((f) => f.id === action.food.id);
+      return {
+        ...state,
+        favorites: isFav ? state.favorites.filter((f) => f.id !== action.food.id) : [action.food, ...state.favorites],
+      };
+    }
+    case 'saveMeal': {
+      const exists = state.savedMeals.some((m) => m.id === action.meal.id);
+      return {
+        ...state,
+        savedMeals: exists
+          ? state.savedMeals.map((m) => (m.id === action.meal.id ? action.meal : m))
+          : [action.meal, ...state.savedMeals],
+      };
+    }
+    case 'deleteMeal':
+      return { ...state, savedMeals: state.savedMeals.filter((m) => m.id !== action.id) };
+    case 'reset':
+      return initialState;
+  }
+}
+
+/** Most recently logged distinct foods, newest first. */
+export function recentFoods(entries: DiaryEntry[], limit = 30): Food[] {
+  const seen = new Set<string>();
+  const out: Food[] = [];
+  for (const e of [...entries].sort((a, b) => b.createdAt - a.createdAt)) {
+    if (seen.has(e.food.id)) continue;
+    seen.add(e.food.id);
+    out.push(e.food);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export function uid(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
