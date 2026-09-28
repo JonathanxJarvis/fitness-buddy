@@ -68,6 +68,16 @@ export const DAYS_REPLY: Record<number, string> = {
   6: 'Six days. Push, pull, legs, twice. Bold.',
 };
 
+/**
+ * Short edit flow when a profile exists, the full new-user flow otherwise,
+ * or when the route asks for it with `?fresh=1` ("Redo onboarding").
+ */
+export function onboardingMode(hasProfile: boolean, fresh?: string | string[]): 'new' | 'edit' {
+  const f = Array.isArray(fresh) ? fresh[0] : fresh;
+  const forced = f === '1' || f === 'true';
+  return hasProfile && !forced ? 'edit' : 'new';
+}
+
 /** Which preset split fits how many days you can train. */
 export function splitForDays(days: number): string {
   if (days <= 3) return 'full3';

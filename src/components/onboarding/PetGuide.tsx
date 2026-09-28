@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Pet, type Mood, type Species } from '@/components/Mascot';
 import { nativeDriver } from '@/components/motion';
@@ -7,28 +7,66 @@ import { T } from '@/components/ui';
 import { font, useTheme } from '@/theme';
 import type { Pep } from './script';
 
-/** Reveals `text` a few characters at a time. Returns how many are showing and a way to skip ahead. */
-export function useTypewriter(text: string, cps = 48) {
-  const [n, setN] = useState(0);
+/** True while the OS asks for reduced motion. */
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
   useEffect(() => {
-    setN(0);
-    const step = Math.max(1, Math.round(cps / 30));
-    const id = setInterval(() => {
-      setN((c) => {
-        if (c >= text.length) {
-          clearInterval(id);
-          return c;
-        }
-        return Math.min(text.length, c + step);
-      });
-    }, 1000 / 30);
-    return () => clearInterval(id);
-  }, [text, cps]);
-  return { shown: n, done: n >= text.length, skip: () => setN(text.length) };
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((r) => alive && setReduced(r))
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
+    return () => {
+      alive = false;
+      sub?.remove();
+    };
+  }, []);
+  return reduced;
 }
 
 /**
- * The pet with a speech bubble. The line types itself out; the pet hops
+ * Drives the speech bubble. Returns the line to render (it lags `line` by one
+ * short dip so the text swaps while the bubble is ducked) and a 0..1 value:
+ * 0 = tucked toward the pet, 1 = settled. Springs slightly past 1.
+ */
+export function useBubblePop(line: string, reduced: boolean) {
+  const v = useRef(new Animated.Value(0)).current;
+  const [shown, setShown] = useState(line);
+  const first = useRef(true);
+
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      setShown(line);
+      v.setValue(0);
+      const a = reduced
+        ? Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: nativeDriver })
+        : Animated.sequence([
+            Animated.delay(140),
+            Animated.spring(v, { toValue: 1, useNativeDriver: nativeDriver, stiffness: 260, damping: 17, mass: 0.9 }),
+          ]);
+      a.start();
+      return () => a.stop();
+    }
+    if (reduced) {
+      setShown(line);
+      return;
+    }
+    // New line: duck a little toward the pet, swap the words, spring back out.
+    const a = Animated.timing(v, { toValue: 0.55, duration: 95, easing: Easing.in(Easing.quad), useNativeDriver: nativeDriver });
+    a.start(({ finished }) => {
+      setShown(line);
+      if (!finished) return;
+      Animated.spring(v, { toValue: 1, useNativeDriver: nativeDriver, stiffness: 320, damping: 16, mass: 0.8 }).start();
+    });
+    return () => a.stop();
+  }, [line, reduced, v]);
+
+  return { shown, pop: v };
+}
+
+/**
+ * The pet with a speech bubble. The bubble pops out of the pet's side; the pet hops
  * whenever `beat` changes (a new question, or a reaction to your answer).
  */
 export function PetGuide({
@@ -47,7 +85,8 @@ export function PetGuide({
   size?: number;
 }) {
   const { colors, dark } = useTheme();
-  const { shown, done, skip } = useTypewriter(line);
+  const reduced = useReducedMotion();
+  const { shown, pop } = useBubblePop(line, reduced);
 
   const hop = useRef(new Animated.Value(0)).current;
   const first = useRef(true);
@@ -94,12 +133,24 @@ export function PetGuide({
           />
           <Pet species={species} mood={mood} size={size} />
         </Animated.View>
-        <Pressable
-          onPress={skip}
+        <Animated.View
           accessibilityRole="text"
           accessibilityLabel={line}
           accessibilityLiveRegion="polite"
-          style={{ flex: 1, marginBottom: size * 0.34 }}
+          style={{
+            flex: 1,
+            marginBottom: size * 0.34,
+            // Grow out of the tail, which points at the pet.
+            transformOrigin: 'left bottom',
+            opacity: pop.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0.82, 1], extrapolate: 'clamp' }),
+            transform: reduced
+              ? []
+              : [
+                  { translateX: pop.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) },
+                  { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) },
+                  { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) },
+                ],
+          }}
         >
           <View
             style={{
@@ -117,13 +168,8 @@ export function PetGuide({
               elevation: 2,
             }}
           >
-            {/* The full line holds the bubble's size so it doesn't grow while typing. */}
-            <T size={16.5} weight="600" style={{ lineHeight: 23, color: 'transparent' }}>
-              {line}
-            </T>
-            <T size={16.5} weight="600" style={{ lineHeight: 23, position: 'absolute', left: 15, right: 15, top: 12 }}>
-              {line.slice(0, shown)}
-              {!done ? <T size={16.5} weight="600" color={colors.primary}>▍</T> : null}
+            <T size={16.5} weight="600" style={{ lineHeight: 23 }}>
+              {shown}
             </T>
           </View>
           {/* tail pointing at the pet */}
@@ -131,7 +177,7 @@ export function PetGuide({
             <Path d="M14 0 L14 12 Q6 14 0 13 Q8 8 10 0 Z" fill={bubbleBg} />
             <Path d="M10 0 Q8 8 0 13 Q6 14 14 12" stroke={bubbleEdge} strokeWidth={1} fill="none" />
           </Svg>
-        </Pressable>
+        </Animated.View>
       </View>
       {pep && pep.length ? <PepLine lines={pep} /> : null}
     </View>

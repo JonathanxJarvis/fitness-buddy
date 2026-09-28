@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { PEP, SLEEP, planForDays, splitForDays } from '@/components/onboarding/script';
+import { PEP, SLEEP, onboardingMode, planForDays, splitForDays } from '@/components/onboarding/script';
 
 describe('onboarding starter plan', () => {
   it('maps days a week to a split', () => {
@@ -24,5 +24,13 @@ describe('onboarding starter plan', () => {
       expect(PEP[k]?.length).toBeGreaterThan(0);
     }
     expect(SLEEP.map((s) => s.key)).toEqual([5, 6, 7, 8, 9]);
+  });
+
+  it('picks the full flow for new users and for ?fresh=1', () => {
+    expect(onboardingMode(false)).toBe('new');
+    expect(onboardingMode(true)).toBe('edit');
+    expect(onboardingMode(true, '1')).toBe('new');
+    expect(onboardingMode(true, ['1'])).toBe('new');
+    expect(onboardingMode(true, '0')).toBe('edit');
   });
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Field, Screen, Segmented, T } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
 import { PETS, type Mood, type Species } from '@/components/Mascot';
@@ -15,6 +15,7 @@ import {
   OBSTACLES,
   PEP,
   SLEEP,
+  onboardingMode,
   planForDays,
   splitForDays,
   type Pick,
@@ -43,8 +44,12 @@ const EDIT_STEPS: StepKey[] = ['hello', 'body', 'activity', 'goal', 'plan'];
 export default function Onboarding() {
   const { state, dispatch } = useStore();
   const { colors } = useTheme();
+  // `?fresh=1` runs the full new-user flow even with a profile ("Redo onboarding" in Profile).
+  const { fresh } = useLocalSearchParams<{ fresh?: string }>();
   // Fixed at mount: finishing sets a profile, which must not swap the step list mid-render.
-  const [editing] = useState(() => !!state.profile);
+  const [editing] = useState(() => onboardingMode(!!state.profile, fresh) === 'edit');
+  const [redo] = useState(() => !!state.profile && !editing);
+  const prev = state.settings.onboarding;
   const p = state.profile;
   const species = (state.settings.pet ?? 'kettle') as Species;
   const defPetName = PETS.find((x) => x.key === species)?.name ?? 'Kettle';
@@ -66,11 +71,11 @@ export default function Onboarding() {
 
   // New-user extras
   const [petName, setPetName] = useState(state.settings.petName ?? defPetName);
-  const [motivation, setMotivation] = useState<string>();
-  const [experience, setExperience] = useState<string>();
-  const [days, setDays] = useState<number>();
-  const [obstacle, setObstacle] = useState<string>();
-  const [sleep, setSleep] = useState<number>();
+  const [motivation, setMotivation] = useState<string | undefined>(prev?.motivation);
+  const [experience, setExperience] = useState<string | undefined>(prev?.experience);
+  const [days, setDays] = useState<number | undefined>(prev?.daysPerWeek);
+  const [obstacle, setObstacle] = useState<string | undefined>(prev?.obstacle);
+  const [sleep, setSleep] = useState<number | undefined>(prev?.sleepHours);
 
   // What the pet says after you answer (cleared on each new step).
   const [reaction, setReaction] = useState<{ line: string; mood: Mood } | null>(null);
@@ -146,7 +151,9 @@ export default function Onboarding() {
   const script: Record<StepKey, { line: string; mood: Mood }> = {
     hello: editing
       ? { line: `Back to fine-tune your goals${first ? `, ${first}` : ''}? Let’s keep it quick.`, mood: 'wink' }
-      : { line: `Hi, I’m ${defPetName}. I’ll be in your corner from today on. First things first: what’s your name?`, mood: 'happy' },
+      : redo
+        ? { line: `Starting over${first ? `, ${first}` : ''}? Good. Your logs stay safe, we’re just catching up from the top.`, mood: 'happy' }
+        : { line: `Hi, I’m ${defPetName}. I’ll be in your corner from today on. First things first: what’s your name?`, mood: 'happy' },
     petName: { line: `Nice to meet you${first ? `, ${first}` : ''}. Most people call me ${defPetName}, but you can pick something else.`, mood: 'wink' },
     body: { line: editing ? 'Anything changed? Update what you need.' : 'Now a little about you. This stays on your phone, just between us.', mood: 'happy' },
     activity: { line: 'How much do you move in a normal week, outside of workouts too?', mood: 'happy' },
@@ -452,8 +459,13 @@ export default function Onboarding() {
         <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
           {step > 0 ? (
             <Button title="Back" variant="secondary" onPress={() => setStep(step - 1)} style={{ flex: 1 }} />
-          ) : editing ? (
-            <Button title="Cancel" variant="secondary" onPress={() => router.back()} style={{ flex: 1 }} />
+          ) : editing || redo ? (
+            <Button
+              title="Cancel"
+              variant="secondary"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+              style={{ flex: 1 }}
+            />
           ) : null}
           <Button
             title={last ? (editing ? 'Save goals' : 'Start tracking') : optional && !answered ? 'Skip' : 'Continue'}

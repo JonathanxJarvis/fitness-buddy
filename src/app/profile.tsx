@@ -117,6 +117,13 @@ export default function ProfileScreen() {
         />
         <ListRow icon="refresh" title="Recalculate my plan" subtitle="Update age, height, activity or goal" onPress={() => router.push('/onboarding')} right={chevron(colors.textMuted)} />
         <ListRow
+          icon="play-skip-back-outline"
+          title="Redo onboarding"
+          subtitle="All the questions again, logs kept"
+          onPress={() => router.push({ pathname: '/onboarding', params: { fresh: '1' } })}
+          right={chevron(colors.textMuted)}
+        />
+        <ListRow
           icon="flag-outline"
           title="Daily goals"
           subtitle={`${g.calories} kcal · protein ${g.protein} g · carbs ${g.carbs} g · fat ${g.fat} g`}
