@@ -11,6 +11,7 @@ import { EVOLUTION } from '@/components/pet/Gear';
 import { usePetLook } from '@/components/pet/usePetLook';
 import { useStore } from '@/store/StoreProvider';
 import { isPro } from '@/lib/pro';
+import { ProMark } from '@/components/ProMark';
 import { AURAS, CATALOG, hasItem, itemById, RARITY, type ItemKind, type LootItem } from '@/lib/loot';
 import { TIERS } from '@/lib/progression';
 import { shortDate } from '@/lib/dates';
@@ -291,8 +292,9 @@ function ItemCard({ item, got, equipped, species, skin, onPress }: { item: LootI
       <View style={{ borderRadius: 16, backgroundColor: colors.card, borderWidth: equipped ? 2 : 1, borderColor: equipped ? rar.color : colors.border, overflow: 'hidden', paddingBottom: 8 }}>
         <LinearGradient colors={[rar.color + (got ? '38' : '14'), 'transparent']} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 80 }} />
         <View style={{ height: 3, backgroundColor: rar.color, opacity: got ? 1 : 0.4 }} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, paddingTop: 6 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingTop: 6 }}>
           <T size={8.5} weight="800" color={rar.color} style={{ letterSpacing: 1 }}>{rar.label.toUpperCase()}</T>
+          {item.source === 'pro' && <ProMark size={10} />}
         </View>
         <View style={{ alignItems: 'center', marginTop: 2 }}>{preview}</View>
         <T size={12} weight="800" center numberOfLines={1} color={got ? colors.text : colors.textMuted} style={{ paddingHorizontal: 4 }}>
@@ -319,9 +321,10 @@ function LockedNote({ item, onClose }: { item: LootItem; onClose: () => void }) 
         </T>
       </View>
       {item.source === 'pro' && (
-        <T size={12} weight="800" color={colors.primary} onPress={() => router.push('/pro?feature=pets')}>
-          Pro
-        </T>
+        <Pressable onPress={() => router.push('/pro?feature=pets')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <ProMark />
+          <T size={12} weight="800" color={colors.primary}>Pro</T>
+        </Pressable>
       )}
     </Pressable>
   );

@@ -13,8 +13,9 @@ import { CodeInput } from '@/components/people/CodeInput';
 import { EVENT_STYLE, EventGlyph, Flame } from '@/components/people/Glyphs';
 import { useStore } from '@/store/StoreProvider';
 import { useSocial } from '@/lib/useSocial';
-import { addFriend, DEMO, formatCode, levelsGained, makeSnapshot, scoreGained, sendMessage } from '@/lib/social';
+import { addFriend, DEMO, OFFLINE, OFFLINE_MESSAGE, formatCode, levelsGained, makeSnapshot, scoreGained, sendMessage } from '@/lib/social';
 import { FREE_FRIEND_LIMIT, isPro } from '@/lib/pro';
+import { ProMark } from '@/components/ProMark';
 import { STAGES } from '@/lib/progression';
 import { radius, spacing, useTheme } from '@/theme';
 import type { SocialEvent, SocialSnapshot } from '@/lib/types';
@@ -376,14 +377,23 @@ export default function FriendsScreen() {
       )}
 
       <Sheet visible={addOpen} onClose={() => setAddOpen(false)} title="Add a friend">
-        <T muted style={{ marginBottom: spacing.lg }}>
-          Ask your friend for their code. They’ll find it under Friends → Invite. {pro ? '' : `Free accounts can add ${FREE_FRIEND_LIMIT} friends (${social.friends.length}/${FREE_FRIEND_LIMIT} used).`}
+        <T muted style={{ marginBottom: pro ? spacing.lg : 6 }}>
+          Ask your friend for their code. They’ll find it under Friends → Invite.
         </T>
+        {!pro && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.lg }}>
+            <ProMark />
+            <T size={13} muted>
+              {social.friends.length}/{FREE_FRIEND_LIMIT} free friends used · unlimited with Pro
+            </T>
+          </View>
+        )}
         <CodeInput value={code} onChange={setCode} onSubmit={add} autoFocus />
         {addError && <T size={13} color={colors.danger} style={{ marginBottom: spacing.sm }}>{addError}</T>}
         <Button title="Add friend" onPress={add} loading={adding} disabled={!me || code.length !== 6} />
         <Button title="Share my code instead" variant="ghost" icon="share-outline" onPress={share} style={{ marginTop: spacing.sm }} />
         {DEMO && <T size={12} muted center style={{ marginTop: spacing.sm }}>In the demo, any 6-character code adds a new friend.</T>}
+        {OFFLINE && <T size={12} muted center style={{ marginTop: spacing.sm }}>{OFFLINE_MESSAGE}</T>}
       </Sheet>
     </ScrollView>
   );

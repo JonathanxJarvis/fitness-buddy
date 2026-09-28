@@ -170,6 +170,21 @@ export interface Settings {
   avatar?: AvatarConfig;
   /** Profile photo as a small JPEG data URI. Stays on this phone: friends see `avatar`. */
   photo?: string;
+  /** Extra answers from the first-run questions (coach tone, plan and reminders can use these). */
+  onboarding?: OnboardingAnswers;
+}
+
+export interface OnboardingAnswers {
+  /** Why you're here: 'strength' | 'look' | 'health' | 'energy' | 'sport'. */
+  motivation?: string;
+  /** 'new' | 'some' | 'experienced'. */
+  experience?: string;
+  /** Days a week you can train (2–6). */
+  daysPerWeek?: number;
+  /** What gets in the way most: 'time' | 'motivation' | 'cravings' | 'knowhow'. */
+  obstacle?: string;
+  /** Typical hours of sleep a night. */
+  sleepHours?: number;
 }
 
 /** A claimed reward: daily quest ("q:<id>"), daily chest ("chest"), weekly challenge ("week") or path chest ("path:<n>"). */
@@ -262,6 +277,8 @@ export interface AppState {
 /** Which days you train and what. `week` is Monday-first; null is a rest day. */
 export interface TrainingPlan {
   split: string;
+  /** Your own name for a custom split ("Summer cut"). */
+  name?: string;
   week: (string | null)[];
   /** One-off changes for a single date: session id, or 'rest'. */
   overrides?: Record<string, string>;

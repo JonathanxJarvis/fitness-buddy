@@ -169,6 +169,7 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
             subtitle: 'AI estimates calories & macros from a photo',
             icon: 'camera',
             color: colors.primary,
+            pro: true,
             onPress: () => router.push({ pathname: '/snap-meal', params: { meal, date } }),
           },
           { label: 'Scan a barcode', subtitle: 'Packaged foods', icon: 'barcode-outline', color: nutrientColors.fat, onPress: () => router.push({ pathname: '/scan', params: { meal, date } }) },

@@ -9,7 +9,7 @@ import { Avatar } from '@/components/Avatar';
 import { Flame } from '@/components/people/Glyphs';
 import { clockTime } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
-import { DEMO, demoReplyText, fetchMessages, sendMessage } from '@/lib/social';
+import { DEMO, demoReplyText, fetchMessages, OFFLINE, sendMessage } from '@/lib/social';
 import { STAGES } from '@/lib/progression';
 import { font, radius, spacing, useTheme } from '@/theme';
 
@@ -54,7 +54,7 @@ export default function ChatScreen() {
 
   // With a real server, poll for new messages while the chat is open.
   useEffect(() => {
-    if (DEMO || !me) return;
+    if (DEMO || OFFLINE || !me) return;
     let since = lastAt;
     const tick = () =>
       fetchMessages(me, id, since)

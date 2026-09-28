@@ -59,14 +59,27 @@ export const REST = 'rest';
 export const findSplit = (id: string | undefined) => SPLITS.find((s) => s.id === id) ?? SPLITS[SPLITS.length - 1];
 
 /** A new plan from a preset split. */
-export function planFromSplit(splitId: string, since: string, week?: (string | null)[]): TrainingPlan {
+export function planFromSplit(splitId: string, since: string, week?: (string | null)[], name?: string): TrainingPlan {
   const split = findSplit(splitId);
-  return { split: split.id, week: [...(week ?? split.week)], since };
+  const clean = split.id === 'custom' ? name?.trim() : undefined;
+  return { split: split.id, week: [...(week ?? split.week)], since, ...(clean ? { name: clean } : {}) };
 }
+
+/** What to call a plan: your own name for a custom split, else the split's. */
+export const planName = (plan: Pick<TrainingPlan, 'split' | 'name'>) => (plan.split === 'custom' && plan.name?.trim()) || findSplit(plan.split).name;
 
 /** Sessions you can pick for a day: the split's own, then your saved routines. */
 export function sessionChoices(state: Pick<AppState, 'plan' | 'routines'>): Session[] {
   const split = findSplit(state.plan?.split);
+  // A custom split is built from your own workouts first, then the built-in ones.
+  if (split.id === 'custom') {
+    const mineNames = new Set(state.routines.map((r) => r.name.trim().toLowerCase()));
+    const own = state.routines.map((r) => {
+      const builtIn = SESSIONS.find((s) => s.name.toLowerCase() === r.name.trim().toLowerCase());
+      return builtIn ? { ...builtIn, routine: r } : routineSession(r);
+    });
+    return [...own, ...SESSIONS.filter((s) => !mineNames.has(s.name.toLowerCase()))];
+  }
   const own = split.sessions.map((id) => SESSIONS.find((s) => s.id === id)!).filter(Boolean);
   const used = new Set(own.map((s) => s.name.toLowerCase()));
   const mine = state.routines.filter((r) => !used.has(r.name.toLowerCase())).map(routineSession);

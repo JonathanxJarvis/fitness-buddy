@@ -220,3 +220,24 @@ describe('pet care', () => {
     expect(petCare(confirmCheckin(s, 'sleep', rest), rest, 9).rested).toBeGreaterThan(p.rested);
   });
 });
+
+describe('custom splits', () => {
+  const { sessionChoices, planName } = require('@/lib/plan');
+  const routines = [
+    { id: 'a', name: 'Push', exercises: [{ exerciseId: 'bench-press', sets: 5, reps: 5 }] },
+    { id: 'b', name: 'Heavy legs', exercises: [{ exerciseId: 'squat', sets: 5, reps: 5 }] },
+  ];
+  it('keeps the name only for custom splits', () => {
+    expect(planFromSplit('custom', today, undefined, '  Summer cut ').name).toBe('Summer cut');
+    expect(planFromSplit('ppl', today, undefined, 'Nope').name).toBeUndefined();
+    expect(planName(planFromSplit('custom', today, undefined, 'Summer cut'))).toBe('Summer cut');
+    expect(planName(planFromSplit('custom', today))).toBe('Custom');
+  });
+  it('offers your own workouts first, replacing built-ins with the same name', () => {
+    const choices = sessionChoices({ plan: planFromSplit('custom', today), routines });
+    expect(choices.slice(0, 2).map((c: { name: string }) => c.name)).toEqual(['Push', 'Heavy legs']);
+    expect(choices[0].id).toBe('push');
+    expect(choices[0].routine.exercises[0].sets).toBe(5);
+    expect(choices.filter((c: { name: string }) => c.name === 'Push')).toHaveLength(1);
+  });
+});

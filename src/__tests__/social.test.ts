@@ -108,15 +108,19 @@ describe('social snapshot', () => {
     expect(formatCode('LENA26')).toBe('LEN-A26');
   });
 
-  it('adds demo friends from any code, but not your own', async () => {
+  it('never makes up friends in a real build without a server', async () => {
     const me = { id: 'local-x', code: 'ABCDEF', secret: 'demo' };
     await expect(addFriend(me, 'abc-def')).rejects.toThrow(/own code/);
     await expect(addFriend(me, 'ab')).rejects.toThrow(/6/);
-    const f = await addFriend(me, 'zz9-zz9');
-    expect(f.code).toBe('ZZ9ZZ9');
-    expect(f.history).toHaveLength(8);
-    const again = await addFriend(me, 'ZZ9ZZ9');
-    expect(again.name).toBe(f.name);
+    await expect(addFriend(me, 'zz9-zz9')).rejects.toThrow(/server is live/);
+  });
+
+  it('drops demo friends saved by older installs', () => {
+    const [demo] = demoCrew(today);
+    const saved = { ...initialState, social: { friends: [demo], chats: { [demo.id]: [] }, read: {} } } as AppState;
+    const next = reducer(initialState, { type: 'hydrate', state: saved });
+    expect(next.social?.friends).toHaveLength(0);
+    expect(next.social?.chats).toEqual({});
   });
 
   it('gives each demo friend a growth curve that ends at their score', () => {

@@ -8,14 +8,18 @@ import { avatarFromSeed, cleanAvatar } from '@/components/people/avatarConfig';
 
 /**
  * Friends and chat. With EXPO_PUBLIC_SOCIAL_URL set, this talks to the small
- * Cloudflare Worker in server/social. Without it (and always in the preview)
- * it runs a local demo friends list so every screen can be tried.
+ * Cloudflare Worker in server/social. The web preview (EXPO_PUBLIC_PREVIEW=1)
+ * runs a local demo friends list so every screen can be tried. Real builds
+ * never get demo friends: without a server the list simply starts empty.
  *
  * Profile photos stay on this phone: there's no image server, so friends get
  * your illustrated avatar config (settings.avatar) instead.
  */
 const BASE = (process.env.EXPO_PUBLIC_SOCIAL_URL ?? '').replace(/\/$/, '');
-export const DEMO = PREVIEW || !BASE;
+export const DEMO = PREVIEW;
+/** A real build with no Friends server yet: everything stays on this phone. */
+export const OFFLINE = !DEMO && !BASE;
+export const OFFLINE_MESSAGE = 'Adding friends switches on once Fitness Buddy’s Friends server is live.';
 
 type Me = NonNullable<SocialState['me']>;
 
@@ -238,18 +242,19 @@ async function api<T>(path: string, init: RequestInit & { me?: Me } = {}): Promi
 }
 
 export async function register(snapshot: SocialSnapshot): Promise<Me> {
-  if (DEMO) return { id: `local-${randomCode()}`, code: randomCode(), secret: 'demo' };
+  if (DEMO || OFFLINE) return { id: `local-${randomCode()}`, code: randomCode(), secret: 'demo' };
   return api<Me>('/register', { method: 'POST', body: JSON.stringify({ snapshot }) });
 }
 
 export async function publish(me: Me, snapshot: SocialSnapshot): Promise<void> {
-  if (DEMO) return;
+  if (DEMO || OFFLINE) return;
   await api('/me', { method: 'PUT', me, body: JSON.stringify({ snapshot }) });
 }
 
 export async function fetchFriends(me: Me, current: Friend[]): Promise<Friend[]> {
   // Demo friends are regenerated so they pick up new fields and fresh activity.
   if (DEMO) return current.map((f) => (f.id.startsWith('demo-') ? demoFromCode(f.code, todayKey()) : f));
+  if (OFFLINE) return current.filter((f) => !f.id.startsWith('demo-'));
   return (await api<{ friends: Friend[] }>('/friends', { me })).friends;
 }
 
@@ -257,6 +262,7 @@ export async function addFriend(me: Me, rawCode: string): Promise<Friend> {
   const code = normalizeCode(rawCode);
   if (code.length !== 6) throw new Error('Friend codes have 6 letters and numbers.');
   if (code === me.code) throw new Error('That’s your own code. Share it with a friend instead!');
+  if (OFFLINE) throw new Error(OFFLINE_MESSAGE);
   if (DEMO) {
     await new Promise((r) => setTimeout(r, 500));
     return demoFromCode(code, todayKey());
@@ -265,18 +271,18 @@ export async function addFriend(me: Me, rawCode: string): Promise<Friend> {
 }
 
 export async function removeFriend(me: Me, id: string): Promise<void> {
-  if (DEMO) return;
+  if (DEMO || OFFLINE) return;
   await api(`/friends/${encodeURIComponent(id)}`, { method: 'DELETE', me });
 }
 
 export async function sendMessage(me: Me, to: string, text: string): Promise<SocialMessage> {
   const clean = text.trim().slice(0, 500);
-  if (DEMO) return { id: `m-${Date.now()}-${randomCode()}`, from: me.id, to, text: clean, at: Date.now() };
+  if (DEMO || OFFLINE) return { id: `m-${Date.now()}-${randomCode()}`, from: me.id, to, text: clean, at: Date.now() };
   return (await api<{ message: SocialMessage }>('/messages', { method: 'POST', me, body: JSON.stringify({ to, text: clean }) })).message;
 }
 
 export async function fetchMessages(me: Me, friendId: string, since: number): Promise<SocialMessage[]> {
-  if (DEMO) return [];
+  if (DEMO || OFFLINE) return [];
   return (await api<{ messages: SocialMessage[] }>(`/messages/${encodeURIComponent(friendId)}?since=${since}`, { me })).messages;
 }
 

@@ -162,16 +162,26 @@ export default function Train() {
         </PressScale>
       </FadeIn>
 
-      {/* Routines */}
+      {/* Your own workouts */}
+      <SectionTitle>My workouts</SectionTitle>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.lg }} style={{ marginHorizontal: -spacing.lg, paddingLeft: spacing.lg, flexGrow: 0 }}>
+        <PressScale onPress={() => router.push('/routine-builder')} accessibilityLabel="Create a custom workout" style={{ width: 132 }}>
+          <View style={{ height: 128, borderRadius: radius.lg, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', gap: 6, padding: spacing.md }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="add" size={22} color={colors.onPrimary} />
+            </View>
+            <T size={13} weight="800" center color={colors.primary}>Create a{'\n'}workout</T>
+          </View>
+        </PressScale>
+        {state.routines.map((r) => (
+          <RoutineCard key={r.id} r={r} onStart={() => start(r)} onMenu={() => setMenu(r)} />
+        ))}
+      </ScrollView>
+      {state.routines.length === 0 && (
+        <T size={12} muted style={{ marginTop: 6 }}>Design your own Push, Pull or anything else, name it, and plan it before your first session.</T>
+      )}
       {state.routines.length > 0 && (
-        <>
-          <SectionTitle>My routines</SectionTitle>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.lg }} style={{ marginHorizontal: -spacing.lg, paddingLeft: spacing.lg, flexGrow: 0 }}>
-            {state.routines.map((r) => (
-              <RoutineCard key={r.id} r={r} onStart={() => start(r)} onMenu={() => setMenu(r)} />
-            ))}
-          </ScrollView>
-        </>
+        <T size={12} muted style={{ marginTop: 6 }}>Tap to start · hold to edit</T>
       )}
       <SectionTitle>Templates</SectionTitle>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.lg }} style={{ marginHorizontal: -spacing.lg, paddingLeft: spacing.lg, flexGrow: 0 }}>
@@ -239,8 +249,9 @@ export default function Train() {
         onClose={() => setMenu(null)}
         title={menu?.name}
         actions={[
-          { label: 'Start this routine', icon: 'play', onPress: () => menu && start(menu) },
-          { label: 'Delete routine', icon: 'trash-outline', destructive: true, onPress: () => menu && dispatch({ type: 'deleteRoutine', id: menu.id }) },
+          { label: 'Start this workout', icon: 'play', onPress: () => menu && start(menu) },
+          { label: 'Edit workout', icon: 'create-outline', onPress: () => menu && router.push({ pathname: '/routine-builder', params: { id: menu.id } }) },
+          { label: 'Delete workout', icon: 'trash-outline', destructive: true, onPress: () => menu && dispatch({ type: 'deleteRoutine', id: menu.id }) },
         ]}
       />
       <ActionSheet

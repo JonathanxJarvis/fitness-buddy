@@ -1,7 +1,7 @@
 import { proteinTarget } from '@/lib/nutrition';
 import { claimWithLoot } from '@/lib/lootChest';
 import { reachTier } from '@/lib/loot';
-import { isPro } from '@/lib/pro';
+import { isPro, PREVIEW } from '@/lib/pro';
 import type {
   QuestLogEntry,
   Friend,
@@ -122,6 +122,14 @@ function migrate(saved: AppState): AppState {
   return { ...saved, goals: { ...g, protein, carbs } };
 }
 
+/** Real builds never keep demo friends (installs from before they were preview-only may have them). */
+function dropDemoFriends(saved: AppState): AppState {
+  const social = saved.social;
+  if (PREVIEW || !social?.friends.some((f) => f.id.startsWith('demo-'))) return saved;
+  const chats = Object.fromEntries(Object.entries(social.chats).filter(([id]) => !id.startsWith('demo-')));
+  return { ...saved, social: { ...social, friends: social.friends.filter((f) => !f.id.startsWith('demo-')), chats } };
+}
+
 function latestWeightDate(weights: Record<string, number>): string | undefined {
   return Object.keys(weights).sort().pop();
 }
@@ -131,7 +139,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'hydrate':
       return {
         ...initialState,
-        ...migrate(action.state),
+        ...dropDemoFriends(migrate(action.state)),
         settings: {
           ...DEFAULT_SETTINGS,
           ...action.state.settings,

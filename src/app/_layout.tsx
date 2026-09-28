@@ -78,6 +78,7 @@ function RootNavigator() {
         <Stack.Screen name="nutrients" options={{ title: 'Nutrients', presentation: 'modal' }} />
         <Stack.Screen name="workout" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="exercise-picker" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="routine-builder" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="workout-detail" options={{ title: 'Workout' }} />
         <Stack.Screen name="rank" options={{ headerShown: false }} />
         <Stack.Screen name="pro" options={{ headerShown: false, presentation: 'modal' }} />

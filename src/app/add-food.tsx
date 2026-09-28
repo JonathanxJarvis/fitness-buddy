@@ -182,7 +182,7 @@ export default function AddFood() {
         />
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
           {!forBuilder && (
-            <Button small icon="camera" title="Snap" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/snap-meal', params: { meal, date } })} />
+            <Button small pro icon="camera" title="Snap" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/snap-meal', params: { meal, date } })} />
           )}
           <Button small icon="barcode-outline" title="Scan" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/scan', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
           <Button small icon="create-outline" title="Create" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />

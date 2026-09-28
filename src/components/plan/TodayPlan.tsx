@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Card, T } from '../ui';
 import { FadeIn, nativeDriver, PressScale } from '../motion';
 import { BarbellGlyph, MiniMoon, MoonGlyph, WeekRhythm } from './Glyphs';
 import { DaySheet } from './DaySheet';
-import { PlanEditor } from './PlanEditor';
+import { hasParkedPlan, PlanEditor } from './PlanEditor';
 import { useStore } from '@/store/StoreProvider';
 import { useStartWorkout } from '@/lib/useStartWorkout';
 import { addDays, todayKey } from '@/lib/dates';
-import { DAY_NAMES, planDay, swapDays, SPLITS, trainedOn, weekdayIndex, weekOf, withDay, type Session } from '@/lib/plan';
+import { DAY_NAMES, planDay, planName, swapDays, SPLITS, trainedOn, weekdayIndex, weekOf, withDay, type Session } from '@/lib/plan';
 import { findExercise, doneSets, durationMinutes } from '@/lib/training';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -118,6 +118,12 @@ export function TodayPlan() {
     setEditing(true);
   };
   const tap = () => Haptics.selectionAsync().catch(() => {});
+  // Back from building a workout inside the plan editor: reopen it where you left off.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasParkedPlan()) setEditing(true);
+    }, []),
+  );
 
   if (!plan) {
     return (
@@ -239,7 +245,7 @@ export function TodayPlan() {
         <View style={{ backgroundColor: colors.cardAlt, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, paddingHorizontal: 4 }}>
             <T size={12} weight="800" style={{ flex: 1 }}>
-              This week <T size={12} weight="700" muted>· {stats.done}/{stats.planned} sessions{stats.minutes ? ` · ${stats.minutes} min` : ''}</T>
+              This week <T size={12} weight="700" muted>· {planName(plan)} · {stats.done}/{stats.planned} sessions{stats.minutes ? ` · ${stats.minutes} min` : ''}</T>
             </T>
             <T size={12} weight="800" color={colors.primary} onPress={() => openEditor()}>
               Edit plan

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ProMark } from '@/components/ProMark';
 import { Animated, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -164,7 +165,7 @@ export default function Today() {
   const mealActions = (m: MealType): SheetAction[] => {
     const items = day.entries.filter((e) => e.meal === m);
     const actions: SheetAction[] = [
-      { label: 'Snap a photo', subtitle: 'AI estimates the whole plate', icon: 'camera', onPress: () => router.push({ pathname: '/snap-meal', params: { meal: m, date } }) },
+      { label: 'Snap a photo', subtitle: 'AI estimates the whole plate', icon: 'camera', pro: true, onPress: () => router.push({ pathname: '/snap-meal', params: { meal: m, date } }) },
       { label: 'Search foods', icon: 'search', color: nutrientColors.protein, onPress: () => router.push({ pathname: '/add-food', params: { meal: m, date } }) },
       { label: 'Scan a barcode', icon: 'barcode-outline', color: nutrientColors.fat, onPress: () => router.push({ pathname: '/scan', params: { meal: m, date } }) },
     ];
@@ -283,7 +284,10 @@ export default function Today() {
             <PressScale scaleTo={0.97} onPress={() => router.push({ pathname: '/snap-meal', params: { date } })} style={{ flex: 1, padding: spacing.md, gap: 8 }}>
               <IconTile icon="camera" color={colors.primary} size={36} />
               <View>
-                <T weight="800">Snap a meal</T>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <T weight="800">Snap a meal</T>
+                  <ProMark />
+                </View>
                 <T size={12} muted style={{ marginTop: 2 }}>AI estimates calories & macros from a photo</T>
               </View>
             </PressScale>

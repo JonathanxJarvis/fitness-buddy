@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Button, Chip, EmptyState, Field, IconButton, IconTile, Sheet, T } from '@/components/ui';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
+import { addToDraft } from '@/lib/routineDraft';
 import { EXERCISE_LIBRARY, MUSCLES, newBlock, personalRecords } from '@/lib/training';
 import { formatWeight } from '@/lib/units';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
@@ -29,6 +30,8 @@ export default function ExercisePicker() {
   const { state, dispatch } = useStore();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  /** "routine" when picking for the routine builder instead of the live workout. */
+  const { for: target } = useLocalSearchParams<{ for?: string }>();
   const [query, setQuery] = useState('');
   const [muscle, setMuscle] = useState<Muscle | 'all'>('all');
   const [picked, setPicked] = useState<string[]>([]);
@@ -58,6 +61,11 @@ export default function ExercisePicker() {
   };
 
   const add = () => {
+    if (target === 'routine') {
+      addToDraft(picked);
+      router.back();
+      return;
+    }
     const w = state.activeWorkout;
     if (w) dispatch({ type: 'setActiveWorkout', workout: { ...w, exercises: [...w.exercises, ...picked.map((id) => newBlock(id, state.workouts))] } });
     router.back();

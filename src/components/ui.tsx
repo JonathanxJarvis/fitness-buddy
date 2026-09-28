@@ -15,6 +15,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { ProMark } from './ProMark';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -150,9 +151,12 @@ export function Button({
   loading,
   style,
   small,
+  pro,
 }: {
   title: string;
   onPress: () => void;
+  /** Marks a Pro feature with the small diamond. */
+  pro?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   icon?: IconName;
   disabled?: boolean;
@@ -221,6 +225,7 @@ export function Button({
         <>
           {icon && <Ionicons name={icon} size={small ? 16 : 18} color={fg} />}
           <Text numberOfLines={1} style={{ color: fg, ...font('700'), fontSize: small ? 14 : 16, letterSpacing: 0.2 }}>{title}</Text>
+          {pro && <ProMark size={small ? 10 : 12} />}
         </>
       )}
     </PressScale>
@@ -583,6 +588,8 @@ export interface SheetAction {
   color?: string;
   subtitle?: string;
   destructive?: boolean;
+  /** Marks a Pro feature with the small diamond. */
+  pro?: boolean;
   onPress: () => void;
 }
 
@@ -616,9 +623,12 @@ export function ActionSheet({
           >
             <IconTile icon={a.icon} color={color} size={42} />
             <View style={{ flex: 1 }}>
-              <T weight="700" color={a.destructive ? colors.danger : undefined}>
-                {a.label}
-              </T>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <T weight="700" color={a.destructive ? colors.danger : undefined}>
+                  {a.label}
+                </T>
+                {a.pro && <ProMark />}
+              </View>
               {a.subtitle ? (
                 <T size={13} muted style={{ marginTop: 1 }}>
                   {a.subtitle}
