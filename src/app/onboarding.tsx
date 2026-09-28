@@ -1,58 +1,53 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Field, Screen, Segmented, T } from '@/components/ui';
+import { FadeIn } from '@/components/motion';
+import { PETS, type Mood, type Species } from '@/components/Mascot';
+import { PetGuide } from '@/components/onboarding/PetGuide';
+import { ChoiceRow, NumberPicks, TrendGlyph, WeekStrip } from '@/components/onboarding/Choices';
+import {
+  ACTIVITY_REPLY,
+  DAYS_REPLY,
+  EXPERIENCE,
+  GOAL_REPLY,
+  MOTIVATIONS,
+  OBSTACLES,
+  PEP,
+  SLEEP,
+  planForDays,
+  splitForDays,
+  type Pick,
+} from '@/components/onboarding/script';
 import { useStore } from '@/store/StoreProvider';
 import { useTheme, radius, spacing, nutrientColors } from '@/theme';
 import { ACTIVITY_LEVELS, calculateGoals } from '@/lib/nutrition';
 import { inToCm, lbToKg, kgToLb, cmToIn, weightUnit } from '@/lib/units';
 import { todayKey } from '@/lib/dates';
-import type { ActivityLevel, GoalType, Profile, Sex, UnitSystem } from '@/lib/types';
+import { findSplit } from '@/lib/plan';
+import type { ActivityLevel, GoalType, OnboardingAnswers, Profile, Settings, Sex, UnitSystem } from '@/lib/types';
 
-const GOALS: { key: GoalType; label: string; icon: React.ComponentProps<typeof Ionicons>['name']; hint: string }[] = [
-  { key: 'lose', label: 'Lose weight', icon: 'trending-down', hint: 'Eat in a calorie deficit' },
-  { key: 'maintain', label: 'Maintain weight', icon: 'remove', hint: 'Stay where you are, eat better' },
-  { key: 'gain', label: 'Gain weight', icon: 'trending-up', hint: 'Build muscle with a small surplus' },
+const GOALS: { key: GoalType; label: string; dir: 'down' | 'flat' | 'up'; hint: string }[] = [
+  { key: 'lose', label: 'Lose weight', dir: 'down', hint: 'Eat in a calorie deficit' },
+  { key: 'maintain', label: 'Maintain weight', dir: 'flat', hint: 'Stay where you are, eat better' },
+  { key: 'gain', label: 'Gain weight', dir: 'up', hint: 'Build muscle with a small surplus' },
 ];
 
 const RATES_KG = [0.25, 0.5, 0.75, 1];
+const DAYS = [2, 3, 4, 5, 6].map((d) => ({ key: d, label: String(d) }));
 
-function Option({ selected, onPress, title, hint, icon }: { selected: boolean; onPress: () => void; title: string; hint?: string; icon?: React.ComponentProps<typeof Ionicons>['name'] }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        padding: spacing.lg,
-        borderRadius: radius.md,
-        borderWidth: 2,
-        borderColor: selected ? colors.primary : colors.border,
-        backgroundColor: selected ? colors.primarySoft : colors.card,
-        marginBottom: spacing.sm,
-      }}
-    >
-      {icon && <Ionicons name={icon} size={22} color={colors.primary} />}
-      <View style={{ flex: 1 }}>
-        <T weight="700">{title}</T>
-        {hint ? <T muted size={13}>{hint}</T> : null}
-      </View>
-      {selected && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
-    </Pressable>
-  );
-}
+type StepKey = 'hello' | 'petName' | 'body' | 'activity' | 'goal' | 'motivation' | 'experience' | 'days' | 'obstacle' | 'sleep' | 'plan';
+const NEW_STEPS: StepKey[] = ['hello', 'petName', 'body', 'activity', 'goal', 'motivation', 'experience', 'days', 'obstacle', 'sleep', 'plan'];
+const EDIT_STEPS: StepKey[] = ['hello', 'body', 'activity', 'goal', 'plan'];
 
 export default function Onboarding() {
   const { state, dispatch } = useStore();
   const { colors } = useTheme();
-  const editing = !!state.profile;
+  // Fixed at mount: finishing sets a profile, which must not swap the step list mid-render.
+  const [editing] = useState(() => !!state.profile);
   const p = state.profile;
+  const species = (state.settings.pet ?? 'kettle') as Species;
+  const defPetName = PETS.find((x) => x.key === species)?.name ?? 'Kettle';
 
   const [step, setStep] = useState(0);
   const [units, setUnits] = useState<UnitSystem>(state.settings.units);
@@ -68,6 +63,22 @@ export default function Onboarding() {
   const [activity, setActivity] = useState<ActivityLevel>(p?.activity ?? 'light');
   const [goal, setGoal] = useState<GoalType>(p?.goal ?? 'lose');
   const [rate, setRate] = useState(p?.weeklyRateKg ?? 0.5);
+
+  // New-user extras
+  const [petName, setPetName] = useState(state.settings.petName ?? defPetName);
+  const [motivation, setMotivation] = useState<string>();
+  const [experience, setExperience] = useState<string>();
+  const [days, setDays] = useState<number>();
+  const [obstacle, setObstacle] = useState<string>();
+  const [sleep, setSleep] = useState<number>();
+
+  // What the pet says after you answer (cleared on each new step).
+  const [reaction, setReaction] = useState<{ line: string; mood: Mood } | null>(null);
+  const react = (line: string, mood: Mood) => setReaction({ line, mood });
+
+  const steps = editing ? EDIT_STEPS : NEW_STEPS;
+  const key = steps[step];
+  useEffect(() => setReaction(null), [step]);
 
   const switchUnits = (u: UnitSystem) => {
     if (u === units) return;
@@ -105,151 +116,339 @@ export default function Onboarding() {
   }, [name, age, weight, heightCm, heightFt, heightIn, units, sex, activity, goal, rate]);
 
   const goals = profile ? calculateGoals(profile) : null;
+  const buddy = petName.trim() || defPetName;
+  const first = name.trim().split(/\s+/)[0] ?? '';
+  const makePlan = !editing && days !== undefined && !state.plan;
 
   const finish = () => {
     if (!profile || !goals) return;
-    dispatch({ type: 'updateSettings', settings: { units } });
+    const settings: Partial<Settings> = { units };
+    if (!editing) {
+      settings.petName = buddy.slice(0, 16);
+      const answers: OnboardingAnswers = {};
+      if (motivation) answers.motivation = motivation;
+      if (experience) answers.experience = experience;
+      if (days !== undefined) answers.daysPerWeek = days;
+      if (obstacle) answers.obstacle = obstacle;
+      if (sleep !== undefined) answers.sleepHours = sleep;
+      settings.onboarding = answers;
+    }
+    dispatch({ type: 'updateSettings', settings });
     dispatch({ type: 'setProfile', profile, goals, date: todayKey() });
+    if (makePlan) dispatch({ type: 'setPlan', plan: planForDays(days, todayKey()) });
     if (editing && router.canGoBack()) router.back();
     else router.replace('/');
   };
 
   const bodyValid = profile !== null;
-  const steps = [
-    // 0: welcome + units
-    <View key="0">
-      <View style={{ alignItems: 'center', marginVertical: spacing.xl }}>
-        <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 96, height: 96, borderRadius: 32, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="leaf" size={46} color="#fff" />
-        </LinearGradient>
-        <T size={28} weight="800" style={{ marginTop: spacing.lg }} center>
-          {editing ? 'Update your goals' : 'Welcome to Fitness Buddy'}
-        </T>
-        <T muted center style={{ marginTop: spacing.sm }}>
-          A few questions and we’ll build your daily calorie and macro plan, with protein set to 1 g per lb of body weight. Everything stays on your phone.
-        </T>
+
+  // ---- what the pet says on each step ----
+  const script: Record<StepKey, { line: string; mood: Mood }> = {
+    hello: editing
+      ? { line: `Back to fine-tune your goals${first ? `, ${first}` : ''}? Let’s keep it quick.`, mood: 'wink' }
+      : { line: `Hi, I’m ${defPetName}. I’ll be in your corner from today on. First things first: what’s your name?`, mood: 'happy' },
+    petName: { line: `Nice to meet you${first ? `, ${first}` : ''}. Most people call me ${defPetName}, but you can pick something else.`, mood: 'wink' },
+    body: { line: editing ? 'Anything changed? Update what you need.' : 'Now a little about you. This stays on your phone, just between us.', mood: 'happy' },
+    activity: { line: 'How much do you move in a normal week, outside of workouts too?', mood: 'happy' },
+    goal: { line: 'What are we working toward together?', mood: 'happy' },
+    motivation: { line: 'And what’s driving you? Knowing your why helps me cheer you on.', mood: 'happy' },
+    experience: { line: 'How much training have you done before? No wrong answers.', mood: 'happy' },
+    days: { line: 'How many days a week can you realistically train? Be honest, I will be.', mood: 'wink' },
+    obstacle: { line: 'What usually gets in the way? I’ll plan around it.', mood: 'happy' },
+    sleep: { line: 'Last question. How many hours do you sleep on a typical night?', mood: 'sleepy' },
+    plan: {
+      line: editing
+        ? 'Here’s your updated plan. Looking good.'
+        : `This is it${first ? `, ${first}` : ''}. Your daily plan, built around you. I’m proud of you for starting.`,
+      mood: 'proud',
+    },
+  };
+  const said = reaction ?? script[key];
+
+  const pick = <K extends string | number>(opts: Pick<K>[], k: K, set: (k: K) => void) => {
+    set(k);
+    const o = opts.find((x) => x.key === k);
+    if (o) react(o.reply, o.mood);
+  };
+
+  const unitW = (r: number) => (units === 'us' ? `${(r * 2.20462).toFixed(1).replace(/\.0$/, '')} lb` : `${r} kg`);
+
+  const body: Record<StepKey, React.ReactNode> = {
+    hello: (
+      <View>
+        <Field label="Your first name (optional)" value={name} onChangeText={setName} placeholder="Jake" autoCapitalize="words" />
+        <T muted size={13} weight="600" style={{ marginBottom: 6 }}>Units</T>
+        <Segmented
+          value={units}
+          onChange={switchUnits}
+          options={[
+            { key: 'us', label: 'US (lb, ft, fl oz)' },
+            { key: 'metric', label: 'Metric (kg, cm, ml)' },
+          ]}
+        />
+        {!editing && (
+          <T muted size={13} style={{ marginTop: spacing.lg, lineHeight: 19 }}>
+            A few questions and we’ll build your daily calorie and macro plan, with protein set to 1 g per lb of body weight. Everything stays on your phone.
+          </T>
+        )}
       </View>
-      <Field label="Your first name (optional)" value={name} onChangeText={setName} placeholder="Jake" autoCapitalize="words" />
-      <T muted size={13} weight="600" style={{ marginBottom: 6 }}>Units</T>
-      <Segmented
-        value={units}
-        onChange={switchUnits}
-        options={[
-          { key: 'us', label: 'US (lb, ft, fl oz)' },
-          { key: 'metric', label: 'Metric (kg, cm, ml)' },
-        ]}
-      />
-    </View>,
-    // 1: body
-    <View key="1">
-      <T size={24} weight="800" style={{ marginBottom: spacing.lg }}>About you</T>
-      <T weight="700" style={{ marginBottom: spacing.sm }}>Sex</T>
-      <Segmented
-        value={sex}
-        onChange={setSex}
-        options={[
-          { key: 'female', label: 'Female' },
-          { key: 'male', label: 'Male' },
-        ]}
-        style={{ marginBottom: spacing.lg }}
-      />
-      <Field label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" placeholder="30" suffix="years" />
-      {units === 'metric' ? (
-        <Field label="Height" value={heightCm} onChangeText={setHeightCm} keyboardType="number-pad" placeholder="170" suffix="cm" />
-      ) : (
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <Field style={{ flex: 1 }} label="Height" value={heightFt} onChangeText={setHeightFt} keyboardType="number-pad" placeholder="5" suffix="ft" />
-          <Field style={{ flex: 1 }} label=" " value={heightIn} onChangeText={setHeightIn} keyboardType="number-pad" placeholder="8" suffix="in" />
+    ),
+    petName: (
+      <View>
+        <Field
+          label="Your buddy’s name"
+          value={petName}
+          onChangeText={setPetName}
+          placeholder={defPetName}
+          autoCapitalize="words"
+          maxLength={16}
+          onEndEditing={() => {
+            const n = petName.trim();
+            if (n && n !== defPetName) react(`${n}. I like that. It suits me.`, 'pumped');
+          }}
+        />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {[defPetName, 'Coach', 'Buddy', 'Iron'].map((n) => {
+            const on = buddy === n;
+            return (
+              <Pressable
+                key={n}
+                onPress={() => {
+                  setPetName(n);
+                  react(n === defPetName ? 'The classic. Good call.' : `${n}. I like that. It suits me.`, n === defPetName ? 'happy' : 'pumped');
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                style={{
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  borderRadius: radius.pill,
+                  borderWidth: 1.5,
+                  borderColor: on ? colors.primary : colors.border,
+                  backgroundColor: on ? colors.primarySoft : colors.card,
+                }}
+              >
+                <T size={14} weight="700" color={on ? colors.primary : colors.text}>{n}</T>
+              </Pressable>
+            );
+          })}
         </View>
-      )}
-      <Field label="Current weight" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder={units === 'us' ? '165' : '75'} suffix={weightUnit(units)} />
-      {!bodyValid && (age || weight) ? <T muted size={13}>Enter an age between 13 and 100, your height and weight.</T> : null}
-    </View>,
-    // 2: activity
-    <View key="2">
-      <T size={24} weight="800" style={{ marginBottom: spacing.lg }}>How active are you?</T>
-      {ACTIVITY_LEVELS.map((a) => (
-        <Option key={a.key} selected={activity === a.key} onPress={() => setActivity(a.key)} title={a.label} hint={a.hint} />
-      ))}
-    </View>,
-    // 3: goal
-    <View key="3">
-      <T size={24} weight="800" style={{ marginBottom: spacing.lg }}>What’s your goal?</T>
-      {GOALS.map((g) => (
-        <Option key={g.key} selected={goal === g.key} onPress={() => setGoal(g.key)} title={g.label} hint={g.hint} icon={g.icon} />
-      ))}
-      {goal !== 'maintain' && (
-        <>
-          <T weight="700" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-            Pace per week
-          </T>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {RATES_KG.map((r) => {
-              const active = rate === r;
-              const label = units === 'us' ? `${(r * 2.20462).toFixed(1).replace(/\.0$/, '')} lb` : `${r} kg`;
-              return (
-                <Pressable
-                  key={r}
-                  onPress={() => setRate(r)}
-                  style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: active ? colors.primary : colors.cardAlt }}
-                >
-                  <T weight="700" color={active ? colors.onPrimary : colors.text}>{label}</T>
-                </Pressable>
-              );
-            })}
+      </View>
+    ),
+    body: (
+      <View>
+        <T muted size={13} weight="600" style={{ marginBottom: 6 }}>Sex</T>
+        <Segmented
+          value={sex}
+          onChange={setSex}
+          options={[
+            { key: 'female', label: 'Female' },
+            { key: 'male', label: 'Male' },
+          ]}
+          style={{ marginBottom: spacing.lg }}
+        />
+        <Field label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" placeholder="30" suffix="years" />
+        {units === 'metric' ? (
+          <Field label="Height" value={heightCm} onChangeText={setHeightCm} keyboardType="number-pad" placeholder="170" suffix="cm" />
+        ) : (
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <Field style={{ flex: 1 }} label="Height" value={heightFt} onChangeText={setHeightFt} keyboardType="number-pad" placeholder="5" suffix="ft" />
+            <Field style={{ flex: 1 }} label=" " value={heightIn} onChangeText={setHeightIn} keyboardType="number-pad" placeholder="8" suffix="in" />
           </View>
-          <T muted size={13} style={{ marginTop: spacing.sm }}>
-            {goal === 'lose' ? 'A slower pace is easier to stick with.' : 'Lean gains work best with a small surplus.'}
-          </T>
-        </>
-      )}
-    </View>,
-    // 4: summary
-    <View key="4">
-      <T size={24} weight="800" style={{ marginBottom: spacing.sm }}>Your daily plan</T>
-      <T muted style={{ marginBottom: spacing.lg }}>You can fine-tune these any time from your profile.</T>
-      {goals && (
-        <Card>
+        )}
+        <Field label="Current weight" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder={units === 'us' ? '165' : '75'} suffix={weightUnit(units)} />
+        {!bodyValid && (age || weight) ? <T muted size={13}>Enter an age between 13 and 100, your height and weight.</T> : null}
+      </View>
+    ),
+    activity: (
+      <View>
+        {ACTIVITY_LEVELS.map((a, i) => (
+          <ChoiceRow
+            key={a.key}
+            index={i}
+            selected={activity === a.key}
+            onPress={() => {
+              setActivity(a.key);
+              react(ACTIVITY_REPLY[a.key] ?? 'Got it.', a.key === 'sedentary' ? 'wink' : a.key === 'active' || a.key === 'very_active' ? 'pumped' : 'happy');
+            }}
+            title={a.label}
+            hint={a.hint}
+          />
+        ))}
+      </View>
+    ),
+    goal: (
+      <View>
+        {GOALS.map((g, i) => (
+          <ChoiceRow
+            key={g.key}
+            index={i}
+            selected={goal === g.key}
+            onPress={() => {
+              setGoal(g.key);
+              react(GOAL_REPLY[g.key].reply, GOAL_REPLY[g.key].mood);
+            }}
+            title={g.label}
+            hint={g.hint}
+            glyph={<TrendGlyph dir={g.dir} active={goal === g.key} />}
+          />
+        ))}
+        {goal !== 'maintain' && (
+          <FadeIn>
+            <T muted size={13} weight="600" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+              Pace per week
+            </T>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {RATES_KG.map((r) => {
+                const active = rate === r;
+                return (
+                  <Pressable
+                    key={r}
+                    onPress={() => setRate(r)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: active ? colors.primary : colors.cardAlt }}
+                  >
+                    <T weight="700" color={active ? colors.onPrimary : colors.text}>{unitW(r)}</T>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <T muted size={13} style={{ marginTop: spacing.sm }}>
+              {goal === 'lose' ? 'A slower pace is easier to stick with.' : 'Lean gains work best with a small surplus.'}
+            </T>
+          </FadeIn>
+        )}
+      </View>
+    ),
+    motivation: (
+      <View>
+        {MOTIVATIONS.map((o, i) => (
+          <ChoiceRow key={o.key} index={i} selected={motivation === o.key} onPress={() => pick(MOTIVATIONS, o.key, setMotivation)} title={o.label} hint={o.hint} />
+        ))}
+      </View>
+    ),
+    experience: (
+      <View>
+        {EXPERIENCE.map((o, i) => (
+          <ChoiceRow key={o.key} index={i} selected={experience === o.key} onPress={() => pick(EXPERIENCE, o.key, setExperience)} title={o.label} hint={o.hint} />
+        ))}
+      </View>
+    ),
+    days: (
+      <View>
+        <NumberPicks
+          options={DAYS}
+          value={days}
+          onChange={(d) => {
+            setDays(d);
+            react(DAYS_REPLY[d], d >= 5 ? 'pumped' : 'happy');
+          }}
+        />
+        <T muted size={13} center style={{ marginTop: spacing.sm }}>days a week</T>
+        {days !== undefined && (
+          <FadeIn key={days} style={{ marginTop: spacing.xl }}>
+            <Card>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: spacing.md }}>
+                <T weight="800" size={16}>{findSplit(splitForDays(days)).name}</T>
+                <T muted size={12} weight="600">{state.plan ? 'You already have a plan' : 'Starter plan'}</T>
+              </View>
+              <WeekStrip week={planForDays(days, todayKey()).week} />
+              <T muted size={13} style={{ marginTop: spacing.md }}>
+                {state.plan ? 'Your current plan stays as it is.' : 'You can swap days or change the split any time from Train.'}
+              </T>
+            </Card>
+          </FadeIn>
+        )}
+      </View>
+    ),
+    obstacle: (
+      <View>
+        {OBSTACLES.map((o, i) => (
+          <ChoiceRow key={o.key} index={i} selected={obstacle === o.key} onPress={() => pick(OBSTACLES, o.key, setObstacle)} title={o.label} hint={o.hint} />
+        ))}
+      </View>
+    ),
+    sleep: (
+      <View>
+        <NumberPicks options={SLEEP} value={sleep} onChange={(h) => pick(SLEEP, h, setSleep)} />
+        <T muted size={13} center style={{ marginTop: spacing.sm }}>hours a night</T>
+      </View>
+    ),
+    plan: goals ? (
+      <View>
+        <Card style={{ paddingVertical: spacing.xl }}>
           <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
-            <T size={44} weight="800" color={colors.primary}>{goals.calories.toLocaleString()}</T>
-            <T muted>calories per day</T>
+            <T muted size={12} weight="700" style={{ letterSpacing: 1.2, textTransform: 'uppercase' }}>Every day</T>
+            <T size={46} weight="800" color={colors.primary} style={{ marginTop: 2 }}>{goals.calories.toLocaleString()}</T>
+            <T muted>calories</T>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-            {([['Protein', goals.protein, nutrientColors.protein], ['Carbs', goals.carbs, nutrientColors.carbs], ['Fat', goals.fat, nutrientColors.fat]] as const).map(([l, v, c]) => (
-              <View key={l} style={{ alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row' }}>
+            {([['Protein', goals.protein, nutrientColors.protein], ['Carbs', goals.carbs, nutrientColors.carbs], ['Fat', goals.fat, nutrientColors.fat]] as const).map(([l, v, c], i) => (
+              <View key={l} style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? 1 : 0, borderColor: colors.border }}>
                 <T size={22} weight="800" color={c}>{v} g</T>
                 <T muted size={13}>{l}</T>
               </View>
             ))}
           </View>
           <T size={12} muted center style={{ marginTop: spacing.md }}>Protein target: 1 g per lb of body weight</T>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: spacing.lg }}>
-            <View style={{ alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderColor: colors.border }}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
               <T size={18} weight="700">{goals.fiber} g</T>
               <T muted size={13}>Fiber</T>
             </View>
-            <View style={{ alignItems: 'center' }}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
               <T size={18} weight="700">{goals.steps.toLocaleString()}</T>
               <T muted size={13}>Steps</T>
             </View>
+            {makePlan && days !== undefined ? (
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <T size={18} weight="700">{days}×</T>
+                <T muted size={13}>Training</T>
+              </View>
+            ) : null}
           </View>
         </Card>
-      )}
-    </View>,
-  ];
+        <T muted size={13} center style={{ marginTop: spacing.md }}>You can fine-tune these any time from your profile.</T>
+        {!editing && (
+          <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
+            <View style={{ width: 28, height: 2, borderRadius: 1, backgroundColor: colors.primary, opacity: 0.6, marginBottom: spacing.md }} />
+            <T size={17} weight="700" center style={{ lineHeight: 24 }}>
+              {first ? `${first} and ${buddy}.` : `You and ${buddy}.`} Day one starts now.
+            </T>
+          </View>
+        )}
+      </View>
+    ) : null,
+  };
 
-  const canNext = step !== 1 || bodyValid;
+  // The extra questions can be skipped; the button says so until you answer.
+  const extras: Partial<Record<StepKey, unknown>> = { motivation, experience, days, obstacle, sleep };
+  const optional = !editing && key in extras;
+  const answered = extras[key] !== undefined;
+  const canNext = key !== 'body' || bodyValid;
   const last = step === steps.length - 1;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen topInset>
-        <View style={{ flexDirection: 'row', gap: 6, marginBottom: spacing.xl }}>
-          {steps.map((_, i) => (
-            <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= step ? colors.primary : colors.track }} />
-          ))}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
+          <View style={{ flex: 1, flexDirection: 'row', gap: 4 }}>
+            {steps.map((_, i) => (
+              <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= step ? colors.primary : colors.track }} />
+            ))}
+          </View>
+          <T muted size={12} weight="700" style={{ fontVariant: ['tabular-nums'] }}>
+            {step + 1}/{steps.length}
+          </T>
         </View>
-        {steps[step]}
+
+        <PetGuide species={species} mood={said.mood} line={said.line} beat={reaction ? reaction.line : key} pep={PEP[key]} />
+
+        <FadeIn key={key} delay={80} style={{ marginTop: spacing.xl }}>
+          {body[key]}
+        </FadeIn>
+
         <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
           {step > 0 ? (
             <Button title="Back" variant="secondary" onPress={() => setStep(step - 1)} style={{ flex: 1 }} />
@@ -257,7 +456,7 @@ export default function Onboarding() {
             <Button title="Cancel" variant="secondary" onPress={() => router.back()} style={{ flex: 1 }} />
           ) : null}
           <Button
-            title={last ? (editing ? 'Save goals' : 'Start tracking') : 'Continue'}
+            title={last ? (editing ? 'Save goals' : 'Start tracking') : optional && !answered ? 'Skip' : 'Continue'}
             onPress={last ? finish : () => setStep(step + 1)}
             disabled={!canNext}
             style={{ flex: 2 }}

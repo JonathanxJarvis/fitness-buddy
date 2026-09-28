@@ -338,8 +338,8 @@ export function stateProgression(
     bonusXp: log.reduce((n, q) => n + q.xp, 0),
   });
   if (!previewMaxed(state.settings)) return real;
-  let xp = 0;
-  for (let l = 1; l < 50; l++) xp += xpForLevel(l);
+  // xpForLevel is the total needed to reach a level: land a little into level 50.
+  const xp = xpForLevel(50);
   const lvl = levelFor(xp + 400);
   const top = STAGES[STAGES.length - 1];
   return {
