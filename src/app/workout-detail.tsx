@@ -9,7 +9,7 @@ import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { durationMinutes, findExercise, oneRepMax, prExercises, routineFromWorkout, workoutFromRoutine, workoutVolume, doneSets } from '@/lib/training';
 import { prettyDate, todayKey } from '@/lib/dates';
-import { formatWeight, kgToLb, weightUnit } from '@/lib/units';
+import { formatWeight, kgToLb, weightUnit, weightValue } from '@/lib/units';
 import { nutrientColors, radius, spacing, useTheme } from '@/theme';
 
 export default function WorkoutDetail() {
@@ -79,7 +79,7 @@ export default function WorkoutDetail() {
                 <View key={si} style={{ flexDirection: 'row', paddingVertical: 3 }}>
                   <T size={13} muted weight="700" style={{ width: 26 }}>{si + 1}</T>
                   <T size={14} weight={s === best ? '800' : '500'} style={{ flex: 1 }}>
-                    {x?.bodyweight || !s.kg ? `${s.reps} reps` : `${formatWeight(s.kg, units, s.kg % 1 ? 1 : 0)} × ${s.reps}`}
+                    {x?.bodyweight || !s.kg ? `${s.reps} reps` : `${+weightValue(s.kg, units).toFixed(1)} ${weightUnit(units)} × ${s.reps}`}
                   </T>
                   {s.kg > 0 && s.reps > 1 && (
                     <T size={12} muted>e1RM {formatWeight(oneRepMax(s.kg, s.reps), units, 0)}</T>

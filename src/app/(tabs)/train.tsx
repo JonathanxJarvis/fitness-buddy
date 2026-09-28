@@ -212,8 +212,10 @@ export default function Train() {
                     {shortDate(w.date)} · {durationMinutes(w)} min · {Math.round(units === 'us' ? kgToLb(vol) : vol).toLocaleString()} {weightUnit(units)}
                   </T>
                 </View>
-                <T size={13} weight="800">{w.calories ?? 0}</T>
-                <T size={11} muted>kcal</T>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <T size={14} weight="800">{w.calories ?? 0}</T>
+                  <T size={11} muted>kcal</T>
+                </View>
               </Pressable>
             );
           })}

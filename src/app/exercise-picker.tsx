@@ -114,7 +114,7 @@ export default function ExercisePicker() {
           autoCorrect={false}
         />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }} style={{ flexGrow: 0 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }} style={{ flexGrow: 0, flexShrink: 0 }}>
         {MUSCLES.map((m) => (
           <Chip key={m.key} label={m.label} active={muscle === m.key} onPress={() => setMuscle(m.key)} />
         ))}

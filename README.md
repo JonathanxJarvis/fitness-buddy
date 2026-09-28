@@ -4,15 +4,17 @@ A nutrition and fitness tracker for iOS and Android, in the spirit of Yazio and 
 
 ## Features
 
+- **Workout tracker (Train tab)**: start an empty workout or a routine (Push, Pull, Legs, Full body templates, or your own), log sets with weight and reps, see last session's numbers beside each set, and a rest timer starts when you check a set off. 60+ exercises by muscle group plus custom exercises. Personal records use an estimated one-rep max (Epley). Finished workouts go into history, add their calories burned to the day's budget, show up as training volume in Progress, and are visible to the Coach.
 - **Premium Today dashboard**: a greeting with your streak, a week strip with a mini calorie ring per day, a deep-green hero card with calories left (goal + exercise − food), and animated bars for protein, carbs, fat and fiber. Everything counts up and fades in.
 - **Protein at 1 g per lb of body weight** by default (editable in Daily goals). There is no water goal; water is still tracked by the glass.
 - **Snap a meal (AI)**: take or pick a photo and Claude identifies each food, estimates portions in grams and returns calories, protein, carbs, fat, fiber, sugar and sodium, with a confidence level and a health score. Adjust the portion, pick the meal and log it with the photo.
 - **Coach (AI chat)**: a chatbot that knows your goals, today's log and the last week. Ask what to eat to hit protein, how your day looks, or attach a meal photo and ask about it. "Ask Coach about this meal" hands a photo estimate straight to the chat.
 - **Huge food database**: ~100 built-in common foods (offline), plus live search across **USDA FoodData Central** (~400,000 generic and branded foods) and **Open Food Facts** (~3 million packaged products), merged into one list.
-- **Barcode scanner** backed by Open Food Facts. Unknown barcodes can be saved as a custom food.
+- **German supermarket foods**: set Food database to Germany in Profile to search de.openfoodfacts.org first with German product names.
+- **Barcode and QR scanner** backed by Open Food Facts, including GS1 QR/DataMatrix codes on newer packaging. Unknown barcodes can be saved as a custom food.
 - **Meal detail** with a hero photo, 2×2 nutrition tiles, an overall health score (0–100 with a letter grade), vitamins and minerals.
 - **Logging by meal** with per-meal calorie rings (each meal has a share of your daily goal), entry times, photo thumbnails and an AI badge for photo-logged meals.
-- **Center + button** for quick actions: snap a meal, scan, search, add water, log a workout or weight.
+- **Center + button** for quick actions: snap a meal, scan, search, add water, start a workout, log cardio or weight.
 - **Tracks** water, weight, steps (motion sensor), exercise, fiber, sugar, sodium, potassium, calcium, iron, vitamin C and vitamin D.
 - **Saved meals, recipes, favorites and custom foods** (Profile → My foods & meals).
 - **Diary calendar** with color-coded days and streaks, and **Progress** charts over 7, 30 or 90 days.
@@ -25,6 +27,10 @@ Like Yazio, the AI key lives on a server, not in the app. `server/ai-proxy` is a
 Requests use `claude-opus-5` with Anthropic's server-side fallbacks turned on, so a busy model falls back to another Claude model instead of failing. Anyone can still paste their own key under Profile → AI Coach & meal photos to use their own account; it's stored in the phone's secure keychain and only sent to Anthropic. With no server and no key, the rest of the app works and Snap a meal offers a clearly labeled sample result.
 
 Photo estimates are estimates: portion sizes from a picture can be off by 20% or more, so adjust the portion or edit the entry if you know better.
+
+## Publish to the App Store
+
+The app is configured for EAS Build (`eas.json`, bundle ID in `app.json`). The full step-by-step guide, including costs, the store listing and review tips, is in [docs/APP_STORE.md](docs/APP_STORE.md). A privacy policy you can host is in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Run it on your phone with Expo Go
 

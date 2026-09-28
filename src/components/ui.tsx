@@ -43,7 +43,7 @@ export function Screen({
   const pad: ViewStyle = {
     padding: padded ? spacing.lg : 0,
     paddingTop: (padded ? spacing.lg : 0) + (topInset ? insets.top : 0),
-    paddingBottom: spacing.xl * 2 + (tabs ? 90 + insets.bottom : 0),
+    paddingBottom: spacing.xl + (tabs ? 84 + insets.bottom : 0),
   };
   if (!scroll) {
     return <View style={[{ flex: 1, backgroundColor: colors.background }, pad, style]}>{children}</View>;
@@ -130,8 +130,8 @@ export function T({
 
 export function SectionTitle({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, marginBottom: spacing.md }}>
-      <T size={19} weight="800">
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.sm }}>
+      <T size={17} weight="800">
         {children}
       </T>
       {right}
@@ -180,7 +180,7 @@ export function Button({
         {
           backgroundColor: bg,
           borderRadius: radius.pill,
-          paddingVertical: small ? 9 : 16,
+          paddingVertical: small ? 9 : 13,
           paddingHorizontal: small ? 14 : 22,
           flexDirection: 'row',
           alignItems: 'center',
@@ -264,7 +264,7 @@ export function Field({
       >
         <TextInput
           placeholderTextColor={colors.textMuted}
-          style={{ flex: 1, color: colors.text, fontSize: 16, paddingVertical: 13, ...font('500') }}
+          style={{ flex: 1, color: colors.text, fontSize: 16, paddingVertical: 11, ...font('500') }}
           {...props}
         />
         {suffix ? <T muted>{suffix}</T> : null}

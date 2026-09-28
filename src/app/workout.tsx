@@ -80,7 +80,7 @@ function SetRow({
           placeholder={prev?.kg ? toDisplay(prev.kg, units) : '0'}
           placeholderTextColor={colors.textMuted}
           keyboardType="decimal-pad"
-          style={[input, { flex: 1 }]}
+          style={[input, { flex: 1, minWidth: 0 }]}
           accessibilityLabel={`Set ${index + 1} weight`}
         />
       )}
@@ -93,7 +93,7 @@ function SetRow({
         placeholder={prev ? String(prev.reps) : '0'}
         placeholderTextColor={colors.textMuted}
         keyboardType="number-pad"
-        style={[input, { flex: 1 }]}
+        style={[input, { flex: 1, minWidth: 0 }]}
         accessibilityLabel={`Set ${index + 1} reps`}
       />
       <PressScale

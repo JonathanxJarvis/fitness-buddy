@@ -37,7 +37,7 @@ function WeekStrip({ date, onSelect }: { date: string; onSelect: (d: string) => 
   const today = todayKey();
   const goal = state.goals!.calories;
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg }}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
       {days.map((d, i) => {
         const selected = d === date;
         const future = d > today;
@@ -52,8 +52,8 @@ function WeekStrip({ date, onSelect }: { date: string; onSelect: (d: string) => 
             }}
             style={{
               alignItems: 'center',
-              width: 44,
-              paddingVertical: 8,
+              width: 42,
+              paddingVertical: 6,
               borderRadius: 22,
               backgroundColor: selected ? colors.ink : 'transparent',
               opacity: future ? 0.45 : 1,
@@ -62,9 +62,9 @@ function WeekStrip({ date, onSelect }: { date: string; onSelect: (d: string) => 
             <T size={11} weight="700" color={selected ? colors.onInk : colors.textMuted}>
               {WEEKDAY_LETTERS[i]}
             </T>
-            <View style={{ marginTop: 6 }}>
+            <View style={{ marginTop: 4 }}>
               <Ring
-                size={30}
+                size={28}
                 stroke={3}
                 progress={goal ? kcal / goal : 0}
                 color={kcal > goal * 1.05 ? colors.warning : nutrientColors.calories}
@@ -91,7 +91,7 @@ function HeroCard({ eaten, burned, goal }: { eaten: number; burned: number; goal
   const pct = budget ? eaten / budget : 0;
   const stat = (icon: IconName, label: string, value: number) => (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
         <Ionicons name={icon} size={15} color="#fff" />
       </View>
       <View>
@@ -101,7 +101,7 @@ function HeroCard({ eaten, burned, goal }: { eaten: number; burned: number; goal
     </View>
   );
   return (
-    <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 28, padding: spacing.xl, marginBottom: spacing.md, overflow: 'hidden' }}>
+    <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 24, padding: spacing.lg + 2, marginBottom: spacing.md, overflow: 'hidden' }}>
       {/* soft decorative glows */}
       <View style={{ position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.06)', top: -90, right: -60 }} />
       <View style={{ position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.04)', bottom: -60, left: -30 }} />
@@ -111,19 +111,19 @@ function HeroCard({ eaten, burned, goal }: { eaten: number; burned: number; goal
             {over ? 'Over today’s budget' : 'Calories left'}
           </T>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 2 }}>
-            <CountUp value={Math.abs(Math.round(remaining))} size={46} weight="800" color="#fff" />
-            <T size={15} weight="600" color="rgba(255,255,255,0.75)" style={{ marginBottom: 9 }}>
+            <CountUp value={Math.abs(Math.round(remaining))} size={40} weight="800" color="#fff" />
+            <T size={15} weight="600" color="rgba(255,255,255,0.75)" style={{ marginBottom: 7 }}>
               kcal
             </T>
           </View>
           <T size={12} color="rgba(255,255,255,0.65)">Goal {goal.toLocaleString()} + exercise {Math.round(burned).toLocaleString()}</T>
         </View>
-        <Ring size={104} stroke={10} progress={pct} color="#fff" gradient={over ? ['#FFD29A', '#F2A93B'] : ['#B9F6D2', '#FFFFFF']} trackColor="rgba(255,255,255,0.16)">
-          <CountUp value={Math.round(Math.min(999, pct * 100))} size={22} weight="800" color="#fff" />
+        <Ring size={90} stroke={9} progress={pct} color="#fff" gradient={over ? ['#FFD29A', '#F2A93B'] : ['#B9F6D2', '#FFFFFF']} trackColor="rgba(255,255,255,0.16)">
+          <CountUp value={Math.round(Math.min(999, pct * 100))} size={20} weight="800" color="#fff" />
           <T size={10} weight="700" color="rgba(255,255,255,0.7)">% EATEN</T>
         </Ring>
       </View>
-      <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: spacing.lg }} />
+      <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: spacing.md }} />
       <View style={{ flexDirection: 'row' }}>
         {stat('flag', 'Goal', goal)}
         {stat('restaurant', 'Eaten', eaten)}
@@ -136,21 +136,19 @@ function HeroCard({ eaten, burned, goal }: { eaten: number; burned: number; goal
 function MacroRow({ icon, label, value, goal, color, hint, delay }: { icon: IconName; label: string; value: number; goal: number; color: string; hint?: string; delay: number }) {
   const left = Math.round(goal - value);
   return (
-    <FadeIn delay={delay} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9 }}>
-      <IconTile icon={icon} color={color} size={38} />
+    <FadeIn delay={delay} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
+      <IconTile icon={icon} color={color} size={32} />
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 7 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 5 }}>
           <T weight="700" style={{ flex: 1 }}>
             {label}
             {hint ? <T size={12} muted weight="500">{`  ${hint}`}</T> : null}
           </T>
+          <T size={11} muted>{left > 0 ? `${left} g left  ` : left === 0 ? 'on target  ' : `${-left} g over  `}</T>
           <T size={14} weight="800">{Math.round(value)}</T>
           <T size={13} muted>{` / ${Math.round(goal)} g`}</T>
         </View>
-        <ProgressBar value={value} max={goal} color={color} height={7} />
-        <T size={11} muted style={{ marginTop: 4 }}>
-          {left > 0 ? `${left} g to go` : left === 0 ? 'Right on target' : `${-left} g over`}
-        </T>
+        <ProgressBar value={value} max={goal} color={color} height={6} />
       </View>
     </FadeIn>
   );
@@ -160,7 +158,7 @@ function EntryRow({ e, onPress }: { e: DiaryEntry; onPress: () => void }) {
   const { colors } = useTheme();
   const n = itemNutrients(e);
   return (
-    <PressScale onPress={onPress} scaleTo={0.98} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9 }}>
+    <PressScale onPress={onPress} scaleTo={0.98} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 }}>
       <FoodThumb food={e.food} photo={e.photo} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -253,15 +251,15 @@ export default function Today() {
   return (
     <Screen topInset tabs>
       {/* Greeting */}
-      <FadeIn delay={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.lg }}>
+      <FadeIn delay={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.md }}>
         <PressScale accessibilityLabel="Profile" onPress={() => router.push('/profile')}>
-          <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}>
-            <T size={18} weight="800" color="#fff">{(profile.name || 'Me').charAt(0).toUpperCase()}</T>
+          <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+            <T size={16} weight="800" color="#fff">{(profile.name || 'Me').charAt(0).toUpperCase()}</T>
           </LinearGradient>
         </PressScale>
         <View style={{ flex: 1 }}>
           <T size={13} muted weight="600">{greeting()}</T>
-          <T size={20} weight="800" numberOfLines={1}>{profile.name || prettyDate(date)}</T>
+          <T size={18} weight="800" numberOfLines={1}>{profile.name || prettyDate(date)}</T>
         </View>
         {streak > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warningSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill }}>
@@ -274,9 +272,9 @@ export default function Today() {
 
       {/* Date + week */}
       <FadeIn delay={next()}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
           <Pressable onPress={() => setSelectedDate(todayKey())} style={{ flex: 1 }}>
-            <T size={28} weight="800">{prettyDate(date)}</T>
+            <T size={22} weight="800">{prettyDate(date)}</T>
           </Pressable>
           <IconButton label="Open diary calendar" icon="calendar-clear-outline" color={colors.textMuted} onPress={() => router.navigate('/calendar')} />
           <View style={{ width: 14 }} />
@@ -312,16 +310,16 @@ export default function Today() {
       <FadeIn delay={next()}>
         <Card style={{ padding: 0, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row' }}>
-            <PressScale scaleTo={0.97} onPress={() => router.push({ pathname: '/snap-meal', params: { date } })} style={{ flex: 1, padding: spacing.lg, gap: 10 }}>
-              <IconTile icon="camera" color={colors.primary} size={42} />
+            <PressScale scaleTo={0.97} onPress={() => router.push({ pathname: '/snap-meal', params: { date } })} style={{ flex: 1, padding: spacing.md, gap: 8 }}>
+              <IconTile icon="camera" color={colors.primary} size={36} />
               <View>
                 <T weight="800">Snap a meal</T>
                 <T size={12} muted style={{ marginTop: 2 }}>AI estimates calories & macros from a photo</T>
               </View>
             </PressScale>
             <View style={{ width: 1, backgroundColor: colors.border, marginVertical: spacing.lg }} />
-            <PressScale scaleTo={0.97} onPress={() => router.navigate('/coach')} style={{ flex: 1, padding: spacing.lg, gap: 10 }}>
-              <IconTile icon="chatbubbles" color={nutrientColors.protein} size={42} />
+            <PressScale scaleTo={0.97} onPress={() => router.navigate('/coach')} style={{ flex: 1, padding: spacing.md, gap: 8 }}>
+              <IconTile icon="chatbubbles" color={nutrientColors.protein} size={36} />
               <View>
                 <T weight="800">Ask Coach</T>
                 <T size={12} muted style={{ marginTop: 2 }}>What should I eat to hit my protein?</T>
@@ -352,13 +350,13 @@ export default function Today() {
         const target = Math.round(goals.calories * MEAL_SHARES[m.key]);
         return (
           <FadeIn key={m.key} delay={next()}>
-            <Card style={{ paddingVertical: spacing.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Ring size={44} stroke={4} progress={target ? kcal / target : 0} color={kcal > target * 1.15 ? colors.warning : nutrientColors.calories}>
-                  <Ionicons name={m.icon as never} size={17} color={colors.text} />
+            <Card style={{ paddingVertical: spacing.sm + 2, marginBottom: spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ring size={38} stroke={4} progress={target ? kcal / target : 0} color={kcal > target * 1.15 ? colors.warning : nutrientColors.calories}>
+                  <Ionicons name={m.icon as never} size={15} color={colors.text} />
                 </Ring>
                 <Pressable style={{ flex: 1 }} onPress={() => setMenu(m.key)} accessibilityLabel={`${m.label} options`}>
-                  <T size={16} weight="800">{m.label}</T>
+                  <T size={15} weight="800">{m.label}</T>
                   <T size={13} muted>
                     {Math.round(kcal)} / {target} kcal
                   </T>
@@ -366,12 +364,12 @@ export default function Today() {
                 <PressScale
                   accessibilityLabel={`Add food to ${m.label}`}
                   onPress={() => setMenu(m.key)}
-                  style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Ionicons name="add" size={22} color={colors.onInk} />
+                  <Ionicons name="add" size={20} color={colors.onInk} />
                 </PressScale>
               </View>
-              {items.length > 0 && <View style={{ height: 1, backgroundColor: colors.border, marginTop: spacing.md, marginBottom: 2 }} />}
+              {items.length > 0 && <View style={{ height: 1, backgroundColor: colors.border, marginTop: spacing.sm, marginBottom: 2 }} />}
               {items.map((e) => (
                 <EntryRow key={e.id} e={e} onPress={() => router.push({ pathname: '/food', params: { entryId: e.id } })} />
               ))}
@@ -385,7 +383,7 @@ export default function Today() {
       <FadeIn delay={next()}>
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <IconTile icon="water" color={nutrientColors.water} size={42} />
+            <IconTile icon="water" color={nutrientColors.water} size={36} />
             <View style={{ flex: 1 }}>
               <T size={16} weight="800">{formatWater(day.waterMl, units)}</T>
               <T size={12} muted>
@@ -401,10 +399,10 @@ export default function Today() {
       <FadeIn delay={next()} style={{ flexDirection: 'row', gap: spacing.md }}>
         <PressScale style={{ flex: 1 }} onPress={() => router.push({ pathname: '/log-exercise', params: { date } })}>
           <Card style={{ alignItems: 'center' }}>
-            <Ring size={84} stroke={8} progress={goals.steps ? day.steps / goals.steps : 0} color={nutrientColors.steps}>
+            <Ring size={70} stroke={7} progress={goals.steps ? day.steps / goals.steps : 0} color={nutrientColors.steps}>
               <Ionicons name="footsteps" size={22} color={nutrientColors.steps} />
             </Ring>
-            <CountUp value={day.steps} size={17} weight="800" style={{ marginTop: 10 }} />
+            <CountUp value={day.steps} size={16} weight="800" style={{ marginTop: 8 }} />
             <T size={12} muted>of {goals.steps.toLocaleString()} steps</T>
             <T size={12} weight="700" color={colors.primary} style={{ marginTop: 6 }}>
               {day.exercises.length ? `${day.exercises.length} workout${day.exercises.length > 1 ? 's' : ''} · ${Math.round(day.burned)} kcal` : '+ Log workout'}
@@ -413,10 +411,10 @@ export default function Today() {
         </PressScale>
         <PressScale style={{ flex: 1 }} onPress={() => router.push({ pathname: '/log-weight', params: { date } })}>
           <Card style={{ alignItems: 'center' }}>
-            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: nutrientColors.carbs + '1F', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: nutrientColors.carbs + '1F', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="scale" size={28} color={nutrientColors.carbs} />
             </View>
-            <T size={17} weight="800" style={{ marginTop: 10 }}>
+            <T size={16} weight="800" style={{ marginTop: 8 }}>
               {state.weights[date] !== undefined ? formatWeight(state.weights[date], units) : latestWeightDate ? formatWeight(state.weights[latestWeightDate], units) : '—'}
             </T>
             <T size={12} muted numberOfLines={1}>

@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# secrets for local dev (EXPO_PUBLIC_ values still end up in the app bundle)
+.env

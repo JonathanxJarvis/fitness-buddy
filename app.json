@@ -7,10 +7,25 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "infoPlist": {
-        "NSCameraUsageDescription": "Fitness Buddy uses the camera to scan food barcodes.",
+        "NSCameraUsageDescription": "Fitness Buddy uses the camera to scan food barcodes and photograph meals for nutrition estimates.",
         "NSMotionUsageDescription": "Fitness Buddy reads your step count to track daily activity."
+      },
+      "bundleIdentifier": "com.jonathanxjarvis.fitnessbuddy",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
       }
     },
     "android": {
@@ -24,7 +39,9 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACTIVITY_RECOGNITION"
-      ]
+      ],
+      "package": "com.jonathanxjarvis.fitnessbuddy",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -52,6 +69,7 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#2E7D32"
-    }
+    },
+    "description": "Calorie, macro and strength-training tracker with an AI coach."
   }
 }
