@@ -3,11 +3,14 @@ import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Button, EmptyState, Field, IconButton, ListRow, Segmented, T } from '@/components/ui';
+import { Button, EmptyState, Field, IconButton, ListRow, Segmented, Sheet, T } from '@/components/ui';
+import { PortionPicker } from '@/components/PortionPicker';
+import { gramServingIndex } from '@/lib/portion';
 import { useStore } from '@/store/StoreProvider';
 import { recentFoods, uid } from '@/store/reducer';
 import { cacheFood, mealDraft } from '@/store/session';
 import { BUILTIN_FOODS, searchLocal } from '@/lib/foodDatabase';
+import { GERMAN_FOODS } from '@/lib/germanFoods';
 import { searchFoods } from '@/lib/openFoodFacts';
 import { searchUsda } from '@/lib/usda';
 import { FoodThumb } from '@/components/FoodThumb';
@@ -33,13 +36,16 @@ export default function AddFood() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [portion, setPortion] = useState<{ food: Food; servingIndex: number; quantity: number } | null>(null);
 
   const recents = useMemo(() => recentFoods(state.entries), [state.entries]);
   const localPool = useMemo(() => {
     const byId = new Map<string, Food>();
-    for (const f of [...state.customFoods, ...state.favorites, ...recents, ...BUILTIN_FOODS]) if (!byId.has(f.id)) byId.set(f.id, f);
+    // German shoppers get the offline supermarket staples ahead of the US list.
+    const staples = region === 'de' ? [...GERMAN_FOODS, ...BUILTIN_FOODS] : [...BUILTIN_FOODS, ...GERMAN_FOODS];
+    for (const f of [...state.customFoods, ...state.favorites, ...recents, ...staples]) if (!byId.has(f.id)) byId.set(f.id, f);
     return [...byId.values()];
-  }, [state.customFoods, state.favorites, recents]);
+  }, [state.customFoods, state.favorites, recents, region]);
   const localResults = useMemo(() => searchLocal(localPool, query).slice(0, 25), [localPool, query]);
 
   // Debounced online search across USDA FoodData Central and Open Food Facts.
@@ -61,8 +67,11 @@ export default function AddFood() {
           const o = off.status === 'fulfilled' ? off.value : [];
           // German shoppers get their supermarket products first; USDA (US foods) follows.
           const [a, b] = region === 'de' ? [o, u] : [u, o];
+          if (off.status === 'rejected' && usda.status === 'fulfilled' && region === 'de') {
+            setError('The German supermarket database didn’t respond, so these are USDA results. Try again in a moment or scan the barcode.');
+          }
           if (usda.status === 'rejected' && off.status === 'rejected') {
-            setError('Couldn’t reach the online food databases. Check your connection.');
+            setError('Couldn’t reach the online food databases right now, so only foods stored in the app are shown. Try again in a moment or scan the barcode.');
           }
           // Interleave so both generic (USDA) and packaged (OFF) foods show near the top.
           const merged: Food[] = [];
@@ -81,7 +90,7 @@ export default function AddFood() {
         .finally(() => {
           if (!ctrl.signal.aborted) setLoading(false);
         });
-    }, 500);
+    }, 650);
     return () => {
       clearTimeout(t);
       ctrl.abort();
@@ -98,14 +107,24 @@ export default function AddFood() {
     setTimeout(() => setFlash(null), 1800);
   };
 
+  // The + button asks how much before logging, with grams from a scale or a serving.
   const quickAdd = (food: Food) => {
+    const g = gramServingIndex(food);
+    const inGrams = food.servings[0]?.label === '100 g' && g >= 0;
+    setPortion({ food, servingIndex: inGrams ? g : 0, quantity: inGrams ? 100 : 1 });
+  };
+
+  const addPortion = () => {
+    if (!portion || portion.quantity <= 0) return;
+    const { food, servingIndex, quantity } = portion;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setPortion(null);
     if (forBuilder) {
-      mealDraft.add({ food, servingIndex: 0, quantity: 1 });
+      mealDraft.add({ food, servingIndex, quantity });
       showFlash(`Added ${food.name} to meal`);
       return;
     }
-    dispatch({ type: 'addEntries', entries: [{ id: uid(), date, meal, food, servingIndex: 0, quantity: 1, createdAt: Date.now() }] });
+    dispatch({ type: 'addEntries', entries: [{ id: uid(), date, meal, food, servingIndex, quantity, createdAt: Date.now() }] });
     showFlash(`Added ${food.name}`);
   };
 
@@ -150,11 +169,11 @@ export default function AddFood() {
         />
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
           {!forBuilder && (
-            <Button small icon="camera" title="Snap" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/snap-meal', params: { meal, date } })} />
+            <Button small icon="camera" title="Snap" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/snap-meal', params: { meal, date } })} />
           )}
-          <Button small icon="barcode-outline" title="Scan" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/scan', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
-          <Button small icon="create-outline" title="Create" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
-          <Button small icon="flash-outline" title="Quick" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, quick: '1', target: forBuilder ? 'builder' : '' } })} />
+          <Button small icon="barcode-outline" title="Scan" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/scan', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
+          <Button small icon="create-outline" title="Create" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
+          <Button small icon="flash-outline" title="Quick" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, quick: '1', target: forBuilder ? 'builder' : '' } })} />
         </View>
         {!query && (
           <Segmented<Tab>
@@ -180,11 +199,11 @@ export default function AddFood() {
           ListHeaderComponent={
             <>
               {localResults.length > 0 && (
-                <T size={12} weight="800" muted style={{ marginTop: spacing.sm, letterSpacing: 0.6 }}>COMMON & SAVED FOODS</T>
+                <T size={12} weight="800" muted style={{ marginTop: spacing.sm, letterSpacing: 0.6 }}>{region === 'de' ? 'GERMAN STAPLES & SAVED FOODS' : 'COMMON & SAVED FOODS'}</T>
               )}
               {localResults.map(foodRow)}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.lg }}>
-                <T size={12} weight="800" muted style={{ letterSpacing: 0.6 }}>{region === 'de' ? 'DEUTSCHE SUPERMÄRKTE & USDA' : 'USDA & OPEN FOOD FACTS'}</T>
+                <T size={12} weight="800" muted style={{ letterSpacing: 0.6 }}>{region === 'de' ? 'OPEN FOOD FACTS DEUTSCHLAND & USDA' : 'USDA & OPEN FOOD FACTS'}</T>
                 {loading && <ActivityIndicator size="small" color={colors.primary} />}
               </View>
               {error && <T size={13} color={colors.danger} style={{ marginTop: 6 }}>{error}</T>}
@@ -230,6 +249,16 @@ export default function AddFood() {
           renderItem={({ item }) => foodRow(item)}
         />
       )}
+
+      <Sheet visible={!!portion} onClose={() => setPortion(null)} title={portion?.food.name}>
+        {portion && (
+          <>
+            {portion.food.brand ? <T size={13} muted style={{ marginTop: -6, marginBottom: spacing.sm }}>{portion.food.brand}</T> : null}
+            <PortionPicker food={portion.food} servingIndex={portion.servingIndex} quantity={portion.quantity} onChange={(servingIndex, quantity) => setPortion({ ...portion, servingIndex, quantity })} />
+            <Button title={forBuilder ? 'Add to saved meal' : `Add to ${mealLabel}`} icon="add-circle" onPress={addPortion} disabled={portion.quantity <= 0} style={{ marginTop: spacing.md }} />
+          </>
+        )}
+      </Sheet>
 
       {flash && (
         <View style={{ position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: colors.text, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 999 }}>

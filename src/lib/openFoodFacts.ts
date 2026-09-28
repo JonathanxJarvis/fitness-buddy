@@ -115,10 +115,44 @@ function scale(n: Nutrients, f: number): Nutrients {
   return out as unknown as Nutrients;
 }
 
-async function getJson(url: string, signal?: AbortSignal): Promise<any> {
-  const res = await fetch(url, { headers: HEADERS, signal });
-  if (!res.ok) throw new Error(`Open Food Facts returned ${res.status}`);
-  return res.json();
+async function getJson(url: string, signal?: AbortSignal, timeoutMs = 9000): Promise<any> {
+  // Give up on slow responses instead of spinning forever on a weak connection.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener('abort', onAbort);
+  try {
+    const res = await fetch(url, { headers: HEADERS, signal: ctrl.signal });
+    if (!res.ok) throw new Error(`Open Food Facts returned ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+const COUNTRY_TAG: Record<Exclude<FoodRegion, 'world'>, string> = { de: 'en:germany', us: 'en:united-states' };
+
+/**
+ * Open Food Facts' full-text search service (search-a-licious). It is faster
+ * and less rate-limited than the older cgi/search.pl endpoint.
+ */
+async function searchALicious(query: string, region: FoodRegion, signal?: AbortSignal): Promise<OffProduct[]> {
+  const filter = region === 'world' ? '' : ` countries_tags:"${COUNTRY_TAG[region]}"`;
+  const langs = region === 'de' ? 'de,en' : 'en';
+  const url =
+    `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query.trim() + filter)}` +
+    `&langs=${langs}&page_size=30&fields=${FIELDS}`;
+  const data = await getJson(url, signal);
+  return Array.isArray(data?.hits) ? data.hits : [];
+}
+
+async function searchLegacy(query: string, region: FoodRegion, signal?: AbortSignal): Promise<OffProduct[]> {
+  const url =
+    `${host(region)}/cgi/search.pl?search_terms=${encodeURIComponent(query.trim())}&search_simple=1&action=process&json=1` +
+    `&page_size=30&sort_by=unique_scans_n&fields=${FIELDS}`;
+  const data = await getJson(url, signal);
+  return data?.products ?? [];
 }
 
 export async function lookupBarcode(code: string, signal?: AbortSignal, region: FoodRegion = 'us'): Promise<Food | null> {
@@ -128,13 +162,31 @@ export async function lookupBarcode(code: string, signal?: AbortSignal, region: 
   return productToFood({ code, ...data.product }, region);
 }
 
+const searchCache = new Map<string, Food[]>();
+
 export async function searchFoods(query: string, signal?: AbortSignal, region: FoodRegion = 'world'): Promise<Food[]> {
-  const q = encodeURIComponent(query.trim());
-  const url =
-    `${host(region)}/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1` +
-    `&page_size=30&sort_by=unique_scans_n&fields=${FIELDS}`;
-  const data = await getJson(url, signal);
-  const products: OffProduct[] = data?.products ?? [];
+  const key = `${region}|${query.trim().toLowerCase()}`;
+  const cached = searchCache.get(key);
+  if (cached) return cached;
+
+  // Try the fast search service first, then the classic endpoint if it fails or finds nothing.
+  let products: OffProduct[] = [];
+  let firstError: unknown = null;
+  try {
+    products = await searchALicious(query, region, signal);
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    firstError = e;
+  }
+  if (!products.length) {
+    try {
+      products = await searchLegacy(query, region, signal);
+    } catch (e) {
+      if (signal?.aborted || firstError) throw firstError ?? e;
+      throw e;
+    }
+  }
+
   const seen = new Set<string>();
   const foods: Food[] = [];
   for (const p of products) {
@@ -143,6 +195,7 @@ export async function searchFoods(query: string, signal?: AbortSignal, region: F
     seen.add(f.id);
     foods.push(f);
   }
+  if (foods.length) searchCache.set(key, foods);
   return foods;
 }
 

@@ -5,14 +5,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Badge, Button, Card, Chip, CountUp, EmptyState, IconTile, Screen, Stepper, T } from '@/components/ui';
+import { Badge, Button, Card, Chip, CountUp, EmptyState, IconTile, Screen, T } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
 import { HealthScoreCard } from '@/components/HealthScore';
+import { PortionPicker } from '@/components/PortionPicker';
+import { gramServingIndex } from '@/lib/portion';
 import { clockTime } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { getCachedFood, mealDraft } from '@/store/session';
 import { BUILTIN_FOODS } from '@/lib/foodDatabase';
+import { GERMAN_FOODS } from '@/lib/germanFoods';
 import { healthScore, itemNutrients, NUTRIENT_INFO } from '@/lib/nutrition';
 import { prettyDate, todayKey } from '@/lib/dates';
 import { nutrientColors, spacing, useTheme } from '@/theme';
@@ -68,12 +71,15 @@ export default function FoodDetail() {
       state.customFoods.find((f) => f.id === id) ??
       state.favorites.find((f) => f.id === id) ??
       state.entries.find((e) => e.food.id === id)?.food ??
-      BUILTIN_FOODS.find((f) => f.id === id)
+      BUILTIN_FOODS.find((f) => f.id === id) ??
+      GERMAN_FOODS.find((f) => f.id === id)
     );
   }, [entry, params.foodId, state]);
 
-  const [servingIndex, setServingIndex] = useState(entry?.servingIndex ?? 0);
-  const [quantity, setQuantity] = useState(entry?.quantity ?? 1);
+  // Foods measured per 100 g open in grams so you can type what the scale says.
+  const startInGrams = !entry && food?.servings[0]?.label === '100 g' && gramServingIndex(food) >= 0;
+  const [servingIndex, setServingIndex] = useState(entry?.servingIndex ?? (startInGrams && food ? gramServingIndex(food) : 0));
+  const [quantity, setQuantity] = useState(entry?.quantity ?? (startInGrams ? 100 : 1));
   const [meal, setMeal] = useState<MealType>(entry?.meal ?? (MEALS.find((m) => m.key === params.meal)?.key || 'snacks'));
 
   if (!food) {
@@ -171,27 +177,16 @@ export default function FoodDetail() {
           </View>
 
           <Card>
-            <T weight="800" style={{ marginBottom: spacing.sm }}>Serving</T>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {food.servings.map((s, i) => (
-                <Chip
-                  key={s.label}
-                  label={s.label}
-                  active={i === servingIndex}
-                  onPress={() => {
-                    // Keep roughly the same amount when switching to a gram/ounce unit.
-                    const cur = food.servings[servingIndex].factor * quantity;
-                    setServingIndex(i);
-                    if (/^1 (g|oz)$/.test(s.label)) setQuantity(Math.round(cur / s.factor));
-                    else if (i !== servingIndex) setQuantity(1);
-                  }}
-                />
-              ))}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm }}>
-              <T weight="700">Amount</T>
-              <Stepper value={quantity} onChange={setQuantity} step={/^1 (g|oz)$/.test(food.servings[servingIndex].label) ? 10 : 0.5} />
-            </View>
+            <T weight="800" style={{ marginBottom: spacing.sm }}>How much?</T>
+            <PortionPicker
+              food={food}
+              servingIndex={servingIndex}
+              quantity={quantity}
+              onChange={(i, q) => {
+                setServingIndex(i);
+                setQuantity(q);
+              }}
+            />
             {!forBuilder && (
               <>
                 <T weight="800" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>Meal</T>
