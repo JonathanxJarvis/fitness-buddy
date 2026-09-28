@@ -7,31 +7,51 @@ import { itemNutrients, servingText } from './nutrition';
 import { formatWeight } from './units';
 
 /**
- * Claude powers the Coach chat and meal-photo estimates. Requests go straight
- * from the phone to the Claude API with the user's own key. Server-side
- * fallbacks are on, so if the primary model is overloaded Anthropic retries on
- * a fallback model instead of failing.
+ * Claude powers the Coach chat and meal-photo estimates. By default requests go
+ * through the app's own AI server (server/ai-proxy), which holds the API key,
+ * so users need no key. Someone who adds a personal key in Profile calls the
+ * Claude API directly with it instead. Server-side fallbacks are on, so if the
+ * primary model is overloaded Anthropic retries on a fallback model.
  */
 const MODEL = 'claude-opus-5';
 const BETAS = ['server-side-fallback-2026-07-01'];
 
+const PROXY_URL = process.env.EXPO_PUBLIC_AI_PROXY_URL?.replace(/\/+$/, '') || null;
+const APP_TOKEN = process.env.EXPO_PUBLIC_AI_APP_TOKEN || null;
+
+export const hasBuiltInAi = PROXY_URL !== null;
+
 export class MissingKeyError extends Error {
   constructor() {
-    super('Add your Claude API key in Profile → AI Coach to use this feature.');
+    super('AI isn’t set up in this build yet. Add a Claude API key in Profile → AI Coach.');
   }
+}
+
+/** Which way AI requests will go: a personal key, the app's server, or neither. */
+export async function aiMode(): Promise<'personal' | 'builtin' | null> {
+  if (await getApiKey()) return 'personal';
+  return PROXY_URL ? 'builtin' : null;
 }
 
 async function client(): Promise<Anthropic> {
   const apiKey = await getApiKey();
-  if (!apiKey) throw new MissingKeyError();
-  // The key belongs to the person using the app and stays on their device.
-  return new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 2 });
+  // A personal key belongs to the person using the app and stays on their device.
+  if (apiKey) return new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 2 });
+  if (!PROXY_URL) throw new MissingKeyError();
+  // The app's server adds the real key; the SDK still needs a placeholder.
+  return new Anthropic({
+    apiKey: 'proxy',
+    baseURL: PROXY_URL,
+    defaultHeaders: APP_TOKEN ? { 'x-app-token': APP_TOKEN } : undefined,
+    dangerouslyAllowBrowser: true,
+    maxRetries: 2,
+  });
 }
 
 export function friendlyError(e: unknown): string {
   if (e instanceof MissingKeyError) return e.message;
-  if (e instanceof Anthropic.AuthenticationError) return 'That Claude API key was rejected. Check it in Profile → AI Coach.';
-  if (e instanceof Anthropic.RateLimitError) return 'Claude is rate limiting this key right now. Try again in a minute.';
+  if (e instanceof Anthropic.AuthenticationError) return 'The AI service rejected this request. If you added your own key in Profile, check it there.';
+  if (e instanceof Anthropic.RateLimitError) return 'Too many AI requests right now. Try again in a minute.';
   if (e instanceof Anthropic.APIConnectionError) return 'Couldn’t reach Claude. Check your internet connection.';
   if (e instanceof Anthropic.APIError) return `Claude returned an error (${e.status ?? 'unknown'}). Try again.`;
   return e instanceof Error ? e.message : 'Something went wrong.';

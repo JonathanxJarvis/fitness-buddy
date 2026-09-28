@@ -10,6 +10,7 @@ import { ACTIVITY_LEVELS } from '@/lib/nutrition';
 import { formatHeight, formatWeight } from '@/lib/units';
 import { scheduleReminders } from '@/lib/reminders';
 import { getApiKey, maskKey, setApiKey } from '@/lib/secrets';
+import { hasBuiltInAi } from '@/lib/ai';
 import { spacing, useTheme } from '@/theme';
 import type { ThemePref, UnitSystem } from '@/lib/types';
 
@@ -96,12 +97,16 @@ export default function ProfileScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <Ionicons name="sparkles" size={18} color={colors.primary} />
           <T weight="800" style={{ flex: 1 }}>AI Coach & meal photos</T>
-          <Badge label={key ? 'CONNECTED' : 'NEEDS KEY'} color={key ? colors.primary : colors.warning} />
+          <Badge label={key ? 'YOUR KEY' : hasBuiltInAi ? 'READY' : 'NOT SET UP'} color={key || hasBuiltInAi ? colors.primary : colors.warning} />
         </View>
         <T size={14} muted style={{ marginBottom: spacing.md }}>
-          Coach chat and snap-a-meal estimates run on Claude. They need your own Claude API key from console.anthropic.com (usage is billed to that account). The key is kept in this phone’s secure storage and only sent to Anthropic.
+          {hasBuiltInAi
+            ? 'Coach chat and snap-a-meal estimates are built in, powered by Claude. No key needed. Power users can add their own Claude API key below to use their own account instead.'
+            : 'Coach chat and snap-a-meal estimates run on Claude. This build has no AI server yet, so add a Claude API key from console.anthropic.com to use them. The key is kept in this phone’s secure storage and only sent to Anthropic.'}
         </T>
-        {key && !editingKey ? (
+        {hasBuiltInAi && !key && !editingKey ? (
+          <Button small variant="secondary" title="Use my own key instead" icon="key-outline" onPress={() => setEditingKey(true)} style={{ alignSelf: 'flex-start' }} />
+        ) : key && !editingKey ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <T weight="700" style={{ flex: 1 }}>{maskKey(key)}</T>
             <Button small variant="secondary" title="Change" onPress={() => setEditingKey(true)} />

@@ -11,8 +11,7 @@ import { HealthScoreCard } from '@/components/HealthScore';
 import { mealForNow } from '@/components/TabBar';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
-import { estimateMeal, estimateToFood, friendlyError, MissingKeyError, type MealEstimate } from '@/lib/ai';
-import { getApiKey } from '@/lib/secrets';
+import { aiMode, estimateMeal, estimateToFood, friendlyError, MissingKeyError, type MealEstimate } from '@/lib/ai';
 import { pickMealPhoto, type MealPhoto } from '@/lib/photos';
 import { healthScore, scaleNutrients } from '@/lib/nutrition';
 import { todayKey } from '@/lib/dates';
@@ -116,7 +115,7 @@ export default function SnapMeal() {
   const date = params.date || todayKey();
 
   useEffect(() => {
-    getApiKey().then((k) => setHasKey(!!k));
+    aiMode().then((m) => setHasKey(m !== null));
   }, []);
 
   const analyze = async (p: MealPhoto) => {

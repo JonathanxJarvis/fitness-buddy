@@ -18,14 +18,11 @@ A nutrition and fitness tracker for iOS and Android, in the spirit of Yazio and 
 - **Diary calendar** with color-coded days and streaks, and **Progress** charts over 7, 30 or 90 days.
 - **Tips and smart nudges**, **onboarding** that builds your plan (Mifflin–St Jeor), **reminders** for meals and water, **US or metric units**, and **light, dark or automatic theme**.
 
-### AI setup (needs your own Claude API key)
+### AI setup (no key for users)
 
-Snap a meal and Coach call the Claude API directly from your phone, so they need a key:
+Like Yazio, the AI key lives on a server, not in the app. `server/ai-proxy` is a tiny Cloudflare Worker that holds your Claude API key and forwards the app's requests to Claude. Deploy it once (steps in [server/ai-proxy/README.md](server/ai-proxy/README.md)), put its URL in `.env` as `EXPO_PUBLIC_AI_PROXY_URL` (see `.env.example`), and Snap a meal and Coach work for everyone with no key. AI usage is billed to your Anthropic account.
 
-1. Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys). Usage is billed to that account (a photo estimate or chat reply costs a few cents at most).
-2. In the app, tap your avatar on Today → **AI Coach & meal photos** → paste the key → **Save key**.
-
-The key is stored in the phone's secure keychain/keystore (expo-secure-store) and is only sent to Anthropic. Requests use `claude-opus-5` with Anthropic's server-side fallbacks turned on, so a busy model falls back to another Claude model instead of failing. Without a key, the rest of the app works normally, and Snap a meal offers a clearly labeled sample result so you can see the flow.
+Requests use `claude-opus-5` with Anthropic's server-side fallbacks turned on, so a busy model falls back to another Claude model instead of failing. Anyone can still paste their own key under Profile → AI Coach & meal photos to use their own account; it's stored in the phone's secure keychain and only sent to Anthropic. With no server and no key, the rest of the app works and Snap a meal offers a clearly labeled sample result.
 
 Photo estimates are estimates: portion sizes from a picture can be off by 20% or more, so adjust the portion or edit the entry if you know better.
 

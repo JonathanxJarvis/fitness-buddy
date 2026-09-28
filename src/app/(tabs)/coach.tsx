@@ -10,8 +10,7 @@ import { FadeIn, PressScale, TypingDots } from '@/components/motion';
 import { tabBarHeight, useKeyboardVisible } from '@/components/TabBar';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
-import { askCoach, friendlyError } from '@/lib/ai';
-import { getApiKey } from '@/lib/secrets';
+import { aiMode, askCoach, friendlyError } from '@/lib/ai';
 import { pickMealPhoto, type MealPhoto } from '@/lib/photos';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
 import type { ChatMessage } from '@/lib/types';
@@ -105,7 +104,7 @@ export default function CoachScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      getApiKey().then((k) => setHasKey(!!k));
+      aiMode().then((m) => setHasKey(m !== null));
     }, []),
   );
 
@@ -161,7 +160,7 @@ export default function CoachScreen() {
           <T size={22} weight="800">Coach</T>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: hasKey ? colors.primary : colors.warning }} />
-            <T size={12} muted>{hasKey ? 'Powered by Claude · knows your goals & log' : 'Needs a Claude API key'}</T>
+            <T size={12} muted>{hasKey ? 'Powered by Claude · knows your goals & log' : 'AI not set up yet'}</T>
           </View>
         </View>
         {state.chat.length > 0 && <IconButton label="Clear chat" icon="trash-outline" color={colors.textMuted} onPress={() => dispatch({ type: 'clearChat' })} />}
@@ -171,9 +170,9 @@ export default function CoachScreen() {
         {hasKey === false && (
           <FadeIn>
             <Card style={{ borderColor: colors.warning, borderWidth: 1 }}>
-              <T weight="800">Connect Claude to chat</T>
+              <T weight="800">AI isn’t set up yet</T>
               <T size={14} muted style={{ marginTop: 4, marginBottom: spacing.md }}>
-                Coach and meal-photo estimates use your own Claude API key. Add it once in your profile; it stays in this phone’s secure storage.
+                This build isn’t connected to the Fitness Buddy AI server. Until it is, you can add your own Claude API key in your profile.
               </T>
               <Button title="Add API key" icon="key-outline" onPress={() => router.push('/profile')} />
             </Card>
