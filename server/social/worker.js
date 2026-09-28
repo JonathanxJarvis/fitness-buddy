@@ -57,6 +57,8 @@ function cleanSnapshot(s) {
     pet: str(s.pet, 20) || undefined,
     petName: str(s.petName, 24) || undefined,
     avatar: cleanAvatar(s.avatar),
+    icon: s.icon === 'pet' ? 'pet' : undefined,
+    aura: str(s.aura, 20) || undefined,
     parts: s.parts && typeof s.parts === 'object' ? { strength: num(s.parts.strength, 100), consistency: num(s.parts.consistency, 100), momentum: num(s.parts.momentum, 100) } : undefined,
     streak: Math.round(num(s.streak, 100000)),
     recent: (Array.isArray(s.recent) ? s.recent : [])

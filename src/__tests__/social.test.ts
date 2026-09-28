@@ -159,6 +159,18 @@ describe('avatars', () => {
     expect(snap.avatar).toEqual(custom);
     expect(JSON.stringify(snap)).not.toContain('data:image');
   });
+
+  it('shares a pet profile icon only when chosen, with an owned aura', () => {
+    const plain = makeSnapshot(state, today)!;
+    expect(plain.icon).toBeUndefined();
+    expect(plain.aura).toBeUndefined();
+    const petIcon = makeSnapshot({ ...state, settings: { ...state.settings, profileIcon: 'pet', pet: 'egg', petAura: 'chalk' }, loot: { owned: ['aura:chalk'] } } as AppState, today)!;
+    expect(petIcon.icon).toBe('pet');
+    expect(petIcon.pet).toBe('egg');
+    expect(petIcon.aura).toBe('chalk');
+    const photo = makeSnapshot({ ...state, settings: { ...state.settings, profileIcon: 'photo' } }, today)!;
+    expect(photo.icon).toBeUndefined();
+  });
 });
 
 describe('social reducer', () => {

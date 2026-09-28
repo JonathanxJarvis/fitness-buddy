@@ -170,6 +170,8 @@ export interface Settings {
   avatar?: AvatarConfig;
   /** Profile photo as a small JPEG data URI. Stays on this phone: friends see `avatar`. */
   photo?: string;
+  /** What your profile picture shows: you (photo or illustrated avatar, default) or your pet. */
+  profileIcon?: ProfileIcon;
   /** Extra answers from the first-run questions (coach tone, plan and reminders can use these). */
   onboarding?: OnboardingAnswers;
 }
@@ -287,6 +289,9 @@ export interface TrainingPlan {
 }
 
 /** What friends can see about you: progression only, never food or body data. */
+/** Profile picture subject: your own picture or your pet. */
+export type ProfileIcon = 'photo' | 'pet';
+
 /** An illustrated person: each field indexes a palette or shape list in components/people/avatarConfig. */
 export interface AvatarConfig {
   face: number;
@@ -318,6 +323,10 @@ export interface SocialSnapshot {
   petName?: string;
   /** Illustrated profile picture. Photos are never synced (no image server), only this config. */
   avatar?: AvatarConfig;
+  /** 'pet' when they show their pet as their profile picture (absent means their avatar). */
+  icon?: ProfileIcon;
+  /** Their pet's equipped aura, so a pet profile picture looks the same for friends. */
+  aura?: string;
   /** Rank score parts: strength, consistency, momentum (0–100 each). */
   parts?: { strength: number; consistency: number; momentum: number };
   streak?: number;

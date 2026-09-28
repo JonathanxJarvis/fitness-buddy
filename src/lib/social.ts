@@ -3,7 +3,7 @@ import { levelFor, STAGES, stageFor, stateProgression, totalXp } from './progres
 import { addDays, fromKey, todayKey } from './dates';
 import { doneSets, findExercise, prExercises } from './training';
 import { activeDays, streakInfo } from './quests';
-import { PREVIEW } from './pro';
+import { petAura, PREVIEW } from './pro';
 import { avatarFromSeed, cleanAvatar } from '@/components/people/avatarConfig';
 
 /**
@@ -72,6 +72,8 @@ export function makeSnapshot(state: AppState, today = todayKey()): SocialSnapsho
     pet: state.settings.pet ?? 'kettle',
     petName: state.settings.petName,
     avatar: cleanAvatar(state.settings.avatar) ?? avatarFromSeed(p.name?.trim() || 'Lifter'),
+    icon: state.settings.profileIcon === 'pet' ? 'pet' : undefined,
+    aura: petAura(state) !== 'none' ? petAura(state) : undefined,
     parts: prog.parts,
     streak,
     recent: recent.slice(0, 6),

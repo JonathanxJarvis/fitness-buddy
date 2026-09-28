@@ -3,7 +3,6 @@ import { ProMark, proOutline } from '@/components/ProMark';
 import { Animated, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { ActionSheet, Card, CountUp, IconButton, IconTile, Screen, SectionTitle, T, type SheetAction } from '@/components/ui';
 import { FadeIn, PressScale, usePulse } from '@/components/motion';
@@ -17,6 +16,7 @@ import { nutrientColors, radius, spacing, useTheme } from '@/theme';
 import { addDays, fromKey, prettyDate, todayKey, WEEKDAY_LETTERS } from '@/lib/dates';
 import { activeDays, streakInfo } from '@/lib/quests';
 import { PetCard } from '@/components/PetCard';
+import { MyAvatar } from '@/components/Avatar';
 import { DailyQuests } from '@/components/Quests';
 import { CelebrationDemoCard } from '@/components/Celebrate';
 import { PREVIEW } from '@/lib/pro';
@@ -193,10 +193,8 @@ export default function Today() {
     <Screen topInset tabs>
       {/* Greeting */}
       <FadeIn delay={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.md }}>
-        <PressScale accessibilityLabel="Profile" onPress={() => router.push('/profile')}>
-          <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
-            <T size={16} weight="800" color="#fff">{(profile.name || 'Me').charAt(0).toUpperCase()}</T>
-          </LinearGradient>
+        <PressScale accessibilityLabel="Profile picture" onPress={() => router.push('/avatar')} onLongPress={() => router.push('/profile')} scaleTo={0.92}>
+          <MyAvatar size={50} frame="compact" petBadge={false} />
         </PressScale>
         <View style={{ flex: 1 }}>
           <T size={13} muted weight="600">{greetingFor(hour)}</T>

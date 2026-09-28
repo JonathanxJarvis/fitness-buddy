@@ -67,6 +67,7 @@ function RootNavigator() {
         <Stack.Screen name="food" options={{ title: 'Food details', presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="snap-meal" options={{ title: 'Snap a meal', presentation: 'fullScreenModal', headerShown: false }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="avatar" options={{ title: 'Profile picture' }} />
         <Stack.Screen name="my-foods" options={{ title: 'My foods & meals' }} />
         <Stack.Screen name="scan" options={{ title: 'Scan barcode', presentation: 'fullScreenModal', headerShown: false }} />
         <Stack.Screen name="custom-food" options={{ title: 'Custom food', presentation: 'modal' }} />

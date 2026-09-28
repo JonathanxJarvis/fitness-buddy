@@ -7,12 +7,16 @@ import { PressScale } from '@/components/motion';
 import { radius, spacing, useTheme } from '@/theme';
 import type { AvatarConfig } from '@/lib/types';
 import { PortraitCircle } from './Portrait';
+import { ProfileIconPicker } from './ProfileIconPicker';
 import { avatarFromSeed, BEARDS, BG_DARK, BG_LIGHT, FACES, GLASSES, HAIR_COLORS, HAIRS, SKIN_TONES, TOP_COLORS, TOPS } from './avatarConfig';
 
 type Key = keyof AvatarConfig;
 
-/** Build-your-own portrait: a live preview plus rows of visual choices. */
-export function AvatarEditor({ value, onChange }: { value: AvatarConfig; onChange: (v: AvatarConfig) => void }) {
+/**
+ * Build-your-own portrait: a live preview plus rows of visual choices. By
+ * default it opens with the profile-icon choice (you or your pet).
+ */
+export function AvatarEditor({ value, onChange, iconPicker = true }: { value: AvatarConfig; onChange: (v: AvatarConfig) => void; iconPicker?: boolean }) {
   const { colors, dark } = useTheme();
   const set = (k: Key, v: number) => {
     Haptics.selectionAsync().catch(() => {});
@@ -57,6 +61,17 @@ export function AvatarEditor({ value, onChange }: { value: AvatarConfig; onChang
 
   return (
     <View>
+      {iconPicker && (
+        <View style={{ marginBottom: spacing.lg }}>
+          <T size={13} weight="800" muted style={{ marginBottom: spacing.sm, letterSpacing: 0.3 }}>
+            PROFILE ICON
+          </T>
+          <ProfileIconPicker frameSize={112} />
+          <T size={13} weight="800" muted style={{ marginTop: spacing.xl, letterSpacing: 0.3 }}>
+            YOUR AVATAR
+          </T>
+        </View>
+      )}
       <View style={{ alignItems: 'center', marginBottom: spacing.sm }}>
         <PortraitCircle config={value} size={124} dark={dark} />
         <PressScale
