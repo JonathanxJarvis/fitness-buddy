@@ -6,7 +6,7 @@ import { RankBadge } from './RankBadge';
 import { T } from './ui';
 import { nativeDriver, useTween } from './motion';
 import { useStore } from '@/store/StoreProvider';
-import { STAGES, stateProgression, TIERS } from '@/lib/progression';
+import { previewMaxed, STAGES, stateProgression, TIERS } from '@/lib/progression';
 import { LinearGradient as ExpoGradient } from 'expo-linear-gradient';
 import { Pet, PETS, type Species } from './Mascot';
 import { EVOLUTION } from './pet/Gear';
@@ -38,7 +38,7 @@ export function CelebrationProvider({ children }: { children: React.ReactNode })
   const stage = useMemo(
     () => (state.profile ? stateProgression(state, todayKey()).stage.index : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.workouts, state.profile, state.exercises, state.questLog],
+    [state.workouts, state.profile, state.exercises, state.questLog, state.settings.previewMax],
   );
   const prevStage = useRef<number | null>(null);
   useEffect(() => {
@@ -719,25 +719,36 @@ function demoJoined(stageIndex: number): string[] {
 
 /** Preview-only card that plays the chest and rank-up animations on demand. */
 export function CelebrationDemoCard() {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const celebrate = useCelebrate();
   const stage = state.profile ? stateProgression(state, todayKey()).stage.index : 0;
+  const maxed = previewMaxed(state.settings);
   return (
-    <Pressable
-      onPress={() => celebrate(demoCelebrations(stage))}
-      accessibilityRole="button"
-      accessibilityLabel="Play demo: open a chest and rank up twice"
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, backgroundColor: '#12241A', marginBottom: 12 }}
-    >
-      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#E5A914', alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={26} height={26} viewBox="0 0 20 20">
-          <Polygon points="6,3 17,10 6,17" fill="#3A2A00" />
-        </Svg>
-      </View>
-      <View style={{ flex: 1 }}>
-        <T weight="800" color="#fff">Watch a chest and two rank-ups</T>
-        <T size={12} color="rgba(255,255,255,0.7)">Preview demo. Your data doesn’t change.</T>
-      </View>
-    </Pressable>
+    <View style={{ marginBottom: 12 }}>
+      <Pressable
+        onPress={() => celebrate(demoCelebrations(stage))}
+        accessibilityRole="button"
+        accessibilityLabel="Play demo: open a chest and rank up twice"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, backgroundColor: '#12241A' }}
+      >
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#E5A914', alignItems: 'center', justifyContent: 'center' }}>
+          <Svg width={26} height={26} viewBox="0 0 20 20">
+            <Polygon points="6,3 17,10 6,17" fill="#3A2A00" />
+          </Svg>
+        </View>
+        <View style={{ flex: 1 }}>
+          <T weight="800" color="#fff">Watch a chest and two rank-ups</T>
+          <T size={12} color="rgba(255,255,255,0.7)">Preview demo. Your data doesn’t change.</T>
+        </View>
+      </Pressable>
+      <Pressable
+        onPress={() => dispatch({ type: 'updateSettings', settings: { previewMax: !maxed } })}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: maxed }}
+        style={{ alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 12 }}
+      >
+        <T size={12} weight="700" muted>{maxed ? 'Preview: maxed out (Titan) · Show my real rank' : 'Preview: your real rank · Max me out'}</T>
+      </Pressable>
+    </View>
   );
 }

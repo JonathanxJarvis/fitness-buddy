@@ -30,7 +30,7 @@ export default function RankScreen() {
   const p = useMemo(
     () => stateProgression(state, todayKey()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.workouts, state.profile, state.exercises, state.questLog],
+    [state.workouts, state.profile, state.exercises, state.questLog, state.settings.previewMax],
   );
   const cur = p.stage;
   const next = STAGES[cur.index + 1];
@@ -47,7 +47,7 @@ export default function RankScreen() {
     return () => clearTimeout(t);
   }, [width, pathTop, cur.index]);
 
-  const claimed = useMemo(() => new Set((state.questLog ?? []).map((q) => q.id)), [state.questLog]);
+  const claimed = useMemo(() => new Set((state.questLog ?? []).map((q) => q.id)), [state.questLog, state.settings.previewMax]);
   const celebrate = useCelebrate();
   const openChest = (id: string) => {
     celebrate({ kind: 'chest', xp: CHEST_XP_PATH, title: 'World chest', color: cur.tier.color, claim: id });

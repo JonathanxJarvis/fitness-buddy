@@ -75,7 +75,7 @@ export default function Train() {
   const restSeconds = state.restSeconds ?? 90;
 
   const today = todayKey();
-  const prog = useMemo(() => stateProgression(state, today), [state.workouts, state.profile, state.exercises, state.questLog, today]);
+  const prog = useMemo(() => stateProgression(state, today), [state.workouts, state.profile, state.exercises, state.questLog, state.settings.previewMax, today]);
   const recent = [...state.workouts].reverse().slice(0, 8);
   const prs = useMemo(
     () =>

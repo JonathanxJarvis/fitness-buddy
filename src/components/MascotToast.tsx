@@ -45,7 +45,7 @@ export function MascotToast() {
   const prog = useMemo(
     () => (state.profile ? stateProgression(state, todayKey()) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.workouts, state.profile, state.exercises, state.questLog],
+    [state.workouts, state.profile, state.exercises, state.questLog, state.settings.previewMax],
   );
   const today = todayKey();
   const protein = useMemo(() => state.entries.filter((e) => e.date === today).reduce((s, e) => s + itemNutrients(e).protein, 0), [state.entries, today]);

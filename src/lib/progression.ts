@@ -323,14 +323,35 @@ export function progression(workouts: Workout[], bodyKg: number, sex: Sex, today
 }
 
 /** Everything the app state knows, fed into the rank. */
+/** Preview builds start maxed out (Titan, all gear) unless the tester switches it off. */
+const PREVIEW = process.env.EXPO_PUBLIC_PREVIEW === '1';
+export const previewMaxed = (settings?: { previewMax?: boolean }) => PREVIEW && settings?.previewMax !== false;
+
 export function stateProgression(
-  state: { workouts: Workout[]; exercises: { date: string; minutes: number }[]; profile: { weightKg: number; sex: Sex } | null; questLog?: { date: string; xp: number; id: string }[] },
+  state: { workouts: Workout[]; exercises: { date: string; minutes: number }[]; profile: { weightKg: number; sex: Sex } | null; questLog?: { date: string; xp: number; id: string }[]; settings?: { previewMax?: boolean } },
   today: string,
 ): Progression {
   const log = state.questLog ?? [];
-  return progression(state.workouts, state.profile?.weightKg ?? 75, state.profile?.sex ?? 'male', today, {
+  const real = progression(state.workouts, state.profile?.weightKg ?? 75, state.profile?.sex ?? 'male', today, {
     cardio: state.exercises,
     questDays: log.filter((q) => q.id.startsWith('q:')).map((q) => q.date),
     bonusXp: log.reduce((n, q) => n + q.xp, 0),
   });
+  if (!previewMaxed(state.settings)) return real;
+  let xp = 0;
+  for (let l = 1; l < 50; l++) xp += xpForLevel(l);
+  const lvl = levelFor(xp + 400);
+  const top = STAGES[STAGES.length - 1];
+  return {
+    ...real,
+    score: 100,
+    parts: { strength: 100, consistency: 100, momentum: 100 },
+    stage: top,
+    progress: 1,
+    xp: xp + 400,
+    level: lvl.level,
+    levelInto: lvl.into,
+    levelNeeded: lvl.needed,
+    history: real.history.map((h, i, a) => ({ ...h, score: Math.round(60 + (40 * (i + 1)) / a.length) })),
+  };
 }
