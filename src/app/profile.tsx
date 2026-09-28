@@ -12,7 +12,7 @@ import { scheduleReminders } from '@/lib/reminders';
 import { getApiKey, maskKey, setApiKey } from '@/lib/secrets';
 import { hasBuiltInAi } from '@/lib/ai';
 import { spacing, useTheme } from '@/theme';
-import type { ThemePref, UnitSystem } from '@/lib/types';
+import type { FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
 
 const chevron = (color: string) => <Ionicons name="chevron-forward" size={18} color={color} />;
 
@@ -142,6 +142,18 @@ export default function ProfileScreen() {
           ]}
           style={{ marginBottom: spacing.lg }}
         />
+        <T weight="700" style={{ marginBottom: spacing.sm }}>Food database</T>
+        <Segmented<FoodRegion>
+          value={state.settings.foodRegion}
+          onChange={(r) => dispatch({ type: 'updateSettings', settings: { foodRegion: r } })}
+          options={[
+            { key: 'de', label: 'Germany' },
+            { key: 'us', label: 'USA' },
+            { key: 'world', label: 'Worldwide' },
+          ]}
+          style={{ marginBottom: 6 }}
+        />
+        <T size={12} muted style={{ marginBottom: spacing.lg }}>Which country’s supermarket products show first in search. Barcode scans work for every country.</T>
         <T weight="700" style={{ marginBottom: spacing.sm }}>Appearance</T>
         <Segmented<ThemePref>
           value={state.settings.theme}

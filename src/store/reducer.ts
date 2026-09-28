@@ -11,8 +11,19 @@ import type {
   Settings,
 } from '@/lib/types';
 
+/** German-language phones get German supermarket products first. */
+function defaultRegion(): Settings['foodRegion'] {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale ?? '';
+    if (/^de\b|-DE$|-AT$|-CH$/i.test(locale)) return 'de';
+    if (/-US$/i.test(locale)) return 'us';
+  } catch {}
+  return 'world';
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   units: 'us',
+  foodRegion: defaultRegion(),
   theme: 'system',
   reminders: {
     meals: false,

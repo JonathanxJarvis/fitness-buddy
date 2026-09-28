@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { bmr, calculateGoals, healthScore, itemNutrients, mealItemsToLog, sumItems, exerciseCalories } from '@/lib/nutrition';
 import { fdcToFood } from '@/lib/usda';
 import { estimateToFood, parseEstimate } from '@/lib/ai';
-import { productToFood, nutrientsPer100g } from '@/lib/openFoodFacts';
+import { extractGtin, productToFood, nutrientsPer100g } from '@/lib/openFoodFacts';
 import { BUILTIN_FOODS, searchLocal } from '@/lib/foodDatabase';
 import { currentStreak, longestStreak, monthGrid, addDays, parseTime } from '@/lib/dates';
 import { kgToLb, lbToKg, formatHeight, formatWater } from '@/lib/units';
@@ -90,6 +90,21 @@ describe('Open Food Facts mapping', () => {
     const n = nutrientsPer100g({ energy_100g: 418.4, salt_100g: 1 })!;
     expect(n.calories).toBeCloseTo(100);
     expect(n.sodium).toBeCloseTo(400);
+  });
+
+  it('uses German names for the German region', () => {
+    const p = { code: '4001', product_name: 'Skyr Natur', product_name_en: 'Plain skyr', product_name_de: 'Skyr Natur', nutriments: { 'energy-kcal_100g': 63, proteins_100g: 11, carbohydrates_100g: 4, fat_100g: 0.2 } };
+    expect(productToFood(p, 'de')!.name).toBe('Skyr Natur');
+    expect(productToFood(p, 'us')!.name).toBe('Plain skyr');
+  });
+
+  it('reads product numbers from barcodes and GS1 QR codes', () => {
+    expect(extractGtin('4006040002513')).toBe('4006040002513');
+    expect(extractGtin('https://id.gs1.org/01/04006040002513/10/ABC123')).toBe('4006040002513');
+    expect(extractGtin('https://brand.example/01/04006040002513?17=261231')).toBe('4006040002513');
+    expect(extractGtin('(01)04006040002513(17)261231')).toBe('4006040002513');
+    expect(extractGtin('0104006040002513172612311')).toBe('4006040002513');
+    expect(extractGtin('https://example.com/menu')).toBeNull();
   });
 
   it('rejects products without nutrition', () => {

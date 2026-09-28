@@ -142,8 +142,12 @@ export interface ReminderSettings {
   waterEveryHours: number;
 }
 
+/** Which country's supermarket products come first in search. */
+export type FoodRegion = 'de' | 'us' | 'world';
+
 export interface Settings {
   units: UnitSystem;
+  foodRegion: FoodRegion;
   theme: ThemePref;
   reminders: ReminderSettings;
 }

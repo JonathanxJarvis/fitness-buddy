@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, IconButton, Screen, T } from '@/components/ui';
 import { useStore } from '@/store/StoreProvider';
 import { cacheFood } from '@/store/session';
-import { lookupBarcode } from '@/lib/openFoodFacts';
+import { extractGtin, lookupBarcode } from '@/lib/openFoodFacts';
 import { spacing, useTheme } from '@/theme';
 
 export default function Scan() {
@@ -17,7 +17,7 @@ export default function Scan() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const busy = useRef(false);
-  const [status, setStatus] = useState<'scanning' | 'looking' | 'notfound' | 'error'>('scanning');
+  const [status, setStatus] = useState<'scanning' | 'looking' | 'notfound' | 'error' | 'notproduct'>('scanning');
   const [code, setCode] = useState('');
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
@@ -40,15 +40,22 @@ export default function Scan() {
   const onScanned = async (r: BarcodeScanningResult) => {
     if (busy.current) return;
     busy.current = true;
-    setCode(r.data);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    // QR and DataMatrix codes on newer packs carry the same product number (GS1).
+    const gtin = extractGtin(r.data);
+    if (!gtin) {
+      setCode(r.data);
+      setStatus('notproduct');
+      return;
+    }
+    setCode(gtin);
 
-    const custom = state.customFoods.find((f) => f.barcode === r.data);
+    const custom = state.customFoods.find((f) => f.barcode === gtin);
     if (custom) return openFood(custom.id);
 
     setStatus('looking');
     try {
-      const food = await lookupBarcode(r.data);
+      const food = await lookupBarcode(gtin, undefined, state.settings.foodRegion);
       if (food) return openFood(cacheFood(food));
       setStatus('notfound');
     } catch {
@@ -70,7 +77,7 @@ export default function Scan() {
       <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr', 'datamatrix'] }}
         onBarcodeScanned={status === 'scanning' ? onScanned : undefined}
       />
       <View style={{ position: 'absolute', top: insets.top + 8, left: 16 }}>
@@ -78,7 +85,7 @@ export default function Scan() {
       </View>
       <View pointerEvents="none" style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <View style={{ width: 280, height: 160, borderRadius: 18, borderWidth: 3, borderColor: colors.primary }} />
-        <T color="#fff" weight="600" style={{ marginTop: spacing.lg }}>Point at a barcode</T>
+        <T color="#fff" weight="600" style={{ marginTop: spacing.lg }}>Point at a barcode or QR code</T>
       </View>
       {status !== 'scanning' && (
         <View style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 24, backgroundColor: colors.card, borderRadius: 20, padding: spacing.lg }}>
@@ -103,6 +110,15 @@ export default function Scan() {
                   onPress={() => router.replace({ pathname: '/custom-food', params: { barcode: code, meal: params.meal ?? '', date: params.date ?? '', target: params.target ?? '' } })}
                 />
               </View>
+            </>
+          )}
+          {status === 'notproduct' && (
+            <>
+              <T weight="700" size={16}>That code isn’t a product</T>
+              <T muted style={{ marginVertical: spacing.sm }} numberOfLines={3}>
+                This QR code doesn’t contain a product number. Try the barcode or the GS1 QR code on the pack.
+              </T>
+              <Button small title="Scan again" onPress={retry} />
             </>
           )}
           {status === 'error' && (

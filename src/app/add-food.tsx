@@ -26,6 +26,7 @@ export default function AddFood() {
   const { state, dispatch } = useStore();
   const { colors } = useTheme();
 
+  const region = state.settings.foodRegion;
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<Tab>('recent');
   const [online, setOnline] = useState<Food[]>([]);
@@ -53,11 +54,13 @@ export default function AddFood() {
     const ctrl = new AbortController();
     setLoading(true);
     const t = setTimeout(() => {
-      Promise.allSettled([searchUsda(q, ctrl.signal), searchFoods(q, ctrl.signal)])
+      Promise.allSettled([searchUsda(q, ctrl.signal), searchFoods(q, ctrl.signal, region)])
         .then(([usda, off]) => {
           if (ctrl.signal.aborted) return;
-          const a = usda.status === 'fulfilled' ? usda.value : [];
-          const b = off.status === 'fulfilled' ? off.value : [];
+          const u = usda.status === 'fulfilled' ? usda.value : [];
+          const o = off.status === 'fulfilled' ? off.value : [];
+          // German shoppers get their supermarket products first; USDA (US foods) follows.
+          const [a, b] = region === 'de' ? [o, u] : [u, o];
           if (usda.status === 'rejected' && off.status === 'rejected') {
             setError('Couldn’t reach the online food databases. Check your connection.');
           }
@@ -83,7 +86,7 @@ export default function AddFood() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [query]);
+  }, [query, region]);
 
   const openFood = (food: Food) => {
     cacheFood(food);
@@ -138,7 +141,7 @@ export default function AddFood() {
       <Stack.Screen options={{ title: forBuilder ? 'Add to saved meal' : `Add to ${mealLabel}` }} />
       <View style={{ padding: spacing.lg, paddingBottom: 0 }}>
         <Field
-          placeholder="Search foods, e.g. “greek yogurt”"
+          placeholder={region === 'de' ? 'Search foods, e.g. “Skyr” or “Rewe Vollkornbrot”' : 'Search foods, e.g. “greek yogurt”'}
           value={query}
           onChangeText={setQuery}
           autoCorrect={false}
@@ -181,7 +184,7 @@ export default function AddFood() {
               )}
               {localResults.map(foodRow)}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.lg }}>
-                <T size={12} weight="800" muted style={{ letterSpacing: 0.6 }}>USDA & OPEN FOOD FACTS</T>
+                <T size={12} weight="800" muted style={{ letterSpacing: 0.6 }}>{region === 'de' ? 'DEUTSCHE SUPERMÄRKTE & USDA' : 'USDA & OPEN FOOD FACTS'}</T>
                 {loading && <ActivityIndicator size="small" color={colors.primary} />}
               </View>
               {error && <T size={13} color={colors.danger} style={{ marginTop: 6 }}>{error}</T>}

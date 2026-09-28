@@ -1,10 +1,19 @@
-import type { Food, Nutrients, Serving } from './types';
+import type { Food, FoodRegion, Nutrients, Serving } from './types';
 
 // Open Food Facts is a free, open database of ~3M packaged foods. No API key needed,
 // but they ask apps to identify themselves with a User-Agent.
 const BASE = 'https://world.openfoodfacts.org';
 const HEADERS = { 'User-Agent': 'FitnessBuddy/1.0 (React Native; open-source hobby app)' };
-const FIELDS = 'code,product_name,product_name_en,generic_name,brands,nutriments,serving_size,serving_quantity';
+const FIELDS = 'code,product_name,product_name_en,product_name_de,generic_name,generic_name_de,brands,nutriments,serving_size,serving_quantity';
+
+/**
+ * Country subdomains filter search to that country's products and prefer its
+ * language, so de.openfoodfacts.org returns German supermarket items (Rewe,
+ * Edeka, Aldi, Lidl, dm, …) with German names.
+ */
+function host(region: FoodRegion) {
+  return region === 'world' ? BASE : `https://${region}.openfoodfacts.org`;
+}
 
 type Nutriments = Record<string, number | string | undefined>;
 
@@ -12,6 +21,8 @@ export interface OffProduct {
   code?: string;
   product_name?: string;
   product_name_en?: string;
+  product_name_de?: string;
+  generic_name_de?: string;
   generic_name?: string;
   brands?: string;
   nutriments?: Nutriments;
@@ -75,9 +86,10 @@ export function nutrientsPer100g(n: Nutriments = {}): Nutrients | null {
 }
 
 /** Convert an OFF product to our Food shape. Base serving is the package serving, else 100 g. */
-export function productToFood(p: OffProduct): Food | null {
+export function productToFood(p: OffProduct, region: FoodRegion = 'us'): Food | null {
   const per100 = nutrientsPer100g(p.nutriments);
-  const name = (p.product_name_en || p.product_name || p.generic_name || '').trim();
+  const names = region === 'de' ? [p.product_name_de, p.product_name, p.generic_name_de, p.product_name_en] : [p.product_name_en, p.product_name, p.generic_name];
+  const name = (names.find((n) => n && n.trim()) ?? '').trim();
   if (!per100 || !name) return null;
 
   const grams = num(p.serving_quantity);
@@ -109,26 +121,47 @@ async function getJson(url: string, signal?: AbortSignal): Promise<any> {
   return res.json();
 }
 
-export async function lookupBarcode(code: string, signal?: AbortSignal): Promise<Food | null> {
+export async function lookupBarcode(code: string, signal?: AbortSignal, region: FoodRegion = 'us'): Promise<Food | null> {
+  // Barcodes are global, so look them up worldwide; the region only picks the name language.
   const data = await getJson(`${BASE}/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`, signal);
   if (data?.status !== 1 || !data.product) return null;
-  return productToFood({ code, ...data.product });
+  return productToFood({ code, ...data.product }, region);
 }
 
-export async function searchFoods(query: string, signal?: AbortSignal): Promise<Food[]> {
+export async function searchFoods(query: string, signal?: AbortSignal, region: FoodRegion = 'world'): Promise<Food[]> {
   const q = encodeURIComponent(query.trim());
   const url =
-    `${BASE}/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1` +
+    `${host(region)}/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1` +
     `&page_size=30&sort_by=unique_scans_n&fields=${FIELDS}`;
   const data = await getJson(url, signal);
   const products: OffProduct[] = data?.products ?? [];
   const seen = new Set<string>();
   const foods: Food[] = [];
   for (const p of products) {
-    const f = productToFood(p);
+    const f = productToFood(p, region);
     if (!f || seen.has(f.id)) continue;
     seen.add(f.id);
     foods.push(f);
   }
   return foods;
+}
+
+/**
+ * Pulls the product number (GTIN) out of anything the scanner reads: a plain
+ * EAN/UPC barcode, a GS1 Digital Link QR code (https://…/01/04012345678901…),
+ * or a GS1 element string ("(01)04012345678901…" or "0104012345678901…").
+ * Returns null for QR codes that don't identify a product.
+ */
+export function extractGtin(data: string): string | null {
+  const s = data.trim();
+  if (/^\d{8}$|^\d{12,14}$/.test(s)) return s;
+  const m =
+    /\/01\/(\d{8,14})(?=[/?#]|$)/.exec(s) ?? // Digital Link URL
+    /^\(01\)(\d{14})/.exec(s) ?? // human-readable element string
+    /^(?:\]d2|\]Q3|\x1d)?01(\d{14})/.exec(s); // raw element string (DataMatrix / QR)
+  if (!m) return null;
+  let gtin = m[1].padStart(14, '0');
+  // Open Food Facts stores EAN-13 codes, so drop the GTIN-14 leading zero(s).
+  while (gtin.length > 13 && gtin.startsWith('0')) gtin = gtin.slice(1);
+  return gtin;
 }
