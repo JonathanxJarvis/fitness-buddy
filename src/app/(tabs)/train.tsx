@@ -9,7 +9,7 @@ import { useStore } from '@/store/StoreProvider';
 import { addDays, fromKey, shortDate, todayKey, WEEKDAY_LETTERS } from '@/lib/dates';
 import { countPRs, durationMinutes, findExercise, personalRecords, TEMPLATES, workoutVolume } from '@/lib/training';
 import { useStartWorkout } from '@/lib/useStartWorkout';
-import { progression, STAGES } from '@/lib/progression';
+import { stateProgression, STAGES } from '@/lib/progression';
 import { unreadCount } from '@/lib/social';
 import { RankBadge } from '@/components/RankBadge';
 import { formatWeight, kgToLb, weightUnit } from '@/lib/units';
@@ -75,7 +75,7 @@ export default function Train() {
   const restSeconds = state.restSeconds ?? 90;
 
   const today = todayKey();
-  const prog = useMemo(() => progression(state.workouts, state.profile?.weightKg ?? 75, state.profile?.sex ?? 'male', today), [state.workouts, state.profile, today]);
+  const prog = useMemo(() => stateProgression(state, today), [state.workouts, state.profile, state.exercises, state.questLog, today]);
   const week = useMemo(() => {
     const startKey = addDays(today, -fromKey(today).getDay());
     return Array.from({ length: 7 }, (_, i) => addDays(startKey, i));
@@ -106,7 +106,7 @@ export default function Train() {
           <T size={26} weight="800">Train</T>
         </View>
         <Pressable
-          onPress={() => router.push('/friends')}
+          onPress={() => router.navigate('/crew')}
           accessibilityLabel="Friends"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, marginRight: 6 }}
         >

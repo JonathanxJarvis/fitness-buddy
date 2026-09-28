@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -14,7 +14,9 @@ import { GERMAN_FOODS } from '@/lib/germanFoods';
 import { searchFoods } from '@/lib/openFoodFacts';
 import { searchUsda } from '@/lib/usda';
 import { FoodThumb } from '@/components/FoodThumb';
-import { mealItemsToLog, sumItems } from '@/lib/nutrition';
+import { MEAL_SHARES, mealItemsToLog, sumItems } from '@/lib/nutrition';
+import { mealToFood, searchMeals, suggestMeals } from '@/lib/meals';
+import { daySummary } from '@/lib/selectors';
 import { todayKey } from '@/lib/dates';
 import { spacing, useTheme } from '@/theme';
 import { MEALS, type Food, type MealType, type SavedMeal } from '@/lib/types';
@@ -47,6 +49,17 @@ export default function AddFood() {
     return [...byId.values()];
   }, [state.customFoods, state.favorites, recents, region]);
   const localResults = useMemo(() => searchLocal(localPool, query).slice(0, 25), [localPool, query]);
+  // Real meals from the offline meal library, loggable as one food.
+  const mealResults = useMemo(() => (query.trim().length >= 2 ? searchMeals(query, region).slice(0, 6).map((m) => mealToFood(m, region)) : []), [query, region]);
+  // Empty search: a few meal ideas that fit what's left of today's budget.
+  const ideas = useMemo(() => {
+    const g = state.goals;
+    if (!g) return [];
+    const day = daySummary(state, date);
+    const kcalLeft = g.calories + day.burned - day.totals.calories;
+    const target = Math.max(150, Math.min(kcalLeft, g.calories * MEAL_SHARES[meal] * 1.2));
+    return suggestMeals({ meal, kcalLeft: Math.max(kcalLeft, 150), proteinLeft: g.protein - day.totals.protein, region, n: 4, kcalTarget: target, seed: date }).map((m) => mealToFood(m, region));
+  }, [state, date, meal, region]);
 
   // Debounced online search across USDA FoodData Central and Open Food Facts.
   useEffect(() => {
@@ -175,6 +188,26 @@ export default function AddFood() {
           <Button small icon="create-outline" title="Create" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
           <Button small icon="flash-outline" title="Quick" variant="secondary" style={{ flex: 1, paddingHorizontal: 6, gap: 5 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, quick: '1', target: forBuilder ? 'builder' : '' } })} />
         </View>
+        {!query && ideas.length > 0 && (
+          <>
+            <T size={12} weight="800" muted style={{ letterSpacing: 0.6, marginBottom: 6 }}>MEAL IDEAS FOR {mealLabel.toUpperCase()}</T>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginHorizontal: -spacing.lg, marginBottom: spacing.md }} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+              {ideas.map((f) => (
+                <Pressable
+                  key={f.id}
+                  onPress={() => openFood(f)}
+                  style={({ pressed }) => ({ width: 168, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 14, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, opacity: pressed ? 0.6 : 1 })}
+                >
+                  <View style={{ flex: 1 }}>
+                    <T size={13} weight="700" numberOfLines={2}>{f.name}</T>
+                    <T size={11} muted numberOfLines={1} style={{ marginTop: 2 }}>{Math.round(f.nutrients.calories)} kcal · {Math.round(f.nutrients.protein)} g protein</T>
+                  </View>
+                  <IconButton filled size={18} label={`Quick add ${f.name}`} icon="add" onPress={() => quickAdd(f)} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        )}
         {!query && (
           <Segmented<Tab>
             value={tab}
@@ -202,6 +235,10 @@ export default function AddFood() {
                 <T size={12} weight="800" muted style={{ marginTop: spacing.sm, letterSpacing: 0.6 }}>{region === 'de' ? 'GERMAN STAPLES & SAVED FOODS' : 'COMMON & SAVED FOODS'}</T>
               )}
               {localResults.map(foodRow)}
+              {mealResults.length > 0 && (
+                <T size={12} weight="800" muted style={{ marginTop: spacing.sm, letterSpacing: 0.6 }}>MEALS</T>
+              )}
+              {mealResults.map(foodRow)}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.lg }}>
                 <T size={12} weight="800" muted style={{ letterSpacing: 0.6 }}>{region === 'de' ? 'OPEN FOOD FACTS DEUTSCHLAND & USDA' : 'USDA & OPEN FOOD FACTS'}</T>
                 {loading && <ActivityIndicator size="small" color={colors.primary} />}

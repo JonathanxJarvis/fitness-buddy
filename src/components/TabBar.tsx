@@ -16,8 +16,8 @@ import { useStartWorkout } from '@/lib/useStartWorkout';
 const TABS: Record<string, { label: string; icon: IconName; active: IconName }> = {
   index: { label: 'Today', icon: 'home-outline', active: 'home' },
   train: { label: 'Train', icon: 'barbell-outline', active: 'barbell' },
+  crew: { label: 'Crew', icon: 'people-outline', active: 'people' },
   coach: { label: 'Coach', icon: 'sparkles-outline', active: 'sparkles' },
-  progress: { label: 'Progress', icon: 'stats-chart-outline', active: 'stats-chart' },
 };
 
 /** Height of the bar above the bottom inset; screens pad by this much. */

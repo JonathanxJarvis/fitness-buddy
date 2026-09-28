@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, IconButton, ProgressBar, Sheet, T } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
 import { RankBadge } from '@/components/RankBadge';
-import { Kettle } from '@/components/Mascot';
+import { Avatar } from '@/components/Avatar';
 import { LineChart } from '@/components/Charts';
 import { useStore } from '@/store/StoreProvider';
 import { levelsGained, makeSnapshot, removeFriend, scoreGained } from '@/lib/social';
@@ -37,7 +37,13 @@ export default function FriendScreen() {
   const points = f.history.map((score, i) => ({ label: shortDate(addDays(today, -7 * (7 - i))), value: score }));
   const vs: { label: string; them: number; you: number; fmt?: (n: number) => string }[] = mine
     ? [
-        { label: 'Strength score', them: f.score, you: mine.score, fmt: (n) => `${Math.round(n)}` },
+        { label: 'Rank points', them: f.score, you: mine.score, fmt: (n) => `${Math.round(n)}` },
+        ...(f.parts && mine.parts
+          ? [
+              { label: 'Strength', them: f.parts.strength, you: mine.parts.strength, fmt: (n: number) => `${Math.round(n)}` },
+              { label: 'Consistency', them: f.parts.consistency, you: mine.parts.consistency, fmt: (n: number) => `${Math.round(n)}` },
+            ]
+          : []),
         { label: 'Level', them: f.level, you: mine.level },
         { label: 'Growth (8 wks)', them: scoreGained(f), you: scoreGained(mine), fmt: (n) => `+${n}` },
         { label: 'Workouts this week', them: f.weekWorkouts, you: mine.weekWorkouts },
@@ -61,15 +67,16 @@ export default function FriendScreen() {
         </View>
         <FadeIn style={{ alignItems: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-            <RankBadge stage={stage} size={92} />
-            <View style={{ marginLeft: -14, marginBottom: -4 }}>
-              <Kettle size={52} mood="pumped" skin={f.skin} band={stage.tier.color} />
+            <Avatar stage={f.stage} pet={f.pet} skin={f.skin} size={128} mood="pumped" animate />
+            <View style={{ marginLeft: -26, marginBottom: 0 }}>
+              <RankBadge stage={stage} size={50} />
             </View>
           </View>
           <T size={26} weight="800" style={{ marginTop: spacing.sm }}>{f.name}</T>
           <T size={14} weight="700" color={colors.textMuted}>
-            {stage.label} · Level {f.level}
+            {stage.label} · Level {f.level}{f.streak ? ` · 🔥 ${f.streak}-day streak` : ''}
           </T>
+          {f.petName ? <T size={12} muted>with {f.petName}</T> : null}
         </FadeIn>
       </LinearGradient>
 

@@ -1,11 +1,13 @@
-import { BUILTIN_FOODS } from './foodDatabase';
+import { BUILTIN_FOODS, searchLocal } from './foodDatabase';
 import { GERMAN_FOODS } from './germanFoods';
 import { addDays, todayKey } from './dates';
 import { MEAL_SHARES } from './nutrition';
 import { daySummary } from './selectors';
 import { findExercise, TEMPLATES } from './training';
-import { LEVEL_NAMES, LIFTS, progression, STAGES } from './progression';
+import { LEVEL_NAMES, LIFTS, stateProgression, STAGES } from './progression';
 import { formatWeight, weightValue, weightUnit } from './units';
+import { mealName, normalizeText, searchMeals, suggestMeals, type Meal } from './meals';
+import { searchUsdaMeals } from './mealsOnline';
 import type { AppState, Food, MealType, Muscle } from './types';
 
 /*
@@ -51,7 +53,6 @@ export function proteinPicks(foods: Food[], kcalLeft: number, n = 3): Food[] {
 }
 
 const serving = (f: Food) => f.servings[0].label;
-const line = (f: Food) => `**${f.name}** (${serving(f)}): ${r(f.nutrients.protein)} g protein, ${r(f.nutrients.calories)} kcal`;
 
 function mealNow(): MealType {
   const h = new Date().getHours();
@@ -74,26 +75,116 @@ function howAmIDoing(c: Ctx): string {
   return `${kcalLine}, ${protein}.\n- Eaten: ${r(c.eaten.kcal)} kcal, ${r(c.eaten.protein)} g protein\n- Burned: ${r(c.burned)} kcal from exercise\n\n${tip}`;
 }
 
+// ---------- meals ----------
+
+const region = (c: Ctx) => c.state.settings.foodRegion;
+
+/** Big eaters: suggest 1½ servings when one serving is well under the target and it still fits. */
+function portionsFor(m: Meal, target: number, kcalLeft: number): number {
+  const k = m.nutrients.calories * 1.5;
+  return target >= m.nutrients.calories * 1.4 && k <= kcalLeft && k <= target * 1.05 ? 1.5 : 1;
+}
+
+function mealLine(c: Ctx, m: Meal, portions = 1): string {
+  const size = portions === 1 ? `1 serving, ${m.grams} g` : `1½ servings, ${r(m.grams * portions)} g`;
+  return `**${mealName(m, region(c))}** (${size}): ${r(m.nutrients.calories * portions)} kcal, ${r(m.nutrients.protein * portions)} g protein`;
+}
+
 function protein(c: Ctx): string {
   if (c.left.protein <= 0) return `You’ve hit your protein goal today (${r(c.eaten.protein)} g). Anything more is a bonus, not a must.`;
-  const picks = proteinPicks(c.foods, c.left.kcal);
-  return `You need **${r(c.left.protein)} g more protein** with ${r(Math.max(0, c.left.kcal))} kcal left. Best value picks:\n${picks.map((f) => `- ${line(f)}`).join('\n')}\n\nTwo of those gets you most of the way.`;
+  const kcal = Math.max(0, c.left.kcal);
+  const small = kcal < 350;
+  const picks = suggestMeals({
+    meal: small ? 'snacks' : undefined,
+    kcalLeft: Math.max(kcal, 150),
+    proteinLeft: c.left.protein,
+    region: region(c),
+    n: 3,
+    tags: ['high-protein'],
+    kcalTarget: Math.max(150, Math.min(kcal, 550)),
+    seed: c.today,
+  });
+  const best = picks[0];
+  const share = best ? Math.min(100, Math.round((best.nutrients.protein / c.left.protein) * 100)) : 0;
+  return `You need **${r(c.left.protein)} g more protein** with ${r(kcal)} kcal left. Protein-first ${small ? 'snacks' : 'meals'} that fit:\n${picks.map((m) => `- ${mealLine(c, m)}`).join('\n')}\n\n${share >= 100 ? 'Any one of those closes the gap.' : `The first one alone covers ~${share}% of what’s left.`}`;
 }
 
 function whatToEat(c: Ctx, q: string): string {
   const meal: MealType = /breakfast|frühstück/.test(q) ? 'breakfast' : /lunch|mittag/.test(q) ? 'lunch' : /dinner|abend/.test(q) ? 'dinner' : /snack/.test(q) ? 'snacks' : mealNow();
   const target = Math.max(150, Math.min(c.left.kcal, c.state.goals!.calories * MEAL_SHARES[meal] * 1.2));
-  const main = proteinPicks(c.foods, target, 6);
-  const pick = main[new Date().getDate() % Math.max(1, main.length)];
-  const carbs = c.foods.filter((f) => f.nutrients.carbs >= 20 && f.nutrients.calories <= target - (pick?.nutrients.calories ?? 0) && f.nutrients.fat < 10);
-  const carb = carbs[(new Date().getDay() * 3) % Math.max(1, carbs.length)];
-  const veg = c.foods.filter((f) => f.nutrients.calories < 60 && (f.nutrients.fiber ?? 0) >= 1.5);
-  const v = veg[new Date().getDate() % Math.max(1, veg.length)];
-  const items = [pick, carb, v].filter(Boolean) as Food[];
-  const total = items.reduce((s, f) => s + f.nutrients.calories, 0);
-  const prot = items.reduce((s, f) => s + f.nutrients.protein, 0);
-  if (c.left.kcal < 150) return `You’re at ${r(c.left.kcal)} kcal left, so keep it tiny: ${line(proteinPicks(c.foods, 200, 1)[0])}. Or have tea and call it a win.`;
-  return `For ${meal === 'snacks' ? 'a snack' : meal}, aim for about **${r(target)} kcal**. Try:\n${items.map((f) => `- ${line(f)}`).join('\n')}\n\nThat’s ~${r(total)} kcal and ${r(prot)} g protein. Tap + to log any of them.`;
+  if (c.left.kcal < 150) {
+    const tiny = suggestMeals({ meal: 'snacks', kcalLeft: 150, proteinLeft: Math.max(30, c.left.protein), region: region(c), n: 1, kcalTarget: 130, seed: c.today })[0];
+    return `You’re at ${r(c.left.kcal)} kcal left, so keep it tiny: ${tiny ? mealLine(c, tiny) : 'a cup of skyr or two boiled eggs'}. Or have tea and call it a win.`;
+  }
+  const picks = suggestMeals({ meal, kcalLeft: c.left.kcal, proteinLeft: c.left.protein, region: region(c), n: 3, kcalTarget: target, seed: c.today });
+  const proteinAim = c.left.protein > 0 ? ` and ~${r(Math.max(10, c.left.protein * Math.min(1, target / Math.max(1, c.left.kcal))))} g protein` : '';
+  return `For ${meal === 'snacks' ? 'a snack' : meal}, aim for about **${r(target)} kcal**${proteinAim}. Pick one:\n${picks.map((m) => `- ${mealLine(c, m, portionsFor(m, target, c.left.kcal))}`).join('\n')}\n\nSearch the name in Add food to log it in one tap.`;
+}
+
+// ---------- dish lookups ("how many calories in lasagne", "Nährwerte Döner") ----------
+
+const DISH_ASK =
+  /nährwert|naehrwert|nutrition|macros? (in|of|for)\b|makros|\b(calories|calorie|kalorien|kcal|protein|eiweiß|eiweiss|carbs|kohlenhydrate)\s+(in|of|for|im|hat|haben|von|does|do)\b|\b(how many|how much|wie viele?|wieviele?)\s+(calories|kcal|kalorien|protein|eiweiß|eiweiss|carbs)\s+(does|do|is|are|has|have|hat|haben|sind|stecken|steckt)\b/;
+const DISH_STOP = new Set(
+  (
+    'how many much what what’s whats is are does do has have had in of for a an the one some typical average plate portion serving big small ' +
+    'calories calorie kcal protein proteins eiweiß eiweiss macros macro makros nutrition nutritional nutrients facts info values value carbs carb fat ' +
+    'wie viel viele wieviel wieviele was welche sind ist hat haben stecken steckt enthält ein eine einer einem einen der die das den dem des im von vom für ' +
+    'kalorien nährwerte nährwert naehrwerte kohlenhydrate fett there contain contains'
+  ).split(' '),
+);
+const PERSONAL = /\b(i|me|my|left|today|eaten|burn|burned|burnt|need|should|goal|budget|ich|mir|mein|meine|übrig|heute|noch|brauche|gegessen|ziel)\b/;
+
+/** The dish a nutrition question asks about, or null when it isn't one. */
+export function dishFromQuestion(q: string): string | null {
+  const s = q.toLowerCase();
+  if (!DISH_ASK.test(s)) return null;
+  const words = s
+    .replace(/[?!.,:;"“”„'‘’()]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !DISH_STOP.has(w));
+  const dish = words.join(' ').trim();
+  if (!dish || PERSONAL.test(dish)) return null;
+  return dish;
+}
+
+function fitsToday(c: Ctx, kcal: number): string {
+  if (c.left.kcal <= 0) return `You’re at your budget today, so maybe save it for tomorrow.`;
+  if (kcal <= c.left.kcal) return `Fits today: you have ${r(c.left.kcal)} kcal left.`;
+  return kcal / 2 <= c.left.kcal ? `That’s more than the ${r(c.left.kcal)} kcal you have left today; half a portion fits.` : `That’s well over the ${r(c.left.kcal)} kcal you have left today.`;
+}
+
+/** Answer from the offline meal library or the offline food lists; null when neither knows the dish. */
+function localDish(c: Ctx, dish: string): string | null {
+  const reg = region(c);
+  const foods = searchLocal(reg === 'de' ? [...GERMAN_FOODS, ...BUILTIN_FOODS] : [...BUILTIN_FOODS, ...GERMAN_FOODS], dish);
+  const base = (f: Food) => normalizeText(f.name.split(/[,(]/)[0].trim());
+  const q = normalizeText(dish);
+  // A plain food asked by its exact name ("calories in a banana") beats meals that merely contain it.
+  const exact = foods.find((f) => base(f) === q || base(f) === `${q}s` || `${base(f)}s` === q);
+  const hits = exact ? [] : searchMeals(dish, reg);
+  if (hits.length) {
+    const m = hits[0];
+    const n = m.nutrients;
+    const made = m.ingredients.slice(0, 5).map((i) => `${reg === 'de' ? i.nameDe : i.name} ${i.grams} g`).join(', ') + (m.ingredients.length > 5 ? ', …' : '');
+    const others = hits.slice(1, 3).map((x) => `${mealName(x, reg)} (${r(x.nutrients.calories)} kcal)`);
+    return (
+      `**${mealName(m, reg)}** (1 serving, ${m.grams} g): **${r(n.calories)} kcal**, ${r(n.protein)} g protein, ${r(n.carbs)} g carbs, ${r(n.fat)} g fat.\n- Made with: ${made}` +
+      (m.tags.includes('treat') ? `\n- A treat: fine now and then, just plan the rest of the day around it.` : '') +
+      (others.length ? `\n- Similar: ${others.join(', ')}` : '') +
+      `\n\n${fitsToday(c, n.calories)}`
+    );
+  }
+  if (foods.length) {
+    const f = exact ?? foods[0];
+    const n = f.nutrients;
+    return `**${f.name}** (${serving(f)}): **${r(n.calories)} kcal**, ${r(n.protein)} g protein, ${r(n.carbs)} g carbs, ${r(n.fat)} g fat.\n\n${fitsToday(c, n.calories)}`;
+  }
+  return null;
+}
+
+function dishInfo(c: Ctx, dish: string): string {
+  return localDish(c, dish) ?? `I don’t have **${dish}** in my offline meal list yet. When you’re online I can look it up in the USDA database of prepared dishes. You can also search it in Add food or scan the barcode.`;
 }
 
 function trainToday(c: Ctx): string {
@@ -124,7 +215,7 @@ function daysBetween(a: string, b: string) {
 
 function rank(c: Ctx): string {
   const p = c.state.profile!;
-  const pr = progression(c.state.workouts, p.weightKg, p.sex, c.today);
+  const pr = stateProgression(c.state, c.today);
   const next = STAGES[pr.stage.index + 1];
   const units = c.state.settings.units;
   if (!pr.lifts.length) return `You’re **Rookie III** for now. Log a squat, bench, deadlift, overhead press or pull-ups and I’ll rank you. You’re **level ${pr.level}** from ${pr.xp} XP.`;
@@ -170,46 +261,38 @@ function recovery(): string {
   return `Recovery checklist:\n- **Sleep** 7–9 hours\n- **Protein** spread over 3–5 meals\n- **Soreness** is normal for 1–3 days; light movement helps more than rest\n- Train a muscle again when it’s no longer sore to the touch\n\nSharp or joint pain is different: back off and get it checked.`;
 }
 
-function plan(c: Ctx): string {
+function plan(c: Ctx, q: string): string {
   const g = c.state.goals!;
-  const f = c.foods;
-  const pick = (re: RegExp) => f.find((x) => re.test(x.name));
-  const de = c.state.settings.foodRegion === 'de';
-  const meals: [string, (Food | undefined)[]][] = de
-    ? [
-        ['Breakfast', [pick(/^Haferflocken/), pick(/^Skyr/), pick(/^Heidelbeeren/)]],
-        ['Lunch', [pick(/^Hähnchenbrust/), pick(/^Reis \(gekocht/), pick(/^Brokkoli/)]],
-        ['Snack', [pick(/^Magerquark/), pick(/^Apfel/)]],
-        ['Dinner', [pick(/^Lachsfilet/), pick(/^Kartoffeln/), pick(/^Blattsalat/)]],
-      ]
-    : [
-        ['Breakfast', [pick(/^Rolled oats/), pick(/^Greek yogurt/), pick(/^Blueberries/)]],
-        ['Lunch', [pick(/^Chicken breast, cooked/), pick(/^Brown rice/), pick(/^Broccoli/)]],
-        ['Snack', [pick(/^Cottage cheese/), pick(/^Apple/)]],
-        ['Dinner', [pick(/^Salmon/), pick(/^Sweet potato/), pick(/^Mixed salad/)]],
-      ];
+  const reg = region(c);
+  // A plan usually means tomorrow; seed with that day so it differs from today's ideas.
+  const seed = /today|heute/.test(q) ? c.today : addDays(c.today, 1);
+  const prep = /meal prep|vorkochen/.test(q);
+  const slots: [string, MealType][] = [['Breakfast', 'breakfast'], ['Lunch', 'lunch'], ['Snack', 'snacks'], ['Dinner', 'dinner']];
+  const used: string[] = [];
   let kcal = 0;
   let prot = 0;
-  const lines = meals.map(([name, items]) => {
-    const ok = items.filter(Boolean) as Food[];
-    const k = ok.reduce((s, x) => s + x.nutrients.calories, 0);
-    kcal += k;
-    prot += ok.reduce((s, x) => s + x.nutrients.protein, 0);
-    return `- **${name}**: ${ok.map((x) => `${x.name} (${serving(x)})`).join(', ')} · ${r(k)} kcal`;
+  const lines = slots.map(([label, meal]) => {
+    const opts = { meal, kcalLeft: g.calories - kcal, proteinLeft: g.protein - prot, region: reg, n: 1, kcalTarget: g.calories * MEAL_SHARES[meal], exclude: used, seed };
+    const m = (prep && meal !== 'snacks' && meal !== 'breakfast' ? suggestMeals({ ...opts, tags: ['meal-prep'] })[0] : undefined) ?? suggestMeals(opts)[0];
+    if (!m) return `- **${label}**: something light`;
+    used.push(m.id);
+    kcal += m.nutrients.calories;
+    prot += m.nutrients.protein;
+    return `- **${label}**: ${mealName(m, reg)} · ${r(m.nutrients.calories)} kcal, ${r(m.nutrients.protein)} g protein`;
   });
   const scale = g.calories / Math.max(1, kcal);
   return `A simple day for your ${g.calories.toLocaleString()} kcal goal:\n${lines.join('\n')}\n\nBase plan: ~${r(kcal)} kcal, ${r(prot)} g protein. ${scale > 1.1 ? `Scale portions up about ${Math.round((scale - 1) * 100)}% to hit your goal.` : scale < 0.9 ? `Trim portions about ${Math.round((1 - scale) * 100)}% to fit.` : 'That lands right on target.'}`;
 }
 
 function help(c: Ctx): string {
-  return `I’m Buddy Coach. I work offline and know your numbers. Ask me things like:\n- “How am I doing today?”\n- “What should I eat for dinner?”\n- “How do I hit my protein?”\n- “What should I train today?”\n- “How do I rank up?”\n- “Plan my meals for tomorrow”\n\nRight now: ${r(Math.max(0, c.left.kcal))} kcal and ${r(Math.max(0, c.left.protein))} g protein left.`;
+  return `I’m Buddy Coach. I work offline and know your numbers. Ask me things like:\n- “How am I doing today?”\n- “What should I eat for dinner?”\n- “How do I hit my protein?”\n- “How many calories in a Döner?”\n- “What should I train today?”\n- “How do I rank up?”\n- “Plan my meals for tomorrow”\n\nRight now: ${r(Math.max(0, c.left.kcal))} kcal and ${r(Math.max(0, c.left.protein))} g protein left.`;
 }
 
 const INTENTS: [RegExp, (c: Ctx, q: string) => string][] = [
   [/rank|level|xp|stage|strong(er)?|stärker|stufe/, rank],
   [/plateau|stuck|stall|nicht mehr|keine fortschritte/, (c) => plateau(c.state.settings.units === 'us' ? '5 lb' : '2.5 kg')],
   [/(what|which).*(train|lift|workout|do today)|train today|trainieren|workout today|split|gym today/, trainToday],
-  [/plan|tomorrow|morgen|meal prep/, plan],
+  [/plan|tomorrow|morgen|meal prep|vorkochen/, plan],
   [/protein|eiweiß|eiweiss/, protein],
   [/eat|snack|dinner|lunch|breakfast|hungry|essen|hunger|frühstück|mittag|abendessen|meal idea/, whatToEat],
   [/creatin|supplement|whey|vitamin/, (_c, q) => supplements(q)],
@@ -223,8 +306,34 @@ export function offlineReply(question: string, state: AppState, today = todayKey
   if (!state.goals || !state.profile) return 'Finish setting up your profile first, then ask me anything.';
   const q = question.toLowerCase();
   const c = context(state, today);
+  const dish = dishFromQuestion(q);
+  if (dish) return dishInfo(c, dish);
   for (const [re, fn] of INTENTS) if (re.test(q)) return fn(c, q);
   if (/^(hi|hey|hello|hallo|moin|servus|yo)\b/.test(q)) return `Hey${c.name ? ` ${c.name}` : ''}! ${help(c).split('\n\n')[0].replace('I’m Buddy Coach. ', '')}`;
   if (/thank|danke/.test(q)) return 'Anytime. Now go crush it. 💪';
   return help(c);
+}
+
+/**
+ * Like offlineReply, but when the question is about a dish the offline library
+ * doesn't know, looks it up in USDA FoodData Central (prepared dishes, FNDDS).
+ * Falls back to the offline answer when there's no connection or no match.
+ */
+export async function offlineReplyAsync(question: string, state: AppState, today = todayKey(), opts: { signal?: AbortSignal } = {}): Promise<string> {
+  const sync = offlineReply(question, state, today);
+  if (!state.goals || !state.profile) return sync;
+  const dish = dishFromQuestion(question);
+  if (!dish) return sync;
+  const c = context(state, today);
+  if (localDish(c, dish)) return sync;
+  const found = await searchUsdaMeals(dish, opts);
+  if (!found.length) return `I couldn’t find **${dish}** offline, and the USDA database didn’t have an answer right now. Search it in Add food or scan the barcode for the exact product.`;
+  const [f, ...rest] = found;
+  const n = f.nutrients;
+  const others = rest.slice(0, 2).map((x) => `${x.name} (${r(x.nutrients.calories)} kcal per ${x.servings[0].label})`);
+  return (
+    `**${f.name}** (${f.servings[0].label}): **${r(n.calories)} kcal**, ${r(n.protein)} g protein, ${r(n.carbs)} g carbs, ${r(n.fat)} g fat.\n- Source: USDA FoodData Central (typical US recipe)` +
+    (others.length ? `\n- Also: ${others.join(', ')}` : '') +
+    `\n\n${fitsToday(c, n.calories)}`
+  );
 }

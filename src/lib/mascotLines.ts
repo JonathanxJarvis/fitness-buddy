@@ -11,6 +11,8 @@ export type MascotEvent =
   | 'proteinHit'
   | 'water'
   | 'streak'
+  | 'quest'
+  | 'chest'
   | 'hello';
 
 /**
@@ -65,6 +67,14 @@ const LINES: Record<MascotEvent, { mood: Mood; lines: string[] }> = {
   streak: {
     mood: 'pumped',
     lines: ['{n}-day streak! Don’t break the chain.', '{n} days straight. Unstoppable.'],
+  },
+  quest: {
+    mood: 'proud',
+    lines: ['Quest done! XP in the bag.', 'Quest cleared. You’re on a roll, {name}.', 'Check! One less thing, one more level.'],
+  },
+  chest: {
+    mood: 'pumped',
+    lines: ['Chest opened! Shiny XP!', 'Loot! I love loot.', 'Treasure time. You earned it.'],
   },
   hello: {
     mood: 'wink',

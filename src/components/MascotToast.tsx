@@ -3,16 +3,16 @@ import { Animated, Platform, Pressable, View } from 'react-native';
 import { FullWindowOverlay } from 'react-native-screens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Kettle, usePop, type Mood } from './Mascot';
+import { Kettle, usePop, type Mood, type Species } from './Mascot';
 import { T } from './ui';
 import { useStore } from '@/store/StoreProvider';
 import { mascotLine, type MascotEvent } from '@/lib/mascotLines';
-import { progression } from '@/lib/progression';
+import { stateProgression } from '@/lib/progression';
 import { doneSets, prExercises } from '@/lib/training';
 import { itemNutrients } from '@/lib/nutrition';
 import { todayKey } from '@/lib/dates';
 import { useTheme } from '@/theme';
-import { mascotSkin } from '@/lib/pro';
+import { mascotSkin, petSpecies } from '@/lib/pro';
 
 interface Toast {
   id: number;
@@ -20,7 +20,7 @@ interface Toast {
   mood: Mood;
 }
 
-const PRIORITY: Record<MascotEvent, number> = { rankUp: 5, levelUp: 4, pr: 3, proteinHit: 2, workoutDone: 2, workoutStart: 2, meal: 1, water: 1, setDone: 0, streak: 1, hello: 0 };
+const PRIORITY: Record<MascotEvent, number> = { rankUp: 5, levelUp: 4, chest: 3, quest: 3, pr: 3, proteinHit: 2, workoutDone: 2, workoutStart: 2, meal: 1, water: 1, setDone: 0, streak: 1, hello: 0 };
 
 /**
  * Watches the app state and has Kettle pop up in the top corner when something
@@ -32,13 +32,13 @@ export function MascotToast() {
   const insets = useSafeAreaInsets();
   const [toast, setToast] = useState<Toast | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prev = useRef<null | { active: string | null; workouts: number; entries: number; sets: number; protein: number; water: number; level: number; stage: number }>(null);
+  const prev = useRef<null | { active: string | null; workouts: number; entries: number; sets: number; protein: number; water: number; level: number; stage: number; quests: number }>(null);
   const enabled = state.settings.mascot !== false;
   const pop = usePop(!!toast);
 
   const prog = useMemo(
-    () => (state.profile ? progression(state.workouts, state.profile.weightKg, state.profile.sex, todayKey()) : null),
-    [state.workouts, state.profile],
+    () => (state.profile ? stateProgression(state, todayKey()) : null),
+    [state.workouts, state.profile, state.exercises, state.questLog],
   );
   const today = todayKey();
   const protein = useMemo(() => state.entries.filter((e) => e.date === today).reduce((s, e) => s + itemNutrients(e).protein, 0), [state.entries, today]);
@@ -63,6 +63,7 @@ export function MascotToast() {
       water: state.water[today] ?? 0,
       level: prog.level,
       stage: prog.stage.index,
+      quests: state.questLog?.length ?? 0,
     };
     const p = prev.current;
     prev.current = now;
@@ -87,11 +88,15 @@ export function MascotToast() {
       events.push(['meal', { food: e?.food.name.split(',')[0] ?? 'that' }]);
     }
     if (now.water > p.water) events.push(['water', {}]);
+    if (now.quests > p.quests) {
+      const last = state.questLog![state.questLog!.length - 1];
+      events.push([last.id.startsWith('q:') || last.id === 'week' ? 'quest' : 'chest', {}]);
+    }
     if (!events.length) return;
     events.sort((a, b) => PRIORITY[b[0]] - PRIORITY[a[0]]);
     show(...events[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, state.activeWorkout, state.workouts, state.entries, state.water, protein, prog]);
+  }, [ready, state.activeWorkout, state.workouts, state.entries, state.water, state.questLog, protein, prog]);
 
   useEffect(() => () => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -109,7 +114,7 @@ export function MascotToast() {
             </View>
           </AnimatedBubble>
           <AnimatedBubble pop={pop} scale>
-            <Kettle key={toast.id} size={58} mood={toast.mood} band={band} skin={mascotSkin(state)} />
+            <Kettle key={toast.id} species={petSpecies(state) as Species} size={58} mood={toast.mood} band={band} skin={mascotSkin(state)} />
           </AnimatedBubble>
         </View>
       </Pressable>

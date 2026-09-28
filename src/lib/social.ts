@@ -1,7 +1,8 @@
-import type { AppState, Friend, SocialMessage, SocialSnapshot, SocialState } from './types';
-import { levelFor, progression, STAGES, totalXp } from './progression';
-import { addDays, todayKey } from './dates';
-import { doneSets } from './training';
+import type { AppState, Friend, SocialEvent, SocialMessage, SocialSnapshot, SocialState } from './types';
+import { levelFor, STAGES, stageFor, stateProgression, totalXp } from './progression';
+import { addDays, fromKey, todayKey } from './dates';
+import { doneSets, findExercise, prExercises } from './training';
+import { activeDays, streakInfo } from './quests';
 import { PREVIEW } from './pro';
 
 /**
@@ -19,9 +20,35 @@ type Me = NonNullable<SocialState['me']>;
 export function makeSnapshot(state: AppState, today = todayKey()): SocialSnapshot | null {
   const p = state.profile;
   if (!p) return null;
-  const prog = progression(state.workouts, p.weightKg, p.sex, today);
+  const prog = stateProgression(state, today);
   const weekStart = addDays(today, -6);
-  const last = [...state.workouts].sort((a, b) => a.startedAt - b.startedAt).pop();
+  const sorted = [...state.workouts].sort((a, b) => a.startedAt - b.startedAt);
+  const last = sorted[sorted.length - 1];
+  const bonusBy = (date: string) => (state.questLog ?? []).filter((q) => q.date <= date).reduce((n, q) => n + q.xp, 0);
+
+  // Highlights for friends' feeds: workouts, PRs, rank-ups and cleared quests.
+  const recent: SocialEvent[] = [];
+  sorted.slice(-6).forEach((w) => {
+    const i = sorted.indexOf(w);
+    const at = w.endedAt ?? w.startedAt;
+    const prs = prExercises(w, sorted.slice(0, i));
+    if (prs.length) recent.push({ kind: 'pr', text: `set a PR on ${findExercise(prs[0], state.customExercises)?.name ?? 'a lift'}`, at });
+    else recent.push({ kind: 'workout', text: `finished ${w.name} · ${doneSets(w)} sets`, at });
+  });
+  prog.history.forEach((h, i) => {
+    if (i === 0) return;
+    const before = stageFor(prog.history[i - 1].score);
+    const after = stageFor(h.score);
+    if (after.index > before.index) recent.push({ kind: 'rank', text: `reached ${after.label}`, at: fromKey(h.date).getTime() + 12 * 3600_000 });
+  });
+  (state.questLog ?? [])
+    .filter((q) => q.id === 'chest')
+    .slice(-3)
+    .forEach((q) => recent.push({ kind: 'quests', text: 'cleared all daily quests', at: fromKey(q.date).getTime() + 20 * 3600_000 }));
+  const streak = streakInfo(activeDays(state), today).streak;
+  if (streak >= 7) recent.push({ kind: 'streak', text: `is on a ${streak}-day streak`, at: Date.now() - 3600_000 });
+  recent.sort((a, b) => b.at - a.at);
+
   return {
     name: p.name?.trim() || 'Lifter',
     score: prog.score,
@@ -29,11 +56,16 @@ export function makeSnapshot(state: AppState, today = todayKey()): SocialSnapsho
     level: prog.level,
     xp: prog.xp,
     history: prog.history.map((h) => h.score),
-    levels: prog.history.map((h) => levelFor(totalXp(state.workouts.filter((w) => w.date <= h.date))).level),
+    levels: prog.history.map((h) => levelFor(totalXp(state.workouts.filter((w) => w.date <= h.date)) + bonusBy(h.date)).level),
     weekWorkouts: state.workouts.filter((w) => w.date >= weekStart && w.date <= today).length,
     totalWorkouts: state.workouts.length,
     lastWorkout: last ? { name: last.name, date: last.date, sets: doneSets(last) } : undefined,
     skin: state.settings.mascotSkin,
+    pet: state.settings.pet ?? 'kettle',
+    petName: state.settings.petName,
+    parts: prog.parts,
+    streak,
+    recent: recent.slice(0, 6),
     updatedAt: Date.now(),
   };
 }
@@ -73,16 +105,29 @@ function randomCode(r: () => number = Math.random): string {
 
 // ---------- Demo crew ----------
 
-const DEMO_PEOPLE: { name: string; code: string; base: number; growth: number; level: number; pace: number; skin: string; last: string }[] = [
-  { name: 'Lena', code: 'LENA26', base: 52, growth: 9, level: 23, pace: 4, skin: 'cherry', last: 'Leg day' },
-  { name: 'Marco', code: 'MRC777', base: 70, growth: 4, level: 31, pace: 5, skin: 'midnight', last: 'Push' },
-  { name: 'Aisha', code: 'AISHA1', base: 30, growth: 14, level: 11, pace: 3, skin: 'neon', last: 'Full body' },
+type DemoPerson = { name: string; code: string; base: number; growth: number; level: number; pace: number; skin: string; last: string; pet: string; petName: string; streak: number };
+const DEMO_PEOPLE: DemoPerson[] = [
+  { name: 'Lena', code: 'LENA26', base: 52, growth: 9, level: 23, pace: 4, skin: 'cherry', last: 'Leg day', pet: 'avo', petName: 'Guac', streak: 19 },
+  { name: 'Marco', code: 'MRC777', base: 70, growth: 4, level: 31, pace: 5, skin: 'midnight', last: 'Push', pet: 'dumbbell', petName: 'Tank', streak: 41 },
+  { name: 'Aisha', code: 'AISHA1', base: 30, growth: 14, level: 11, pace: 3, skin: 'classic', last: 'Full body', pet: 'flame', petName: 'Sparky', streak: 8 },
+  { name: 'Tom', code: 'TOMFIT', base: 41, growth: 6, level: 17, pace: 2, skin: 'classic', last: 'Upper body', pet: 'shaker', petName: 'Wheyne', streak: 3 },
+  { name: 'Sofia', code: 'SOFIA9', base: 58, growth: 11, level: 26, pace: 4, skin: 'gold', last: 'Pull', pet: 'egg', petName: 'Yolko', streak: 12 },
 ];
+const PR_LIFTS = ['Squat', 'Bench press', 'Deadlift', 'Overhead press', 'Pull-up', 'Hip thrust'];
 const DEMO_NAMES = ['Jonas', 'Mia', 'Tariq', 'Sofia', 'Ben', 'Nora', 'Luca', 'Emma', 'Yusuf', 'Clara'];
 const DEMO_WORKOUTS = ['Push', 'Pull', 'Legs', 'Upper body', 'Full body', 'Leg day'];
 
-function demoFriend(p: (typeof DEMO_PEOPLE)[number], today: string): Friend {
+function demoFriend(p: DemoPerson, today: string): Friend {
   const r = rng(p.code);
+  const hour = 3600_000;
+  const recent: SocialEvent[] = [
+    { kind: 'pr' as const, text: `set a PR on ${PR_LIFTS[Math.floor(r() * PR_LIFTS.length)]}`, at: Date.now() - (1 + Math.floor(r() * 20)) * hour },
+    { kind: 'workout' as const, text: `finished ${p.last} · ${14 + Math.floor(r() * 10)} sets`, at: Date.now() - (2 + Math.floor(r() * 30)) * hour },
+    { kind: 'quests' as const, text: 'cleared all daily quests', at: Date.now() - (5 + Math.floor(r() * 40)) * hour },
+    ...(p.growth > 8 ? [{ kind: 'rank' as const, text: `reached ${stageFor(p.base).label}`, at: Date.now() - (20 + Math.floor(r() * 50)) * hour }] : []),
+    ...(p.streak >= 7 ? [{ kind: 'streak' as const, text: `is on a ${p.streak}-day streak`, at: Date.now() - 3 * hour }] : []),
+  ].sort((a, b) => b.at - a.at);
+  const strength = Math.min(100, Math.round(p.base * 1.1));
   const history = Array.from({ length: 8 }, (_, i) => Math.round(Math.max(0, p.base - p.growth + (p.growth * i) / 7 + (r() - 0.5) * 2)));
   history[7] = p.base;
   const levels = Array.from({ length: 8 }, (_, i) => Math.max(1, Math.round(p.level - (7 - i) * (p.pace / 3))));
@@ -101,7 +146,12 @@ function demoFriend(p: (typeof DEMO_PEOPLE)[number], today: string): Friend {
     totalWorkouts: p.level * 3 + 4,
     lastWorkout: { name: p.last, date: addDays(today, -Math.floor(r() * 3)), sets: 14 + Math.floor(r() * 10) },
     skin: p.skin,
-    updatedAt: Date.now() - Math.floor(r() * 5) * 3600_000,
+    pet: p.pet,
+    petName: p.petName,
+    parts: { strength, consistency: Math.min(100, Math.round((p.pace * 4 * 100) / 14)), momentum: Math.min(100, Math.round(p.growth * 5)) },
+    streak: p.streak,
+    recent,
+    updatedAt: Date.now() - Math.floor(r() * 5) * hour,
   };
 }
 
@@ -119,6 +169,9 @@ function demoFromCode(code: string, today: string): Friend {
       pace: 1 + Math.floor(r() * 5),
       skin: ['classic', 'gold', 'midnight', 'cherry', 'neon'][Math.floor(r() * 5)],
       last: DEMO_WORKOUTS[Math.floor(r() * DEMO_WORKOUTS.length)],
+      pet: ['kettle', 'shaker', 'egg', 'dumbbell', 'avo', 'broc', 'plate', 'flame'][Math.floor(r() * 8)],
+      petName: ['Bolt', 'Nugget', 'Chip', 'Mochi', 'Rocky', 'Pesto'][Math.floor(r() * 6)],
+      streak: Math.floor(r() * 30),
     },
     today,
   );
@@ -132,6 +185,7 @@ const DEMO_OPENERS: Record<string, string> = {
   'demo-LENA26': 'Saw your last session 👀 what are you squatting these days?',
   'demo-MRC777': 'Bet you can’t out-train me this week 😤',
   'demo-AISHA1': 'Just hit a new deadlift PR!! 🎉',
+  'demo-SOFIA9': 'Race you to Gold I this week? 🏁',
 };
 
 export function demoOpener(friendId: string, at = Date.now()): SocialMessage | null {
@@ -185,7 +239,8 @@ export async function publish(me: Me, snapshot: SocialSnapshot): Promise<void> {
 }
 
 export async function fetchFriends(me: Me, current: Friend[]): Promise<Friend[]> {
-  if (DEMO) return current;
+  // Demo friends are regenerated so they pick up new fields and fresh activity.
+  if (DEMO) return current.map((f) => (f.id.startsWith('demo-') ? demoFromCode(f.code, todayKey()) : f));
   return (await api<{ friends: Friend[] }>('/friends', { me })).friends;
 }
 

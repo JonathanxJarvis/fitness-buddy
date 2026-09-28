@@ -18,7 +18,7 @@ export const PRO_FEATURES: { icon: string; title: string; body: string }[] = [
   { icon: 'camera', title: 'Snap a meal', body: 'Photograph your plate. AI finds every food, weighs the portions and logs the macros.' },
   { icon: 'sparkles', title: 'AI Coach', body: 'Chat with an AI coach that sees your log, workouts and rank, and breaks down meal photos.' },
   { icon: 'people', title: 'Unlimited training crew', body: `Link up with as many friends as you want (free: ${FREE_FRIEND_LIMIT}) and race them up the ranks.` },
-  { icon: 'color-palette', title: 'Kettle outfits', body: 'Dress your mascot in Gold, Midnight, Cherry or Neon.' },
+  { icon: 'paw', title: '5 more pets + outfits', body: 'Unlock Dumbo, Avo, Broc, Plato and Blaze, and dress any pet in Gold, Midnight, Cherry or Neon.' },
   { icon: 'heart', title: 'Support an indie app', body: 'No ads, no data selling. Pro keeps it that way.' },
 ];
 
@@ -30,4 +30,17 @@ export const PLANS = [
 /** The mascot outfit to draw: Pro users pick one, everyone else gets Classic. */
 export function mascotSkin(state: Pick<AppState, 'settings'>): string {
   return isPro(state) ? state.settings.mascotSkin ?? 'classic' : 'classic';
+}
+
+/** Pets everyone gets; the rest come with Pro. */
+export const FREE_PETS = ['kettle', 'shaker', 'egg'];
+
+/** The pet to draw: a Pro pet falls back to Kettle if Pro lapses. */
+export function petSpecies(state: Pick<AppState, 'settings'>): string {
+  const pet = state.settings.pet ?? 'kettle';
+  return isPro(state) || FREE_PETS.includes(pet) ? pet : 'kettle';
+}
+
+export function petName(state: Pick<AppState, 'settings'>, fallback = 'Kettle'): string {
+  return state.settings.petName?.trim() || fallback;
 }

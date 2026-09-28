@@ -1,5 +1,6 @@
 import { proteinTarget } from '@/lib/nutrition';
 import type {
+  QuestLogEntry,
   Friend,
   SocialMessage,
   SocialState,
@@ -96,6 +97,7 @@ export type Action =
   | { type: 'removeFriend'; id: string }
   | { type: 'addMessages'; friendId: string; messages: SocialMessage[] }
   | { type: 'markRead'; friendId: string; at: number }
+  | { type: 'claimReward'; entry: QuestLogEntry }
   | { type: 'reset' };
 
 const EMPTY_SOCIAL: SocialState = { friends: [], chats: {}, read: {} };
@@ -270,6 +272,12 @@ export function reducer(state: AppState, action: Action): AppState {
       const soc = state.social ?? EMPTY_SOCIAL;
       if ((soc.read[action.friendId] ?? 0) >= action.at) return state;
       return { ...state, social: { ...soc, read: { ...soc.read, [action.friendId]: action.at } } };
+    }
+    case 'claimReward': {
+      const log = state.questLog ?? [];
+      const e = action.entry;
+      if (log.some((q) => q.id === e.id && q.date === e.date)) return state;
+      return { ...state, questLog: [...log, e] };
     }
     case 'reset':
       return initialState;

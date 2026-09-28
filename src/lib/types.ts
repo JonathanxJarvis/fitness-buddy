@@ -158,6 +158,17 @@ export interface Settings {
   pro?: boolean;
   /** Coach answers with Claude (Pro) instead of the built-in coach. */
   coachAi?: boolean;
+  /** Pet species (see PETS in components/Mascot). */
+  pet?: string;
+  /** The name you gave your pet. */
+  petName?: string;
+}
+
+/** A claimed reward: daily quest ("q:<id>"), daily chest ("chest"), weekly challenge ("week") or path chest ("path:<n>"). */
+export interface QuestLogEntry {
+  id: string;
+  date: string;
+  xp: number;
 }
 
 export interface ChatMessage {
@@ -231,6 +242,7 @@ export interface AppState {
   /** Rest timer length in seconds. */
   restSeconds?: number;
   social?: SocialState;
+  questLog?: QuestLogEntry[];
 }
 
 /** What friends can see about you: progression only, never food or body data. */
@@ -248,7 +260,20 @@ export interface SocialSnapshot {
   totalWorkouts: number;
   lastWorkout?: { name: string; date: string; sets: number };
   skin?: string;
+  pet?: string;
+  petName?: string;
+  /** Rank score parts: strength, consistency, momentum (0–100 each). */
+  parts?: { strength: number; consistency: number; momentum: number };
+  streak?: number;
+  /** Recent highlights for the crew feed, newest first. */
+  recent?: SocialEvent[];
   updatedAt: number;
+}
+
+export interface SocialEvent {
+  kind: 'pr' | 'workout' | 'rank' | 'quests' | 'streak';
+  text: string;
+  at: number;
 }
 
 export interface Friend extends SocialSnapshot {

@@ -219,8 +219,64 @@ export function levelFor(xp: number): { level: number; into: number; needed: num
 
 // ---------- Summary ----------
 
+/** Extra activity that feeds the rank and XP beyond gym workouts. */
+export interface ProgressExtras {
+  /** Cardio sessions (date, minutes). */
+  cardio?: { date: string; minutes: number }[];
+  /** Days a daily quest was completed. */
+  questDays?: string[];
+  /** XP from quests, chests and challenges. */
+  bonusXp?: number;
+}
+
+export interface RankParts {
+  /** Lift strength vs. body weight (0–100). */
+  strength: number;
+  /** How often you train: sessions in the last 4 weeks (0–100). */
+  consistency: number;
+  /** PRs and completed quests lately (0–100). */
+  momentum: number;
+}
+
+/** How much each part counts toward the rank score. */
+export const RANK_WEIGHTS: RankParts = { strength: 0.6, consistency: 0.25, momentum: 0.15 };
+/** 14 sessions in 4 weeks (3–4 a week) maxes out consistency. */
+export const SESSIONS_FOR_MAX = 14;
+
+function prDates(workouts: Workout[]): string[] {
+  const sorted = [...workouts].sort((a, b) => a.startedAt - b.startedAt);
+  const out: string[] = [];
+  sorted.forEach((w, i) => prExercises(w, sorted.slice(0, i)).forEach(() => out.push(w.date)));
+  return out;
+}
+
+/** Gym workouts plus cardio of 15+ minutes between two dates (inclusive). */
+export function sessionsBetween(workouts: Workout[], extras: ProgressExtras, from: string, to: string): number {
+  const inWindow = (d: string) => d >= from && d <= to;
+  return workouts.filter((w) => inWindow(w.date) && doneSets(w) > 0).length + (extras.cardio ?? []).filter((c) => c.minutes >= 15 && inWindow(c.date)).length;
+}
+
+export function rankParts(workouts: Workout[], bodyKg: number, sex: Sex, asOf: string, extras: ProgressExtras = {}, prs = prDates(workouts)): RankParts {
+  const from28 = addDays(asOf, -27);
+  const from14 = addDays(asOf, -13);
+  const inWindow = (d: string, from: string) => d >= from && d <= asOf;
+  const sessions = sessionsBetween(workouts, extras, from28, asOf);
+  const recentPrs = prs.filter((d) => inWindow(d, from28)).length;
+  const questDays = new Set((extras.questDays ?? []).filter((d) => inWindow(d, from14))).size;
+  return {
+    strength: strengthScore(liftResults(workouts, bodyKg, sex, asOf)),
+    consistency: Math.min(100, Math.round((sessions / SESSIONS_FOR_MAX) * 100)),
+    momentum: Math.min(100, recentPrs * 12 + questDays * 5),
+  };
+}
+
+export function rankScore(p: RankParts): number {
+  return Math.round((p.strength * RANK_WEIGHTS.strength + p.consistency * RANK_WEIGHTS.consistency + p.momentum * RANK_WEIGHTS.momentum) * 10) / 10;
+}
+
 export interface Progression {
   score: number;
+  parts: RankParts;
   stage: Stage;
   progress: number;
   lifts: LiftResult[];
@@ -228,20 +284,53 @@ export interface Progression {
   level: number;
   levelInto: number;
   levelNeeded: number;
-  /** Strength score at the end of each of the last 8 weeks, oldest first. */
+  /** Rank score at the end of each of the last 8 weeks, oldest first. */
   history: { date: string; score: number }[];
   weakest: LiftResult | null;
+  /** Sessions (workouts + cardio) in the last 4 weeks. */
+  sessions28: number;
+  prs28: number;
 }
 
-export function progression(workouts: Workout[], bodyKg: number, sex: Sex, today: string): Progression {
+export function progression(workouts: Workout[], bodyKg: number, sex: Sex, today: string, extras: ProgressExtras = {}): Progression {
   const lifts = liftResults(workouts, bodyKg, sex);
-  const score = strengthScore(lifts);
-  const xp = totalXp(workouts);
+  const prs = prDates(workouts);
+  const parts = rankParts(workouts, bodyKg, sex, today, extras, prs);
+  const score = rankScore(parts);
+  const xp = totalXp(workouts) + (extras.bonusXp ?? 0);
   const lv = levelFor(xp);
   const history = Array.from({ length: 8 }, (_, i) => {
     const date = addDays(today, -7 * (7 - i));
-    return { date, score: strengthScore(liftResults(workouts, bodyKg, sex, date)) };
+    return { date, score: i === 7 ? score : rankScore(rankParts(workouts, bodyKg, sex, date, extras, prs)) };
   });
   const weakest = lifts.length > 1 ? [...lifts].sort((a, b) => a.score - b.score)[0] : null;
-  return { score, stage: stageFor(score), progress: stageProgress(score), lifts, xp, level: lv.level, levelInto: lv.into, levelNeeded: lv.needed, history, weakest };
+  const from28 = addDays(today, -27);
+  return {
+    score,
+    parts,
+    stage: stageFor(score),
+    progress: stageProgress(score),
+    lifts,
+    xp,
+    level: lv.level,
+    levelInto: lv.into,
+    levelNeeded: lv.needed,
+    history,
+    weakest,
+    sessions28: sessionsBetween(workouts, extras, from28, today),
+    prs28: prs.filter((d) => d >= from28 && d <= today).length,
+  };
+}
+
+/** Everything the app state knows, fed into the rank. */
+export function stateProgression(
+  state: { workouts: Workout[]; exercises: { date: string; minutes: number }[]; profile: { weightKg: number; sex: Sex } | null; questLog?: { date: string; xp: number; id: string }[] },
+  today: string,
+): Progression {
+  const log = state.questLog ?? [];
+  return progression(state.workouts, state.profile?.weightKg ?? 75, state.profile?.sex ?? 'male', today, {
+    cardio: state.exercises,
+    questDays: log.filter((q) => q.id.startsWith('q:')).map((q) => q.date),
+    bonusXp: log.reduce((n, q) => n + q.xp, 0),
+  });
 }

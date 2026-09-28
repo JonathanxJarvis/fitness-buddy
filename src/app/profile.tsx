@@ -11,8 +11,8 @@ import { formatHeight, formatWeight } from '@/lib/units';
 import { scheduleReminders } from '@/lib/reminders';
 import { getApiKey, maskKey, setApiKey } from '@/lib/secrets';
 import { hasBuiltInAi } from '@/lib/ai';
-import { isPro, PREVIEW } from '@/lib/pro';
-import { Kettle, SKINS } from '@/components/Mascot';
+import { isPro, mascotSkin, petName, petSpecies, PREVIEW } from '@/lib/pro';
+import { Kettle, type Species } from '@/components/Mascot';
 import { Pressable } from 'react-native';
 import { spacing, useTheme } from '@/theme';
 import type { FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
@@ -34,7 +34,7 @@ export default function ProfileScreen() {
   const [confirmErase, setConfirmErase] = useState(false);
   const pro = isPro(state);
   const mascotOn = state.settings.mascot !== false;
-  const skin = state.settings.mascotSkin ?? 'classic';
+  const skin = mascotSkin(state);
 
   useEffect(() => {
     getApiKey().then(setKey);
@@ -89,6 +89,7 @@ export default function ProfileScreen() {
           onPress={() => router.push('/goals')}
           right={chevron(colors.textMuted)}
         />
+        <ListRow icon="stats-chart-outline" title="Progress" subtitle="Weight, calories and training over time" onPress={() => router.push('/progress')} right={chevron(colors.textMuted)} />
         <ListRow icon="bookmark-outline" title="My foods & meals" subtitle="Saved meals, recipes, favorites and custom foods" onPress={() => router.push('/my-foods')} right={chevron(colors.textMuted)} />
         <ListRow
           icon="notifications-outline"
@@ -103,49 +104,21 @@ export default function ProfileScreen() {
         <ListRow
           icon={pro ? 'diamond' : 'diamond-outline'}
           title={pro ? (PREVIEW ? 'Pro · unlocked in preview' : 'Fitness Buddy Pro') : 'Upgrade to Pro'}
-          subtitle={pro ? 'AI coach, snap a meal, unlimited crew, Kettle outfits' : 'AI coach, snap a meal, unlimited crew and outfits'}
+          subtitle={pro ? 'AI coach, snap a meal, unlimited crew, all pets' : 'AI coach, snap a meal, unlimited crew and 5 more pets'}
           onPress={() => router.push('/pro')}
           right={pro ? <Badge label="PRO" color={colors.primary} /> : chevron(colors.textMuted)}
         />
       </Card>
 
       <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <Kettle size={54} mood={mascotOn ? 'happy' : 'sleepy'} skin={skin} animate={mascotOn} />
+        <Pressable onPress={() => router.push('/pets')} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <Kettle species={petSpecies(state) as Species} size={54} mood={mascotOn ? 'happy' : 'sleepy'} skin={skin} animate={mascotOn} />
           <View style={{ flex: 1 }}>
-            <T weight="800">Kettle, your gym buddy</T>
-            <T size={13} muted>Pops up to cheer workouts, PRs and meals.</T>
+            <T weight="800">{petName(state)}, your gym buddy</T>
+            <T size={13} muted>Change pet, name and outfit</T>
           </View>
-        </View>
-        <Segmented<'on' | 'off'>
-          value={mascotOn ? 'on' : 'off'}
-          onChange={(v) => dispatch({ type: 'updateSettings', settings: { mascot: v === 'on' } })}
-          options={[
-            { key: 'on', label: 'Cheer me on' },
-            { key: 'off', label: 'Quiet' },
-          ]}
-          style={{ marginTop: spacing.md }}
-        />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
-          <T weight="700">Outfit</T>
-          {!pro && <Badge label="PRO" color={colors.warning} />}
-        </View>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: spacing.sm }}>
-          {Object.keys(SKINS).map((k) => {
-            const on = skin === k;
-            return (
-              <Pressable
-                key={k}
-                accessibilityLabel={`${k} outfit`}
-                onPress={() => (pro || k === 'classic' ? dispatch({ type: 'updateSettings', settings: { mascotSkin: k } }) : router.push('/pro?feature=skins'))}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 14, borderWidth: 2, borderColor: on ? colors.primary : 'transparent', backgroundColor: colors.cardAlt, opacity: pro || k === 'classic' ? 1 : 0.55 }}
-              >
-                <Kettle size={38} mood="happy" skin={k} animate={false} />
-                <T size={10} weight="700" muted style={{ textTransform: 'capitalize' }}>{k}</T>
-              </Pressable>
-            );
-          })}
-        </View>
+          {chevron(colors.textMuted)}
+        </Pressable>
       </Card>
 
       {pro && !PREVIEW && (

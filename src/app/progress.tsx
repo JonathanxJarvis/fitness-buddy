@@ -65,8 +65,7 @@ export default function ProgressScreen() {
   const tips = [0, 1, 2].map((i) => tipForDate(addDays(today, i + 1)));
 
   return (
-    <Screen topInset tabs>
-      <T size={26} weight="800" style={{ marginBottom: spacing.md }}>Progress</T>
+    <Screen>
       <Segmented
         value={range}
         onChange={setRange}

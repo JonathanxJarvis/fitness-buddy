@@ -44,6 +44,14 @@ function cleanSnapshot(s) {
     totalWorkouts: Math.round(num(s.totalWorkouts, 100000)),
     lastWorkout: lw && typeof lw === 'object' ? { name: str(lw.name, 40), date: str(lw.date, 10), sets: Math.round(num(lw.sets, 500)) } : undefined,
     skin: str(s.skin, 20) || undefined,
+    pet: str(s.pet, 20) || undefined,
+    petName: str(s.petName, 24) || undefined,
+    parts: s.parts && typeof s.parts === 'object' ? { strength: num(s.parts.strength, 100), consistency: num(s.parts.consistency, 100), momentum: num(s.parts.momentum, 100) } : undefined,
+    streak: Math.round(num(s.streak, 100000)),
+    recent: (Array.isArray(s.recent) ? s.recent : [])
+      .slice(0, 6)
+      .filter((e) => e && ['pr', 'workout', 'rank', 'quests', 'streak'].includes(e.kind))
+      .map((e) => ({ kind: e.kind, text: str(e.text, 80), at: num(e.at, 1e13) })),
     updatedAt: Date.now(),
   };
 }

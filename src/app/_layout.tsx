@@ -79,7 +79,8 @@ function RootNavigator() {
         <Stack.Screen name="workout-detail" options={{ title: 'Workout' }} />
         <Stack.Screen name="rank" options={{ headerShown: false }} />
         <Stack.Screen name="pro" options={{ headerShown: false, presentation: 'modal' }} />
-        <Stack.Screen name="friends" options={{ title: 'Your crew' }} />
+        <Stack.Screen name="progress" options={{ title: 'Progress' }} />
+        <Stack.Screen name="pets" options={{ title: 'Your pet', presentation: 'modal' }} />
         <Stack.Screen name="friend/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
       </Stack>

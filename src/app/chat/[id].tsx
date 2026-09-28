@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton, T } from '@/components/ui';
 import { PressScale, TypingDots } from '@/components/motion';
-import { RankBadge } from '@/components/RankBadge';
+import { Avatar } from '@/components/Avatar';
 import { clockTime } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { DEMO, demoReplyText, fetchMessages, sendMessage } from '@/lib/social';
@@ -90,11 +90,11 @@ export default function ChatScreen() {
       <View style={{ paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderColor: colors.border }}>
         <IconButton label="Back" icon="chevron-back" color={colors.text} onPress={() => router.back()} />
         <Pressable onPress={() => router.push(`/friend/${f.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-          <RankBadge stage={stage} size={36} />
+          <Avatar stage={f.stage} pet={f.pet} skin={f.skin} size={48} />
           <View style={{ flex: 1 }}>
             <T weight="800" size={16}>{f.name}</T>
             <T size={12} muted>
-              {stage.label} · Lv {f.level}
+              {stage.label} · Lv {f.level}{f.streak ? ` · 🔥 ${f.streak}` : ''}
             </T>
           </View>
         </Pressable>
@@ -116,10 +116,15 @@ export default function ChatScreen() {
                   {clockTime(m.at)}
                 </T>
               )}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+              {!mine && (
+                <View style={{ width: 34, opacity: messages[i + 1]?.from === m.from ? 0 : 1 }}>
+                  <Avatar stage={f.stage} pet={f.pet} skin={f.skin} size={34} />
+                </View>
+              )}
               <View
                 style={{
-                  alignSelf: mine ? 'flex-end' : 'flex-start',
-                  maxWidth: '80%',
+                  maxWidth: '78%',
                   backgroundColor: mine ? colors.primary : colors.card,
                   borderRadius: 18,
                   borderBottomRightRadius: mine ? 4 : 18,
@@ -131,6 +136,7 @@ export default function ChatScreen() {
                 }}
               >
                 <T size={15} color={mine ? colors.onPrimary : colors.text}>{m.text}</T>
+              </View>
               </View>
             </View>
           );

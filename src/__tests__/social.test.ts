@@ -30,6 +30,62 @@ describe('offline coach', () => {
     expect(offlineReply('Was soll ich heute trainieren?', state, today).length).toBeGreaterThan(20);
     expect(offlineReply('asdfgh', state, today)).toMatch(/Buddy Coach/);
   });
+
+  const de: AppState = { ...state, settings: { ...state.settings, foodRegion: 'de' } };
+
+  it('suggests real meals with portion, kcal and protein, in German names for German users', () => {
+    const dinner = offlineReply('What should I eat for dinner?', de, today);
+    expect(dinner).toMatch(/aim for about \*\*\d+ kcal\*\*/);
+    const lines = dinner.split('\n').filter((l) => l.startsWith('- '));
+    expect(lines).toHaveLength(3);
+    for (const l of lines) expect(l).toMatch(/^- \*\*.+\*\* \((1|1½) servings?, \d+ g\): \d+ kcal, \d+ g protein$/);
+    expect(dinner).toMatch(/Hähnchen|Lachs|Rind|Pute|Linsen|Seelachs|Gulasch|Thunfisch|Döner/);
+    const us = offlineReply('What should I eat for dinner?', state, today);
+    expect(us).not.toMatch(/Hähnchen|Mit |mit /);
+    expect(offlineReply('How do I hit my protein?', de, today)).toMatch(/176 g more protein[\s\S]*g protein/);
+    const plan = offlineReply('Plan my meals for tomorrow', de, today);
+    expect(plan).toMatch(/\*\*Breakfast\*\*: .+ · \d+ kcal, \d+ g protein/);
+    expect(plan).toMatch(/\*\*Dinner\*\*/);
+  });
+
+  it('answers dish questions from the meal library in English or German', () => {
+    expect(offlineReply('how many calories in lasagne', state, today)).toMatch(/\*\*Lasagna\*\*.*\*\*\d+ kcal\*\*/);
+    const doner = offlineReply('Nährwerte Döner', de, today);
+    expect(doner).toMatch(/\*\*Döner Kebab\*\*/);
+    expect(doner).toMatch(/treat/);
+    expect(offlineReply('Wie viele Kalorien hat ein Döner?', de, today)).toMatch(/Döner/);
+    expect(offlineReply('calories in a banana', state, today)).toMatch(/\*\*Banana\*\*/);
+    // Questions about your own numbers are not dish lookups.
+    expect(offlineReply('how much protein is left?', state, today)).not.toMatch(/offline meal list/);
+    expect(offlineReply('how many calories in beef wellington', state, today)).toMatch(/look it up in the USDA/);
+  });
+
+  it('looks unknown dishes up online, and falls back when offline', async () => {
+    // Imported here so this block stays self-contained.
+    const { offlineReplyAsync } = require('@/lib/offlineCoach') as typeof import('@/lib/offlineCoach');
+    const realFetch = global.fetch;
+    try {
+      global.fetch = (() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              foods: [{ fdcId: 1, description: 'Beef Wellington', foodNutrients: [{ nutrientId: 1008, value: 250 }, { nutrientId: 1003, value: 12 }, { nutrientId: 1005, value: 15 }, { nutrientId: 1004, value: 16 }], foodMeasures: [{ disseminationText: '1 slice', gramWeight: 200, rank: 1 }] }],
+            }),
+        })) as unknown as typeof fetch;
+      const online = await offlineReplyAsync('how many calories in beef wellington', state, today);
+      expect(online).toMatch(/\*\*Beef Wellington\*\* \(1 slice \(200 g\)\): \*\*500 kcal\*\*/);
+      expect(online).toMatch(/USDA/);
+      global.fetch = (() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+      expect(await offlineReplyAsync('how many calories in beef wellington', state, today)).toMatch(/couldn’t find/);
+      // Known dishes and other questions never hit the network.
+      global.fetch = (() => Promise.reject(new Error('should not be called'))) as unknown as typeof fetch;
+      expect(await offlineReplyAsync('Nährwerte Döner', de, today)).toBe(offlineReply('Nährwerte Döner', de, today));
+      expect(await offlineReplyAsync('How do I rank up?', state, today)).toBe(offlineReply('How do I rank up?', state, today));
+    } finally {
+      global.fetch = realFetch;
+    }
+  });
 });
 
 describe('social snapshot', () => {
@@ -85,7 +141,7 @@ describe('social reducer', () => {
     s = reducer(s, { type: 'markRead', friendId: fid, at: 11 });
     expect(unreadCount(s.social, 'me')).toBe(0);
     s = reducer(s, { type: 'removeFriend', id: fid });
-    expect(s.social!.friends).toHaveLength(2);
+    expect(s.social!.friends).toHaveLength(demoCrew(today).length - 1);
     expect(s.social!.chats[fid]).toBeUndefined();
   });
 });

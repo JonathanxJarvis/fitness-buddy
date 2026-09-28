@@ -11,9 +11,10 @@ import { tabBarHeight, useKeyboardVisible } from '@/components/TabBar';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { aiMode, askCoach, friendlyError } from '@/lib/ai';
-import { offlineReply } from '@/lib/offlineCoach';
-import { isPro, mascotSkin } from '@/lib/pro';
-import { Kettle } from '@/components/Mascot';
+import { offlineReplyAsync } from '@/lib/offlineCoach';
+import { todayKey } from '@/lib/dates';
+import { isPro, mascotSkin, petSpecies } from '@/lib/pro';
+import { Kettle, type Species } from '@/components/Mascot';
 import { pickMealPhoto, type MealPhoto } from '@/lib/photos';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
 import type { ChatMessage } from '@/lib/types';
@@ -144,7 +145,7 @@ export default function CoachScreen() {
           ? pro
             ? 'Photo breakdowns use the AI coach. Switch the toggle at the top to AI and send it again.'
             : 'Photo breakdowns are part of **Fitness Buddy Pro**. Meanwhile, search or scan the food and I’ll tell you how it fits your day.'
-          : offlineReply(body, state);
+          : await offlineReplyAsync(body, state, todayKey());
       }
       dispatch({ type: 'addChat', message: { id: uid(), role: 'assistant', text: reply, createdAt: Date.now() } });
     } catch (e) {
@@ -171,7 +172,7 @@ export default function CoachScreen() {
       {/* Header */}
       <View style={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View style={{ width: 46, height: 46, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Kettle size={42} mood={busy ? 'pumped' : 'happy'} skin={mascotSkin(state)} />
+          <Kettle species={petSpecies(state) as Species} size={42} mood={busy ? 'pumped' : 'happy'} skin={mascotSkin(state)} />
         </View>
         <View style={{ flex: 1 }}>
           <T size={22} weight="800">Coach</T>

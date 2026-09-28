@@ -11,6 +11,9 @@ import { FoodThumb, clockTime } from '@/components/FoodThumb';
 import { useStore } from '@/store/StoreProvider';
 import { nutrientColors, radius, spacing, useTheme } from '@/theme';
 import { addDays, currentStreak, fromKey, prettyDate, todayKey, WEEKDAY_LETTERS } from '@/lib/dates';
+import { activeDays, streakInfo } from '@/lib/quests';
+import { PetCard } from '@/components/PetCard';
+import { DailyQuests } from '@/components/Quests';
 import { daySummary, loggedDays, totalsByDate } from '@/lib/selectors';
 import { itemNutrients, MEAL_SHARES } from '@/lib/nutrition';
 import { buildNudges, tipForDate } from '@/lib/tips';
@@ -189,7 +192,8 @@ export default function Today() {
   usePedometer(isToday);
 
   const day = useMemo(() => daySummary(state, date), [state, date]);
-  const streak = useMemo(() => currentStreak(loggedDays(state)), [state.entries]);
+  const streakData = useMemo(() => streakInfo(activeDays(state), todayKey()), [state.entries, state.workouts, state.exercises, state.water, state.weights]);
+  const streak = streakData.streak;
   const nudges = useMemo(
     () =>
       buildNudges({
@@ -265,8 +269,15 @@ export default function Today() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warningSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill }}>
             <Ionicons name="flame" size={15} color={colors.warning} />
             <T size={13} weight="800" color={colors.warning}>{streak}</T>
+            {streakData.freezes > 0 && (
+              <>
+                <Ionicons name="snow" size={13} color="#3B9EF0" style={{ marginLeft: 2 }} />
+                <T size={12} weight="800" color="#3B9EF0">{streakData.freezes}</T>
+              </>
+            )}
           </View>
         )}
+        <IconButton label="Progress" icon="stats-chart-outline" color={colors.text} onPress={() => router.push('/progress')} />
         <IconButton label="Reminders" icon="notifications-outline" color={colors.text} onPress={() => router.push('/reminders')} />
       </FadeIn>
 
@@ -288,6 +299,13 @@ export default function Today() {
       <FadeIn delay={next()}>
         <HeroCard eaten={day.totals.calories} burned={day.burned} goal={goals.calories} />
       </FadeIn>
+
+      {isToday && (
+        <FadeIn delay={next()}>
+          <PetCard date={date} />
+          <DailyQuests date={date} />
+        </FadeIn>
+      )}
 
       {/* Macros */}
       <FadeIn delay={next()}>

@@ -5,11 +5,12 @@ A nutrition and fitness tracker for iOS and Android, in the spirit of Yazio and 
 ## Features
 
 - **Workout tracker (Train tab)**: start an empty workout or a routine (Push, Pull, Legs, Full body templates, or your own), log sets with weight and reps, see last session's numbers beside each set, and a rest timer starts when you check a set off. 60+ exercises by muscle group plus custom exercises. Personal records use an estimated one-rep max (Epley). Finished workouts go into history, add their calories burned to the day's budget, show up as training volume in Progress, and are visible to the Coach.
-- **Ranks and the path**: your strength score (0–100) comes from your best squat, bench, deadlift, overhead press, pull-ups, dips and push-ups compared with standard strength levels for your body weight and sex. It places you on a video-game path of 25 stages, from Rookie III through Iron, Bronze, Silver, Gold, Platinum, Diamond and Champion up to Titan. Workouts also earn XP (sets, volume, PRs, 3-a-week streaks) for levels. Tap the rank card on Train for the path, your lift breakdown and 8 weeks of growth.
-- **Kettle, your gym buddy**: an animated kettlebell mascot pops up in the corner when you start a workout ("Let’s go. Be strong!"), finish sets, hit a PR, rank up, level up, log a meal or hit your protein. Turn it off or change its outfit in Profile.
-- **Your crew**: add friends by a 6-character code, see a leaderboard (strongest, fastest growing, most levels), each friend's rank, growth chart and head-to-head stats, and chat 1:1. Friends see only progression, never food, weight or photos. Runs on the small server in [server/social](server/social/README.md); without it, a demo crew is shown.
+- **Ranks and the path**: rank points (0–100) blend strength (60%: your best squat, bench, deadlift, press, pull-ups, dips and push-ups vs. standards for your body weight), consistency (25%: workouts and cardio in the last 4 weeks) and momentum (15%: recent PRs and daily quests). They place you on a game map of 9 worlds (Training Grounds, Iron Forge, Copper Canyon, Frost Peaks, Golden Temple, Tidal Reef, Crystal Caverns, Storm Summit, Mount Olympus) with 25 stages, treasure chests between divisions and a guardian at every world's gate. Ranks show as game-style ring frames that get wings, gems and crowns as you climb. Workouts, quests and chests earn XP for levels.
+- **Daily quests and streaks**: three quests a day (one food, one training, one bonus), a chest for clearing all three, a weekly "train 3×" challenge, and a streak that earns a freeze every 7 days to cover a missed day.
+- **Pets**: pick a buddy (Kettle, Shaky, Eggbert free; Dumbo, Avo, Broc, Plato and Blaze with Pro), name it and dress it up. It pops up to cheer workouts, PRs, quests and meals, and on Today its mood shows whether you've eaten, trained and had water.
+- **Crew tab**: your framed pet avatar and friend code, a podium and leaderboards (rank, fastest growing, most levels, this week), an activity feed where you can cheer friends' PRs, and 1:1 chats with framed avatars. Friends see only progression, never food, weight or photos. Runs on [server/social](server/social/README.md); without it, a demo crew is shown.
 - **Buddy Coach works offline**: the Coach answers from your own data with no AI: what to eat, protein, what to train today, how to rank up, plateaus, recovery, meal plans, in English or German. Pro users can switch on the AI coach.
-- **Fitness Buddy Pro**: the free app is complete; Pro adds Snap a meal, the AI coach, an unlimited crew (free: 3 friends) and Kettle outfits. The web preview (`EXPO_PUBLIC_PREVIEW=1`) unlocks Pro. Setting up real subscriptions: [docs/MONETIZATION.md](docs/MONETIZATION.md).
+- **Fitness Buddy Pro**: the free app is complete; Pro adds Snap a meal, the AI coach, an unlimited crew (free: 3 friends), five more pets and outfits. The web preview (`EXPO_PUBLIC_PREVIEW=1`) unlocks Pro. Setting up real subscriptions: [docs/MONETIZATION.md](docs/MONETIZATION.md).
 - **Premium Today dashboard**: a greeting with your streak, a week strip with a mini calorie ring per day, a deep-green hero card with calories left (goal + exercise − food), and animated bars for protein, carbs, fat and fiber. Everything counts up and fades in.
 - **Protein at 1 g per lb of body weight** by default (editable in Daily goals). There is no water goal; water is still tracked by the glass.
 - **Snap a meal (AI, Pro)**: take or pick a photo and Claude identifies each food, estimates portions in grams and returns calories, protein, carbs, fat, fiber, sugar and sodium, with a confidence level and a health score. Adjust the portion, pick the meal and log it with the photo.
@@ -73,19 +74,21 @@ npx expo start      # dev server (press i / a for simulators, w for web)
 ```
 src/
   app/              Expo Router screens
-    (tabs)/         Today, Diary, Coach (AI chat), Progress
+    (tabs)/         Today, Train, Crew, Coach, Diary
     snap-meal.tsx   photo → AI nutrition estimate
     onboarding.tsx  goal setup
     add-food.tsx    search (built-in + USDA + Open Food Facts), recents, favorites, saved meals
     food.tsx        meal/food detail with health score
-    profile.tsx     profile, Pro, Kettle, units, theme
+    profile.tsx     profile, Pro, pet, units, theme
     rank.tsx        rank, stage path, lifts, growth
-    friends.tsx     friend code, leaderboard; friend/[id], chat/[id]
+    (tabs)/crew.tsx podium, leaderboards, activity feed, chats; friend/[id], chat/[id]
+    pets.tsx        pick, name and dress your pet
+    progress.tsx    charts (opened from Today and Profile)
     pro.tsx         paywall
     scan.tsx        barcode scanner
     ...
   components/       UI kit, animated rings, sheets, tab bar, charts
-  lib/              progression (ranks, XP), offline coach, social client, Pro, nutrition math, food databases (built-in, USDA, Open Food Facts), Claude client, tips, units, dates, reminders
+  lib/              progression (ranks, XP), quests (daily quests, streaks, pet care), meals, offline coach, social client, Pro, nutrition math, food databases (built-in, USDA, Open Food Facts), Claude client, tips, units, dates, reminders
   store/            app state (reducer + AsyncStorage persistence)
 ```
 

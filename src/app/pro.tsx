@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { IconButton, T } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
-import { Kettle, SKINS } from '@/components/Mascot';
+import { Kettle, PETS, SKINS } from '@/components/Mascot';
 import { useStore } from '@/store/StoreProvider';
 import { isPro, PLANS, PREVIEW, PRO_FEATURES } from '@/lib/pro';
 import { radius, spacing } from '@/theme';
@@ -20,6 +20,7 @@ const REASON: Record<string, string> = {
   coach: 'The AI coach is a Pro feature',
   friends: 'Your crew is full',
   skins: 'Outfits are a Pro feature',
+  pets: 'That pet comes with Pro',
 };
 
 export default function ProScreen() {
@@ -51,10 +52,10 @@ export default function ProScreen() {
             <IconButton label="Close" icon="close" color="#fff" onPress={() => router.back()} />
           </View>
           <FadeIn style={{ alignItems: 'center' }}>
-            <Pressable onPress={() => setSkin((s) => (s + 1) % skins.length)} accessibilityLabel="Try another outfit">
-              <Kettle size={110} mood="proud" band={GOLD} skin={skins[skin]} />
+            <Pressable onPress={() => setSkin((s) => s + 1)} accessibilityLabel="Show another pet">
+              <Kettle species={PETS[skin % PETS.length].key} size={110} mood="proud" band={GOLD} skin={skins[skin % skins.length]} />
             </Pressable>
-            <T size={11} color="rgba(255,255,255,0.5)" style={{ marginTop: 2 }}>Tap Kettle to try outfits</T>
+            <T size={11} color="rgba(255,255,255,0.5)" style={{ marginTop: 2 }}>Tap to meet the Pro pets</T>
             {feature && REASON[feature] ? (
               <T size={13} weight="700" color={GOLD} style={{ marginTop: spacing.md }}>{REASON[feature]}</T>
             ) : null}
