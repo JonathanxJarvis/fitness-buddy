@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { initialState, reducer } from '@/store/reducer';
-import { activeDays, dailyQuests, petCare, questStates, streakInfo, weeklyChallenge, weeklyPr } from '@/lib/quests';
+import { activeDays, dailyQuests, petCare, questStates, streakInfo, weeklyChallenge, weeklyKind, weeklyPr } from '@/lib/quests';
 import { planDay, planFromSplit, swapDays, withDay } from '@/lib/plan';
 import { progression, rankParts, rankScore, stateProgression } from '@/lib/progression';
 import { addDays } from '@/lib/dates';
@@ -136,7 +136,7 @@ describe('daily quests', () => {
 
   it('runs a weekly challenge from Monday to Sunday', () => {
     const s = { ...base, workouts: [workout('a', today, 80), workout('b', addDays(today, 2), 80), workout('c', addDays(today, -1), 80)] };
-    const w = weeklyChallenge(s, addDays(today, 3));
+    const w = weeklyChallenge(s, addDays(today, 3), 'train');
     expect(w.monday).toBe(today);
     expect(w.value).toBe(2);
     expect(w.target).toBe(3);
@@ -145,11 +145,20 @@ describe('daily quests', () => {
 
   it('asks for every planned session when there is a plan', () => {
     const ws = [0, 1, 3, 4].map((i) => workout(`p${i}`, addDays(today, i), 80));
-    const w = weeklyChallenge({ ...base, plan: ul, workouts: ws }, addDays(today, 5));
-    expect(w.title).toBe('Hit all 4 planned sessions');
+    const w = weeklyChallenge({ ...base, plan: ul, workouts: ws }, addDays(today, 5), 'train');
+    expect(w.title).toBe('Show up for all 4 sessions');
     expect(w.target).toBe(4);
     expect(w.done).toBe(true);
-    expect(weeklyChallenge({ ...base, plan: withDay(ul, today, null) }, today).target).toBe(3);
+    expect(weeklyChallenge({ ...base, plan: withDay(ul, today, null) }, today, 'train').target).toBe(3);
+  });
+
+  it('rotates the weekly challenge between habits', () => {
+    const kinds = new Set(Array.from({ length: 6 }, (_, i) => weeklyKind(addDays(today, i * 7))));
+    expect(kinds).toEqual(new Set(['train', 'protein', 'cardio', 'meals']));
+    const cardio = { ...base, exercises: [{ id: 'c', date: today, name: 'Run', minutes: 65, calories: 500 }] };
+    const w = weeklyChallenge(cardio, today, 'cardio');
+    expect(w.value).toBe(2);
+    expect(w.target).toBe(3);
   });
 
   it('turns PRs into a weekly bonus', () => {

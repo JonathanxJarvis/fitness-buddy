@@ -517,7 +517,7 @@ function DropCard({ drop, v }: { drop: Drop; v: Animated.Value }) {
           </Animated.View>
         )}
       </View>
-      <T size={12} weight="700" color="rgba(255,255,255,0.55)" style={{ marginTop: 10 }}>{drop.dup ? 'Repeats turn into XP' : 'Equip it in Pets › Collection'}</T>
+      <T size={12} weight="700" color="rgba(255,255,255,0.55)" style={{ marginTop: 10 }}>Equip it in Pets › Wardrobe</T>
     </Animated.View>
   );
 }

@@ -217,17 +217,42 @@ export function questStates(state: AppState, date: string): QuestState[] {
  * moved session still counts, it's the number that matters). Without one:
  * train three times (gym, or 20+ min cardio).
  */
-export function weeklyChallenge(state: AppState, date: string) {
+export type WeeklyKind = 'train' | 'protein' | 'cardio' | 'meals';
+const WEEKLY_ROTATION: WeeklyKind[] = ['train', 'protein', 'train', 'cardio', 'train', 'meals'];
+
+/** Which challenge a week gets: training every other week, a different habit in between. */
+export function weeklyKind(monday: string): WeeklyKind {
+  const week = Math.floor(Date.parse(monday + 'T12:00:00Z') / (7 * 86400000));
+  return WEEKLY_ROTATION[((week % WEEKLY_ROTATION.length) + WEEKLY_ROTATION.length) % WEEKLY_ROTATION.length];
+}
+
+/** This week's challenge (Monday to Sunday). `value`/`target` count the segments of its bar. */
+export function weeklyChallenge(state: AppState, date: string, kind: WeeklyKind = weeklyKind(mondayOf(date))) {
   const monday = mondayOf(date);
   const sunday = addDays(monday, 6);
+  const days = weekOf(date);
+  const base = { monday, kind, claimed: isClaimed(state.questLog, 'week', monday), xp: WEEKLY_XP };
+  const result = (value: number, target: number, title: string) => ({ ...base, value: Math.min(value, target), target, title, done: value >= target });
+
+  if (kind === 'protein') {
+    const goal = state.goals?.protein ?? 120;
+    const hit = days.filter((d) => daySummary(state, d).totals.protein >= goal).length;
+    return result(hit, 4, 'Hit your protein on 4 days');
+  }
+  if (kind === 'cardio') {
+    const minutes = state.exercises.filter((e) => e.date >= monday && e.date <= sunday).reduce((n, e) => n + e.minutes, 0);
+    return result(Math.floor(minutes / 30), 3, '90 minutes of cardio');
+  }
+  if (kind === 'meals') {
+    const logged = days.filter((d) => state.entries.filter((e) => e.date === d).length >= 2).length;
+    return result(logged, 5, 'Log your meals on 5 days');
+  }
   const planned = state.plan ? plannedSessionsInWeek(state, date).length : 0;
   const target = planned > 0 ? planned : WEEKLY_TARGET;
-  const days = new Set<string>();
-  for (const w of state.workouts) if (w.date >= monday && w.date <= sunday && doneSets(w) > 0) days.add(w.date);
-  if (!planned) for (const e of state.exercises) if (e.date >= monday && e.date <= sunday && e.minutes >= 20) days.add(e.date);
-  const value = Math.min(days.size, target);
-  const title = planned > 0 ? `Hit all ${target} planned sessions` : `Train ${target}× this week`;
-  return { monday, value, target, title, done: value >= target, claimed: isClaimed(state.questLog, 'week', monday), xp: WEEKLY_XP };
+  const trained = new Set<string>();
+  for (const w of state.workouts) if (w.date >= monday && w.date <= sunday && doneSets(w) > 0) trained.add(w.date);
+  if (!planned) for (const e of state.exercises) if (e.date >= monday && e.date <= sunday && e.minutes >= 20) trained.add(e.date);
+  return result(trained.size, target, planned > 0 ? `Show up for all ${target} sessions` : `Train ${target}× this week`);
 }
 
 /** Weekly bonus: any new personal record this week. Claimed as "pr-week" on the Monday. */

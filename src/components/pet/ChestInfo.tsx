@@ -30,12 +30,11 @@ export function ChestEye({ open, onPress, color, bg, size = 26, label = 'What’
     >
       <Svg width={size * 0.62} height={size * 0.62} viewBox="0 0 20 20">
         {open ? (
-          <Path d="M3 9 Q10 15 17 9 M6 11.6 L4.6 13.6 M10 13 L10 15.4 M14 11.6 L15.4 13.6" stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+          <Path d="M6 6 L14 14 M14 6 L6 14" stroke={color} strokeWidth={2} strokeLinecap="round" />
         ) : (
           <>
-            <Path d="M2.5 10 Q10 2.8 17.5 10 Q10 17.2 2.5 10 Z" stroke={color} strokeWidth={1.7} fill="none" strokeLinejoin="round" />
-            <Circle cx={10} cy={10} r={2.9} fill={color} />
-            <Circle cx={11} cy={9} r={0.9} fill={bg} />
+            <Circle cx={10} cy={4.6} r={1.6} fill={color} />
+            <Path d="M7.6 8.4 H10.6 V15.4 M7.4 15.6 H13" stroke={color} strokeWidth={2.1} fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </>
         )}
       </Svg>
@@ -117,7 +116,7 @@ export function ChestInfo({ kind, xp, style, onClose, tone = 'card' }: { kind: C
         })}
       </View>
       <T size={11} color={muted} style={{ marginTop: 6 }}>
-        {fresh > finds.filter((i) => !have(i)).length ? `…and ${fresh - finds.filter((i) => !have(i)).length} more you don’t have yet. ` : ''}Repeats turn into bonus XP.
+        {fresh > finds.filter((i) => !have(i)).length ? `…and ${fresh - finds.filter((i) => !have(i)).length} more you don’t have yet. ` : ''}You never get the same thing twice.
       </T>
 
       <View style={{ flexDirection: 'row', height: 5, borderRadius: 3, overflow: 'hidden', marginTop: 10, backgroundColor: well }}>

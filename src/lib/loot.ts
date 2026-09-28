@@ -200,12 +200,16 @@ export interface LootState {
   peak?: number;
 }
 
+const PREVIEW_ALL = process.env.EXPO_PUBLIC_PREVIEW === '1';
+
 export const EMPTY_LOOT: LootState = { owned: [], dry: 0 };
 
 /** Whether you have an item: starters for all, Pro items with Pro, anything won from a chest. */
 export function hasItem(id: string, pro: boolean, owned: string[] = []): boolean {
   const item = itemById(id);
   if (!item) return false;
+  // The preview build unlocks the whole wardrobe so every pet, outfit and aura can be tried.
+  if (PREVIEW_ALL) return true;
   return item.source === 'starter' || (pro && item.source === 'pro') || owned.includes(id);
 }
 
@@ -331,20 +335,15 @@ export function rollChest(opts: { claim: string; date: string; kind: ChestKind; 
       break;
     }
   }
-  // Within a rarity, things you don't have yet are three times as likely.
-  const pool = chestPool(luck.level ?? Infinity).filter((i) => i.rarity === rarity);
-  const weight = (i: LootItem) => (hasItem(i.id, luck.pro, owned) ? 1 : 3);
-  let n = r() * pool.reduce((s, i) => s + weight(i), 0);
-  let item = pool[pool.length - 1];
-  for (const i of pool) {
-    n -= weight(i);
-    if (n < 0) {
-      item = i;
-      break;
-    }
-  }
-  const dup = hasItem(item.id, luck.pro, owned);
-  return { ...base, item: item.id, dup, bonusXp: dup ? RARITY[rarity].bonusXp : 0 };
+  // Never a repeat: only things you don't have yet can drop. If the rolled
+  // rarity is complete, fall back to the nearest rarity that still has
+  // something new; with everything collected, the chest is XP only.
+  const fresh = chestPool(luck.level ?? Infinity).filter((i) => !hasItem(i.id, luck.pro, owned));
+  const order = [rarity, ...RARITIES.filter((k) => k !== rarity).sort((a, b) => Math.abs(RARITIES.indexOf(a) - RARITIES.indexOf(rarity)) - Math.abs(RARITIES.indexOf(b) - RARITIES.indexOf(rarity)))];
+  const pool = order.map((k) => fresh.filter((i) => i.rarity === k)).find((list) => list.length) ?? [];
+  if (!pool.length) return base;
+  const item = pool[Math.min(pool.length - 1, Math.floor(r() * pool.length))];
+  return { ...base, item: item.id, dup: false, bonusXp: 0 };
 }
 
 /** Apply a chest result to the collection. */
