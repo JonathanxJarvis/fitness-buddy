@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
-import { bmr, calculateGoals, itemNutrients, mealItemsToLog, sumItems, exerciseCalories } from '@/lib/nutrition';
+import { bmr, calculateGoals, healthScore, itemNutrients, mealItemsToLog, sumItems, exerciseCalories } from '@/lib/nutrition';
+import { fdcToFood } from '@/lib/usda';
+import { estimateToFood, parseEstimate } from '@/lib/ai';
 import { productToFood, nutrientsPer100g } from '@/lib/openFoodFacts';
 import { BUILTIN_FOODS, searchLocal } from '@/lib/foodDatabase';
 import { currentStreak, longestStreak, monthGrid, addDays, parseTime } from '@/lib/dates';
@@ -34,7 +36,8 @@ describe('goals', () => {
     expect(Math.abs(maintenance - 550 - g.calories)).toBeLessThan(20);
     const macroCals = g.protein * 4 + g.carbs * 4 + g.fat * 9;
     expect(Math.abs(macroCals - g.calories)).toBeLessThan(15);
-    expect(g.waterMl).toBe(2750);
+    expect(g.protein).toBe(176); // 1 g per lb at 80 kg
+    expect(g).not.toHaveProperty('waterMl');
   });
 
   it('never goes below the safety floor', () => {
@@ -138,10 +141,10 @@ describe('nudges', () => {
     const nudges = buildNudges({ totals: { calories: 800, protein: 10, carbs: 120, fat: 20 }, goals, waterMl: 2000, entries: [entry()], hour: 15, streak: 0, steps: 0 });
     expect(nudges.map((n) => n.id)).toContain('protein-low');
   });
-  it('flags low water and high sodium', () => {
-    const nudges = buildNudges({ totals: { calories: 800, protein: 100, carbs: 50, fat: 20, sodium: 3000 }, goals, waterMl: 0, entries: [entry()], hour: 16, streak: 7, steps: 0 });
+  it('flags missing water and high sodium', () => {
+    const nudges = buildNudges({ totals: { calories: 800, protein: 170, carbs: 50, fat: 20, sodium: 3000 }, goals, waterMl: 0, entries: [entry()], hour: 16, streak: 7, steps: 0 });
     const ids = nudges.map((n) => n.id);
-    expect(ids).toEqual(expect.arrayContaining(['water-low', 'sodium-high', 'streak']));
+    expect(ids).toEqual(expect.arrayContaining(['water-none', 'sodium-high', 'streak']));
   });
   it('stays quiet early in the morning', () => {
     expect(buildNudges({ totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, goals, waterMl: 0, entries: [], hour: 7, streak: 0, steps: 0 })).toEqual([]);
@@ -165,9 +168,89 @@ describe('reducer', () => {
     expect(s.profile!.weightKg).toBe(79);
   });
 
+  it('moves protein to 1 g per lb for data saved before the redesign', () => {
+    const old = { ...initialState, profile, goals: { ...calculateGoals(profile), protein: 144 } } as Partial<typeof initialState>;
+    delete old.chat;
+    const s = reducer(initialState, { type: 'hydrate', state: old as never });
+    expect(s.goals!.protein).toBe(176);
+    expect(s.goals!.calories).toBe(calculateGoals(profile).calories);
+    expect(s.chat).toEqual([]);
+  });
+
+  it('keeps a bounded chat history', () => {
+    let s = initialState;
+    for (let i = 0; i < 90; i++) s = reducer(s, { type: 'addChat', message: { id: String(i), role: 'user', text: 'hi', createdAt: i } });
+    expect(s.chat).toHaveLength(80);
+    expect(s.chat[0].id).toBe('10');
+  });
+
   it('merges saved settings with new defaults on load', () => {
     const s = reducer(initialState, { type: 'hydrate', state: { ...initialState, settings: { units: 'metric' } } as never });
     expect(s.settings.units).toBe('metric');
     expect(s.settings.reminders.mealTimes.lunch).toBe('12:30');
+  });
+});
+
+describe('USDA mapping', () => {
+  it('uses the household serving as the base and keeps per-100 g options', () => {
+    const food = fdcToFood({
+      fdcId: 42,
+      description: 'GREEK YOGURT, PLAIN',
+      dataType: 'Branded',
+      brandOwner: 'ACME DAIRY',
+      servingSize: 170,
+      servingSizeUnit: 'g',
+      householdServingFullText: '1 CONTAINER',
+      foodNutrients: [
+        { nutrientId: 1008, value: 59 },
+        { nutrientId: 1003, value: 10 },
+        { nutrientId: 1005, value: 3.6 },
+        { nutrientId: 1004, value: 0.4 },
+        { nutrientId: 1093, value: 36 },
+      ],
+    })!;
+    expect(food.name).toBe('Greek yogurt, plain');
+    expect(food.brand).toBe('Acme dairy');
+    expect(food.servings[0].label).toBe('1 container (170 g)');
+    expect(food.nutrients.calories).toBeCloseTo(100.3);
+    expect(itemNutrients({ food, servingIndex: 1, quantity: 1 }).protein).toBeCloseTo(10);
+    expect(itemNutrients({ food, servingIndex: 1, quantity: 1 }).sodium).toBeCloseTo(36);
+  });
+
+  it('skips foods without energy', () => {
+    expect(fdcToFood({ fdcId: 1, description: 'Water', foodNutrients: [{ nutrientId: 1003, value: 0 }] })).toBeNull();
+  });
+});
+
+describe('health score and AI estimates', () => {
+  it('rates lean protein above candy', () => {
+    const chicken = healthScore({ calories: 165, protein: 31, carbs: 0, fat: 3.6, sodium: 74, sugar: 0, fiber: 0 })!;
+    const candy = healthScore({ calories: 400, protein: 2, carbs: 95, fat: 2, sugar: 80, sodium: 50, fiber: 0 })!;
+    expect(chicken.score).toBeGreaterThan(candy.score);
+    expect(chicken.highlights.map((h) => h.text)).toContain('High in protein');
+    expect(candy.highlights.map((h) => h.text)).toContain('High in sugar');
+    expect(healthScore({ calories: 0, protein: 0, carbs: 0, fat: 0 })).toBeNull();
+  });
+
+  it('sums AI items into a plate-sized food', () => {
+    const est = parseEstimate({
+      is_food: true,
+      meal_name: 'Steak and salad',
+      items: [
+        { name: 'Sirloin steak', grams: 180.4, calories: 380.2, protein_g: 48.26, carbs_g: 0, fat_g: 20.1 },
+        { name: 'Side salad', grams: 120, calories: 140, protein_g: 2, carbs_g: 8, fat_g: 11 },
+      ],
+      fiber_g: 3,
+      sugar_g: 4,
+      sodium_mg: 520,
+      confidence: 'medium',
+      notes: 'Assumed olive-oil dressing.',
+    });
+    expect(est.totals.calories).toBe(520);
+    expect(est.totals.protein).toBeCloseTo(50.3);
+    expect(est.items[0].grams).toBe(180);
+    const food = estimateToFood(est, 'x');
+    expect(food.source).toBe('ai');
+    expect(itemNutrients({ food, servingIndex: 1, quantity: 1 }).calories).toBe(260);
   });
 });

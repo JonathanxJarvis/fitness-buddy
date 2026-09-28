@@ -3,14 +3,28 @@ import { ActivityIndicator, View } from 'react-native';
 import { Stack, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+// Per-weight imports so only these five font files ship with the app.
+import { PlusJakartaSans_400Regular } from '@expo-google-fonts/plus-jakarta-sans/400Regular';
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
+import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
+import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import { StoreProvider, useStore } from '@/store/StoreProvider';
-import { useTheme } from '@/theme';
+import { font, useTheme } from '@/theme';
 
 function RootNavigator() {
   const { ready } = useStore();
   const { dark, colors } = useTheme();
+  const [fontsLoaded, fontError] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
 
-  if (!ready) {
+  if (!ready || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.primary} />
@@ -36,9 +50,10 @@ function RootNavigator() {
       <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerTintColor: colors.primary,
-          headerTitleStyle: { color: colors.text },
-          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text, ...font('700'), fontSize: 17 },
+          headerStyle: { backgroundColor: colors.background },
+          headerBackButtonDisplayMode: 'minimal',
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
         }}
@@ -46,7 +61,10 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="add-food" options={{ title: 'Add food', presentation: 'modal' }} />
-        <Stack.Screen name="food" options={{ title: 'Food details', presentation: 'modal' }} />
+        <Stack.Screen name="food" options={{ title: 'Food details', presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="snap-meal" options={{ title: 'Snap a meal', presentation: 'fullScreenModal', headerShown: false }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="my-foods" options={{ title: 'My foods & meals' }} />
         <Stack.Screen name="scan" options={{ title: 'Scan barcode', presentation: 'fullScreenModal', headerShown: false }} />
         <Stack.Screen name="custom-food" options={{ title: 'Custom food', presentation: 'modal' }} />
         <Stack.Screen name="meal-builder" options={{ title: 'Saved meal', presentation: 'modal' }} />

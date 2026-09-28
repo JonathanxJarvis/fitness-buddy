@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Button, Card, Field, Screen, Segmented, T } from '@/components/ui';
 import { useStore } from '@/store/StoreProvider';
 import { useTheme, radius, spacing, nutrientColors } from '@/theme';
@@ -63,6 +64,7 @@ export default function Onboarding() {
   const [weight, setWeight] = useState(
     p ? (units === 'us' ? kgToLb(p.weightKg) : p.weightKg).toFixed(1).replace(/\.0$/, '') : '',
   );
+  const [name, setName] = useState(p?.name ?? '');
   const [activity, setActivity] = useState<ActivityLevel>(p?.activity ?? 'light');
   const [goal, setGoal] = useState<GoalType>(p?.goal ?? 'lose');
   const [rate, setRate] = useState(p?.weeklyRateKg ?? 0.5);
@@ -91,6 +93,7 @@ export default function Onboarding() {
     const h = units === 'metric' ? parseFloat(heightCm) : inToCm((parseFloat(heightFt) || 0) * 12 + (parseFloat(heightIn) || 0));
     if (!(a >= 13 && a <= 100) || !(w > 0) || !(h > 90 && h < 250)) return null;
     return {
+      name: name.trim() || undefined,
       sex,
       age: a,
       heightCm: h,
@@ -99,7 +102,7 @@ export default function Onboarding() {
       goal,
       weeklyRateKg: goal === 'maintain' ? 0 : rate,
     };
-  }, [age, weight, heightCm, heightFt, heightIn, units, sex, activity, goal, rate]);
+  }, [name, age, weight, heightCm, heightFt, heightIn, units, sex, activity, goal, rate]);
 
   const goals = profile ? calculateGoals(profile) : null;
 
@@ -116,17 +119,18 @@ export default function Onboarding() {
     // 0: welcome + units
     <View key="0">
       <View style={{ alignItems: 'center', marginVertical: spacing.xl }}>
-        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="leaf" size={44} color={colors.primary} />
-        </View>
+        <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 96, height: 96, borderRadius: 32, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="leaf" size={46} color="#fff" />
+        </LinearGradient>
         <T size={28} weight="800" style={{ marginTop: spacing.lg }} center>
           {editing ? 'Update your goals' : 'Welcome to Fitness Buddy'}
         </T>
         <T muted center style={{ marginTop: spacing.sm }}>
-          A few questions and we’ll build daily calorie, macro and water goals just for you. Everything stays on your phone.
+          A few questions and we’ll build your daily calorie and macro plan, with protein set to 1 g per lb of body weight. Everything stays on your phone.
         </T>
       </View>
-      <T weight="700" style={{ marginBottom: spacing.sm }}>Units</T>
+      <Field label="Your first name (optional)" value={name} onChangeText={setName} placeholder="Jake" autoCapitalize="words" />
+      <T muted size={13} weight="600" style={{ marginBottom: 6 }}>Units</T>
       <Segmented
         value={units}
         onChange={switchUnits}
@@ -203,7 +207,7 @@ export default function Onboarding() {
     // 4: summary
     <View key="4">
       <T size={24} weight="800" style={{ marginBottom: spacing.sm }}>Your daily plan</T>
-      <T muted style={{ marginBottom: spacing.lg }}>You can fine-tune these any time from the Me tab.</T>
+      <T muted style={{ marginBottom: spacing.lg }}>You can fine-tune these any time from your profile.</T>
       {goals && (
         <Card>
           <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
@@ -218,13 +222,8 @@ export default function Onboarding() {
               </View>
             ))}
           </View>
+          <T size={12} muted center style={{ marginTop: spacing.md }}>Protein target: 1 g per lb of body weight</T>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: spacing.lg }}>
-            <View style={{ alignItems: 'center' }}>
-              <T size={18} weight="700" color={nutrientColors.water}>
-                {units === 'us' ? `${Math.round(goals.waterMl / 29.5735)} fl oz` : `${(goals.waterMl / 1000).toFixed(1)} L`}
-              </T>
-              <T muted size={13}>Water</T>
-            </View>
             <View style={{ alignItems: 'center' }}>
               <T size={18} weight="700">{goals.fiber} g</T>
               <T muted size={13}>Fiber</T>

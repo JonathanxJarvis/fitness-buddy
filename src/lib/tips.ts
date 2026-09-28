@@ -86,10 +86,8 @@ export function buildNudges({ totals, goals, waterMl, entries, hour, streak, ste
     out.push({ id: 'protein-low', tone: 'info', icon: 'barbell-outline', text: `You're low on protein today, ${left} g to go. Try chicken, Greek yogurt, eggs, tofu or beans.` });
   }
 
-  if (hour >= 12 && pct(waterMl, goals.waterMl) < dayProgress * 0.6) {
-    out.push({ id: 'water-low', tone: 'info', icon: 'water-outline', text: 'You’re behind on water. Have a glass now and keep a bottle nearby.' });
-  } else if (waterMl >= goals.waterMl) {
-    out.push({ id: 'water-done', tone: 'success', icon: 'water', text: 'Water goal reached. Nice work staying hydrated!' });
+  if (hour >= 14 && hour < 24 && entries.length > 0 && waterMl === 0) {
+    out.push({ id: 'water-none', tone: 'info', icon: 'water-outline', text: 'No water logged yet today. Tap + on the water card when you have a glass.' });
   }
 
   if ((totals.sodium ?? 0) > goals.sodium) {

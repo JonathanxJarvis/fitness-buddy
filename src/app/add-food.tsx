@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +9,8 @@ import { recentFoods, uid } from '@/store/reducer';
 import { cacheFood, mealDraft } from '@/store/session';
 import { BUILTIN_FOODS, searchLocal } from '@/lib/foodDatabase';
 import { searchFoods } from '@/lib/openFoodFacts';
+import { searchUsda } from '@/lib/usda';
+import { FoodThumb } from '@/components/FoodThumb';
 import { mealItemsToLog, sumItems } from '@/lib/nutrition';
 import { todayKey } from '@/lib/dates';
 import { spacing, useTheme } from '@/theme';
@@ -18,8 +20,8 @@ type Tab = 'recent' | 'favorites' | 'mine' | 'meals';
 
 export default function AddFood() {
   const params = useLocalSearchParams<{ meal?: MealType; date?: string; target?: string }>();
-  const meal = (params.meal ?? 'snacks') as MealType;
-  const date = params.date ?? todayKey();
+  const meal = (MEALS.find((m) => m.key === params.meal)?.key ?? 'snacks') as MealType;
+  const date = params.date || todayKey();
   const forBuilder = params.target === 'builder';
   const { state, dispatch } = useStore();
   const { colors } = useTheme();
@@ -39,7 +41,7 @@ export default function AddFood() {
   }, [state.customFoods, state.favorites, recents]);
   const localResults = useMemo(() => searchLocal(localPool, query).slice(0, 25), [localPool, query]);
 
-  // Debounced Open Food Facts search.
+  // Debounced online search across USDA FoodData Central and Open Food Facts.
   useEffect(() => {
     const q = query.trim();
     setError(null);
@@ -51,12 +53,31 @@ export default function AddFood() {
     const ctrl = new AbortController();
     setLoading(true);
     const t = setTimeout(() => {
-      searchFoods(q, ctrl.signal)
-        .then(setOnline)
-        .catch((e) => {
-          if (e?.name !== 'AbortError') setError('Couldn’t reach the online food database. Check your connection.');
+      Promise.allSettled([searchUsda(q, ctrl.signal), searchFoods(q, ctrl.signal)])
+        .then(([usda, off]) => {
+          if (ctrl.signal.aborted) return;
+          const a = usda.status === 'fulfilled' ? usda.value : [];
+          const b = off.status === 'fulfilled' ? off.value : [];
+          if (usda.status === 'rejected' && off.status === 'rejected') {
+            setError('Couldn’t reach the online food databases. Check your connection.');
+          }
+          // Interleave so both generic (USDA) and packaged (OFF) foods show near the top.
+          const merged: Food[] = [];
+          const seen = new Set<string>();
+          for (let i = 0; i < Math.max(a.length, b.length); i++) {
+            for (const f of [a[i], b[i]]) {
+              if (!f) continue;
+              const k = `${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}`;
+              if (seen.has(k)) continue;
+              seen.add(k);
+              merged.push(f);
+            }
+          }
+          setOnline(merged);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!ctrl.signal.aborted) setLoading(false);
+        });
     }, 500);
     return () => {
       clearTimeout(t);
@@ -96,13 +117,17 @@ export default function AddFood() {
   };
 
   const foodRow = (f: Food) => (
-    <ListRow
-      key={f.id}
-      title={f.name}
-      subtitle={`${f.brand ? f.brand + ' · ' : ''}${Math.round(f.nutrients.calories)} kcal · ${f.servings[0].label}`}
-      onPress={() => openFood(f)}
-      right={<IconButton filled label={`Quick add ${f.name}`} icon="add" onPress={() => quickAdd(f)} />}
-    />
+    <Pressable key={f.id} onPress={() => openFood(f)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, opacity: pressed ? 0.6 : 1 })}>
+      <FoodThumb food={f} size={42} />
+      <View style={{ flex: 1 }}>
+        <T weight="700" numberOfLines={1}>{f.name}</T>
+        <T size={12} muted numberOfLines={1} style={{ marginTop: 2 }}>
+          {f.brand ? f.brand + ' · ' : ''}
+          {Math.round(f.nutrients.calories)} kcal · {Math.round(f.nutrients.protein)} g protein · {f.servings[0].label}
+        </T>
+      </View>
+      <IconButton filled label={`Quick add ${f.name}`} icon="add" onPress={() => quickAdd(f)} />
+    </Pressable>
   );
 
   const listForTab: Food[] = tab === 'recent' ? recents : tab === 'favorites' ? state.favorites : tab === 'mine' ? state.customFoods : [];
@@ -121,9 +146,12 @@ export default function AddFood() {
           clearButtonMode="while-editing"
         />
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          {!forBuilder && (
+            <Button small icon="camera" title="Snap" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/snap-meal', params: { meal, date } })} />
+          )}
           <Button small icon="barcode-outline" title="Scan" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/scan', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
           <Button small icon="create-outline" title="Create" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, target: forBuilder ? 'builder' : '' } })} />
-          <Button small icon="flash-outline" title="Quick add" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, quick: '1', target: forBuilder ? 'builder' : '' } })} />
+          <Button small icon="flash-outline" title="Quick" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/custom-food', params: { meal, date, quick: '1', target: forBuilder ? 'builder' : '' } })} />
         </View>
         {!query && (
           <Segmented<Tab>
@@ -149,15 +177,15 @@ export default function AddFood() {
           ListHeaderComponent={
             <>
               {localResults.length > 0 && (
-                <T size={13} weight="700" muted style={{ marginTop: spacing.sm }}>COMMON & SAVED FOODS</T>
+                <T size={12} weight="800" muted style={{ marginTop: spacing.sm, letterSpacing: 0.6 }}>COMMON & SAVED FOODS</T>
               )}
               {localResults.map(foodRow)}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.lg }}>
-                <T size={13} weight="700" muted>OPEN FOOD FACTS</T>
+                <T size={12} weight="800" muted style={{ letterSpacing: 0.6 }}>USDA & OPEN FOOD FACTS</T>
                 {loading && <ActivityIndicator size="small" color={colors.primary} />}
               </View>
               {error && <T size={13} color={colors.danger} style={{ marginTop: 6 }}>{error}</T>}
-              {!loading && !error && query.trim().length < 3 && <T size={13} muted style={{ marginTop: 6 }}>Type at least 3 letters to search millions of packaged foods.</T>}
+              {!loading && !error && query.trim().length < 3 && <T size={13} muted style={{ marginTop: 6 }}>Type at least 3 letters to search millions of foods and packaged products.</T>}
               {!loading && !error && query.trim().length >= 3 && online.length === 0 && <T size={13} muted style={{ marginTop: 6 }}>No online matches.</T>}
             </>
           }
@@ -168,7 +196,7 @@ export default function AddFood() {
           data={state.savedMeals}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 40 }}
-          ListEmptyComponent={<EmptyState icon="bookmark-outline" title="No saved meals yet" body="Build one from the Meals tab, or use “Save as meal” on any logged meal." />}
+          ListEmptyComponent={<EmptyState icon="bookmark-outline" title="No saved meals yet" body="Build one in Profile → My foods & meals, or use “Save as meal” on any logged meal." />}
           renderItem={({ item }) => {
             const n = sumItems(mealItemsToLog(item));
             return (

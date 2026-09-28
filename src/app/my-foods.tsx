@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Alert, View } from 'react-native';
-import { router } from 'expo-router';
+import { View } from 'react-native';
+import { router, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Button, Card, EmptyState, IconButton, ListRow, Screen, Segmented, T } from '@/components/ui';
+import { ActionSheet, Button, Card, EmptyState, IconButton, ListRow, Screen, Segmented, T } from '@/components/ui';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { cacheFood } from '@/store/session';
@@ -18,34 +18,37 @@ export default function MealsScreen() {
   const { colors } = useTheme();
   const [tab, setTab] = useState<Tab>('meals');
 
-  const logMeal = (m: SavedMeal) => {
-    Alert.alert(`Log “${m.name}”`, `Add to ${prettyDate(selectedDate).toLowerCase()} as…`, [
-      ...MEALS.map((meal) => ({
-        text: meal.label,
-        onPress: () => {
-          const now = Date.now();
-          dispatch({
-            type: 'addEntries',
-            entries: mealItemsToLog(m).map((it, i) => ({ id: uid() + i, date: selectedDate, meal: meal.key, ...it, createdAt: now + i })),
-          });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
+  const [logging, setLogging] = useState<SavedMeal | null>(null);
+
+  const logMeal = (m: SavedMeal, meal: (typeof MEALS)[number]['key']) => {
+    const now = Date.now();
+    dispatch({
+      type: 'addEntries',
+      entries: mealItemsToLog(m).map((it, i) => ({ id: uid() + i, date: selectedDate, meal, ...it, createdAt: now + i })),
+    });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
 
   return (
-    <Screen topInset>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
-        <T size={28} weight="800">My food</T>
-        <IconButton
-          filled
-          label={tab === 'meals' ? 'New saved meal' : 'New custom food'}
-          icon="add"
-          onPress={() => router.push(tab === 'meals' ? '/meal-builder' : '/custom-food')}
-        />
-      </View>
+    <Screen>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <IconButton
+              filled
+              label={tab === 'meals' ? 'New saved meal' : 'New custom food'}
+              icon="add"
+              onPress={() => router.push(tab === 'meals' ? '/meal-builder' : '/custom-food')}
+            />
+          ),
+        }}
+      />
+      <ActionSheet
+        visible={!!logging}
+        onClose={() => setLogging(null)}
+        title={logging ? `Log “${logging.name}” ${prettyDate(selectedDate).toLowerCase()} as…` : undefined}
+        actions={MEALS.map((meal) => ({ label: meal.label, icon: meal.icon as never, onPress: () => logging && logMeal(logging, meal.key) }))}
+      />
       <Segmented
         value={tab}
         onChange={setTab}
@@ -79,13 +82,13 @@ export default function MealsScreen() {
                     title={m.name}
                     subtitle={`${Math.round(n.calories)} kcal · ${m.isRecipe ? `recipe, ${m.servings} portions` : `${m.items.length} foods`}`}
                     onPress={() => router.push({ pathname: '/meal-builder', params: { editId: m.id } })}
-                    right={<Button small title="Log" icon="add" onPress={() => logMeal(m)} />}
+                    right={<Button small title="Log" icon="add" onPress={() => setLogging(m)} />}
                   />
                 );
               })}
             </Card>
           )}
-          <T muted size={13} center>Tip: on the Today screen, tap ••• on any meal and choose “Save as meal”.</T>
+          <T muted size={13} center>Tip: on the Today screen, tap any meal’s name and choose “Save as meal”.</T>
         </>
       )}
 

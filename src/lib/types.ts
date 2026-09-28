@@ -35,7 +35,17 @@ export interface Serving {
   factor: number;
 }
 
-export type FoodSource = 'builtin' | 'openfoodfacts' | 'custom' | 'recipe';
+export type FoodSource = 'builtin' | 'openfoodfacts' | 'usda' | 'custom' | 'recipe' | 'ai';
+
+/** One item the AI spotted in a meal photo. */
+export interface MealComponent {
+  name: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
 
 export interface Food {
   id: string;
@@ -46,6 +56,10 @@ export interface Food {
   /** Nutrients for one base serving (servings[0] has factor 1). */
   nutrients: Nutrients;
   servings: Serving[];
+  /** For AI photo estimates: the items it recognized. */
+  components?: MealComponent[];
+  /** For AI photo estimates: a short note on assumptions. */
+  note?: string;
 }
 
 export interface DiaryEntry {
@@ -56,6 +70,8 @@ export interface DiaryEntry {
   servingIndex: number;
   quantity: number;
   createdAt: number;
+  /** Small JPEG data URI of the meal photo, for AI-logged meals. */
+  photo?: string;
 }
 
 export interface SavedMealItem {
@@ -87,6 +103,7 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'ver
 export type GoalType = 'lose' | 'maintain' | 'gain';
 
 export interface Profile {
+  name?: string;
   sex: Sex;
   age: number;
   heightCm: number;
@@ -102,7 +119,6 @@ export interface Goals {
   protein: number;
   carbs: number;
   fat: number;
-  waterMl: number;
   fiber: number;
   sugar: number; // max
   sodium: number; // max, mg
@@ -132,6 +148,16 @@ export interface Settings {
   reminders: ReminderSettings;
 }
 
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  /** Thumbnail data URI when the user attached a photo. */
+  photo?: string;
+  createdAt: number;
+  error?: boolean;
+}
+
 export interface AppState {
   version: 1;
   profile: Profile | null;
@@ -145,4 +171,5 @@ export interface AppState {
   customFoods: Food[];
   favorites: Food[];
   savedMeals: SavedMeal[];
+  chat: ChatMessage[];
 }

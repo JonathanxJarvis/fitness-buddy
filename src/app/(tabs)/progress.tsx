@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Card, Screen, Segmented, T } from '@/components/ui';
+import { Card, CountUp, IconTile, Screen, Segmented, T } from '@/components/ui';
+import { FadeIn } from '@/components/motion';
 import { BarChart, LineChart } from '@/components/Charts';
 import { useStore } from '@/store/StoreProvider';
 import { lastNDays, shortDate, todayKey, weekdayLetter, fromKey, addDays } from '@/lib/dates';
@@ -50,8 +51,8 @@ export default function ProgressScreen() {
   const tips = [0, 1, 2].map((i) => tipForDate(addDays(today, i + 1)));
 
   return (
-    <Screen topInset>
-      <T size={28} weight="800" style={{ marginBottom: spacing.lg }}>Progress</T>
+    <Screen topInset tabs>
+      <T size={30} weight="800" style={{ marginBottom: spacing.lg }}>Progress</T>
       <Segmented
         value={range}
         onChange={setRange}
@@ -63,32 +64,32 @@ export default function ProgressScreen() {
         style={{ marginBottom: spacing.lg }}
       />
 
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <Card style={{ flex: 1 }}>
-          <T muted size={12}>Avg calories</T>
-          <T size={22} weight="800">{Math.round(avgCal).toLocaleString()}</T>
-          <T muted size={12}>goal {goals.calories.toLocaleString()}</T>
+      <FadeIn style={{ flexDirection: 'row', gap: spacing.md }}>
+        <Card style={{ flex: 1, gap: 8 }}>
+          <IconTile icon="flame" color={nutrientColors.calories} size={34} />
+          <CountUp key={range} value={Math.round(avgCal)} size={24} weight="800" />
+          <T muted size={12}>avg kcal · goal {goals.calories.toLocaleString()}</T>
         </Card>
-        <Card style={{ flex: 1 }}>
-          <T muted size={12}>Days on target</T>
-          <T size={22} weight="800">
+        <Card style={{ flex: 1, gap: 8 }}>
+          <IconTile icon="checkmark-done" color={nutrientColors.protein} size={34} />
+          <T size={24} weight="800">
             {onTarget}/{loggedDays.length}
           </T>
-          <T muted size={12}>within 10% of goal</T>
+          <T muted size={12}>days within 10% of goal</T>
         </Card>
-      </View>
+      </FadeIn>
 
       <Card>
         <T weight="700" style={{ marginBottom: spacing.sm }}>Calories {n > 30 ? '(weekly average)' : ''}</T>
-        <BarChart data={bars((d) => totals[d].calories)} goal={goals.calories} color={nutrientColors.calories} />
+        <BarChart key={range} data={bars((d) => totals[d].calories)} goal={goals.calories} color={nutrientColors.calories} />
       </Card>
 
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
           <T weight="700">Protein</T>
-          <T muted size={13}>avg {Math.round(avgProtein)} g</T>
+          <T muted size={13}>avg {Math.round(avgProtein)} g · goal 1 g/lb</T>
         </View>
-        <BarChart data={bars((d) => totals[d].protein)} goal={goals.protein} color={nutrientColors.protein} height={130} />
+        <BarChart key={range} data={bars((d) => totals[d].protein)} goal={goals.protein} color={nutrientColors.protein} height={130} />
       </Card>
 
       <Card>
@@ -114,12 +115,7 @@ export default function ProgressScreen() {
             avg {Math.round(waterValue(avgWater, units))} {waterUnit(units)}
           </T>
         </View>
-        <BarChart
-          data={bars((d) => waterValue(state.water[d] ?? 0, units))}
-          goal={waterValue(goals.waterMl, units)}
-          color={nutrientColors.water}
-          height={120}
-        />
+        <BarChart key={range} data={bars((d) => waterValue(state.water[d] ?? 0, units))} color={nutrientColors.water} height={120} />
       </Card>
 
       <Card>
@@ -127,7 +123,7 @@ export default function ProgressScreen() {
           <T weight="700">Steps</T>
           <T muted size={13}>avg {Math.round(avgSteps).toLocaleString()}</T>
         </View>
-        <BarChart data={bars((d) => state.steps[d] ?? 0)} goal={goals.steps} color={nutrientColors.steps} height={120} />
+        <BarChart key={range} data={bars((d) => state.steps[d] ?? 0)} goal={goals.steps} color={nutrientColors.steps} height={120} />
       </Card>
 
       <T size={18} weight="700" style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>Coming up</T>

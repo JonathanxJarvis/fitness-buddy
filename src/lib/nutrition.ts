@@ -8,6 +8,7 @@ import type {
   Profile,
   SavedMeal,
   SavedMealItem,
+  MealType,
 } from './types';
 
 export const ACTIVITY_LEVELS: { key: ActivityLevel; label: string; hint: string; factor: number }[] = [
@@ -35,6 +36,11 @@ function round(n: number, step: number) {
   return Math.round(n / step) * step;
 }
 
+/** Daily protein target: 1 g per lb of body weight. */
+export function proteinTarget(weightKg: number): number {
+  return Math.round(weightKg * 2.20462);
+}
+
 export function calculateGoals(p: Profile): Goals {
   const maintenance = tdee(p);
   const dailyDelta = (p.weeklyRateKg * KCAL_PER_KG) / 7;
@@ -44,9 +50,9 @@ export function calculateGoals(p: Profile): Goals {
   const floor = p.sex === 'male' ? 1500 : 1200;
   calories = Math.max(floor, round(calories, 10));
 
-  const proteinPerKg = p.goal === 'maintain' ? 1.4 : 1.8;
-  const protein = Math.round(Math.min(p.weightKg * proteinPerKg, (calories * 0.35) / 4));
-  const fat = Math.round((calories * 0.28) / 9);
+  // 1 g of protein per lb of body weight, the common target for building or keeping muscle.
+  const protein = proteinTarget(p.weightKg);
+  const fat = Math.round((calories * (p.goal === 'lose' ? 0.25 : 0.28)) / 9);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
   const female = p.sex === 'female';
@@ -55,7 +61,6 @@ export function calculateGoals(p: Profile): Goals {
     protein,
     carbs,
     fat,
-    waterMl: Math.max(1500, round(p.weightKg * 35, 250)),
     fiber: Math.round((calories / 1000) * 14),
     sugar: Math.round((calories * 0.1) / 4),
     sodium: 2300,
@@ -179,4 +184,58 @@ export function exerciseCalories(met: number, weightKg: number, minutes: number)
 /** Rough calories burned by walking, ~0.04 kcal per step for a 70 kg person. */
 export function stepCalories(steps: number, weightKg: number): number {
   return Math.round(steps * 0.04 * (weightKg / 70));
+}
+
+/** Share of the daily calorie goal each meal aims for. */
+export const MEAL_SHARES: Record<MealType, number> = { breakfast: 0.25, lunch: 0.35, dinner: 0.3, snacks: 0.1 };
+
+export interface HealthScore {
+  score: number;
+  grade: string;
+  highlights: { good: boolean; text: string }[];
+}
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+/**
+ * A simple 0–100 quality score for a food or meal, based on protein and fiber
+ * density (good) and added sugar, sodium and fat density (bad). It's a nudge,
+ * not a medical rating.
+ */
+export function healthScore(n: Nutrients): HealthScore | null {
+  if (!n.calories || n.calories < 5) return null;
+  const per100 = n.calories / 100;
+  const proteinShare = (n.protein * 4) / n.calories;
+  const fatShare = (n.fat * 9) / n.calories;
+  const fiberDensity = n.fiber !== undefined ? n.fiber / per100 : null;
+  const sugarShare = n.sugar !== undefined ? (n.sugar * 4) / n.calories : null;
+  const sodiumDensity = n.sodium !== undefined ? n.sodium / per100 : null;
+
+  let score = 55;
+  const highlights: HealthScore['highlights'] = [];
+
+  score += 25 * clamp01(proteinShare / 0.3);
+  if (proteinShare >= 0.25) highlights.push({ good: true, text: 'High in protein' });
+  if (fiberDensity !== null) {
+    score += 12 * clamp01(fiberDensity / 1.5);
+    if (fiberDensity >= 1.2) highlights.push({ good: true, text: 'Good source of fiber' });
+  }
+  if (sugarShare !== null) {
+    score -= 25 * clamp01((sugarShare - 0.12) / 0.3);
+    if (sugarShare > 0.25) highlights.push({ good: false, text: 'High in sugar' });
+  }
+  if (sodiumDensity !== null) {
+    score -= 15 * clamp01((sodiumDensity - 120) / 200);
+    if (sodiumDensity > 220) highlights.push({ good: false, text: 'High in sodium' });
+  }
+  score -= 12 * clamp01((fatShare - 0.4) / 0.3);
+  if (fatShare > 0.55) highlights.push({ good: false, text: 'Mostly fat' });
+  if ((n.potassium ?? 0) / per100 > 80 || (n.vitaminC ?? 0) / per100 > 6) {
+    score += 5;
+    highlights.push({ good: true, text: 'Packed with vitamins & minerals' });
+  }
+
+  score = Math.round(Math.max(0, Math.min(100, score)));
+  const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B' : score >= 60 ? 'C' : score >= 45 ? 'D' : 'E';
+  return { score, grade, highlights };
 }

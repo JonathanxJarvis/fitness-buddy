@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +17,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radius, spacing, useTheme } from '@/theme';
+import { font, radius, spacing, useTheme } from '@/theme';
+import { nativeDriver, PressScale, useTween } from './motion';
 
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -23,12 +27,15 @@ export function Screen({
   scroll = true,
   padded = true,
   topInset = false,
+  tabs = false,
   style,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   padded?: boolean;
   topInset?: boolean;
+  /** Leaves room for the floating tab bar. */
+  tabs?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
@@ -36,7 +43,7 @@ export function Screen({
   const pad: ViewStyle = {
     padding: padded ? spacing.lg : 0,
     paddingTop: (padded ? spacing.lg : 0) + (topInset ? insets.top : 0),
-    paddingBottom: spacing.xl * 2,
+    paddingBottom: spacing.xl * 2 + (tabs ? 90 + insets.bottom : 0),
   };
   if (!scroll) {
     return <View style={[{ flex: 1, backgroundColor: colors.background }, pad, style]}>{children}</View>;
@@ -46,6 +53,7 @@ export function Screen({
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={[pad, style]}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       {children}
     </ScrollView>
@@ -62,13 +70,13 @@ export function Card({ children, style }: { children: React.ReactNode; style?: S
           borderRadius: radius.lg,
           padding: spacing.lg,
           marginBottom: spacing.md,
-          borderWidth: dark ? StyleSheet.hairlineWidth : 0,
-          borderColor: colors.border,
-          shadowColor: '#000',
-          shadowOpacity: dark ? 0 : 0.05,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: dark ? 0 : 1,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: dark ? colors.border : 'rgba(15,40,25,0.05)',
+          shadowColor: colors.shadow,
+          shadowOpacity: dark ? 0 : 0.06,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: dark ? 0 : 2,
         },
         style,
       ]}
@@ -87,8 +95,10 @@ export function T({
   color,
   center,
   numberOfLines,
+  onPress,
 }: {
   children: React.ReactNode;
+  onPress?: () => void;
   style?: StyleProp<TextStyle>;
   muted?: boolean;
   size?: number;
@@ -101,11 +111,13 @@ export function T({
   return (
     <Text
       numberOfLines={numberOfLines}
+      onPress={onPress}
       style={[
         {
           color: color ?? (muted ? colors.textMuted : colors.text),
           fontSize: size,
-          fontWeight: weight,
+          ...font(weight),
+          letterSpacing: size >= 24 ? -0.6 : size >= 18 ? -0.3 : 0,
           textAlign: center ? 'center' : undefined,
         },
         style,
@@ -118,8 +130,8 @@ export function T({
 
 export function SectionTitle({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.sm }}>
-      <T size={18} weight="700">
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, marginBottom: spacing.md }}>
+      <T size={19} weight="800">
         {children}
       </T>
       {right}
@@ -160,21 +172,21 @@ export function Button({
     danger: colors.danger,
   }[variant];
   return (
-    <Pressable
+    <PressScale
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      style={[
         {
           backgroundColor: bg,
           borderRadius: radius.pill,
-          paddingVertical: small ? 8 : 14,
-          paddingHorizontal: small ? 14 : 20,
+          paddingVertical: small ? 9 : 16,
+          paddingHorizontal: small ? 14 : 22,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+          opacity: disabled ? 0.45 : 1,
           borderWidth: variant === 'danger' ? 1 : 0,
           borderColor: colors.danger,
         },
@@ -186,10 +198,10 @@ export function Button({
       ) : (
         <>
           {icon && <Ionicons name={icon} size={small ? 16 : 18} color={fg} />}
-          <Text numberOfLines={1} style={{ color: fg, fontWeight: '700', fontSize: small ? 14 : 16 }}>{title}</Text>
+          <Text numberOfLines={1} style={{ color: fg, ...font('700'), fontSize: small ? 14 : 16 }}>{title}</Text>
         </>
       )}
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -252,7 +264,7 @@ export function Field({
       >
         <TextInput
           placeholderTextColor={colors.textMuted}
-          style={{ flex: 1, color: colors.text, fontSize: 16, paddingVertical: 12 }}
+          style={{ flex: 1, color: colors.text, fontSize: 16, paddingVertical: 13, ...font('500') }}
           {...props}
         />
         {suffix ? <T muted>{suffix}</T> : null}
@@ -289,6 +301,10 @@ export function Segmented<K extends string>({
               borderRadius: radius.pill,
               backgroundColor: active ? colors.card : 'transparent',
               alignItems: 'center',
+              shadowColor: '#000',
+              shadowOpacity: active ? 0.06 : 0,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 2 },
             }}
           >
             <T size={14} weight={active ? '700' : '500'} color={active ? colors.primary : colors.textMuted}>
@@ -358,7 +374,7 @@ export function ListRow({
       })}
     >
       {icon && (
-        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name={icon} size={18} color={colors.primary} />
         </View>
       )}
@@ -396,7 +412,7 @@ export function EmptyState({ icon, title, body }: { icon: IconName; title: strin
 
 export function ProgressBar({ value, max, color, height = 8 }: { value: number; max: number; color: string; height?: number }) {
   const { colors } = useTheme();
-  const pct = max > 0 ? Math.min(1, value / max) : 0;
+  const pct = useTween(max > 0 ? Math.min(1, value / max) : 0, 900);
   return (
     <View style={{ height, backgroundColor: colors.track, borderRadius: height, overflow: 'hidden' }}>
       <View style={{ width: `${pct * 100}%`, height, backgroundColor: color, borderRadius: height }} />
@@ -417,9 +433,180 @@ export function Stepper({ value, onChange, step = 1, min = 0 }: { value: number;
           onChange(Number.isFinite(n) ? n : 0);
         }}
         keyboardType="decimal-pad"
-        style={{ color: colors.text, fontSize: 20, fontWeight: '700', width: 64, textAlign: 'center', padding: 0 }}
+        style={{ color: colors.text, fontSize: 22, ...font('800'), width: 64, textAlign: 'center', padding: 0 }}
       />
       <IconButton filled label="Increase" icon="add" onPress={() => onChange(+(value + step).toFixed(2))} />
     </View>
+  );
+}
+
+/** A number that counts up to its value. */
+export function CountUp({
+  value,
+  decimals = 0,
+  delay = 0,
+  ...rest
+}: { value: number; decimals?: number; delay?: number } & Omit<React.ComponentProps<typeof T>, 'children'>) {
+  const v = useTween(value, 1000, delay);
+  const shown = decimals ? v.toFixed(decimals) : Math.round(v).toLocaleString();
+  return <T {...rest}>{shown}</T>;
+}
+
+/** A rounded-square icon on a soft tint of its color. */
+export function IconTile({ icon, color, size = 40, iconSize }: { icon: IconName; color: string; size?: number; iconSize?: number }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.32,
+        backgroundColor: color + '1F',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Ionicons name={icon} size={iconSize ?? size * 0.5} color={color} />
+    </View>
+  );
+}
+
+export function Badge({ label, color, icon, solid }: { label: string; color: string; icon?: IconName; solid?: boolean }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: radius.pill,
+        backgroundColor: solid ? color : color + '1F',
+        alignSelf: 'flex-start',
+      }}
+    >
+      {icon && <Ionicons name={icon} size={11} color={solid ? '#fff' : color} />}
+      <T size={11} weight="800" color={solid ? '#fff' : color} style={{ letterSpacing: 0.4 }}>
+        {label}
+      </T>
+    </View>
+  );
+}
+
+/** A bottom sheet with a fading backdrop and a spring slide-up. */
+export function Sheet({
+  visible,
+  onClose,
+  title,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [mounted, setMounted] = useState(visible);
+  const v = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.spring(v, { toValue: 1, useNativeDriver: nativeDriver, damping: 22, stiffness: 220, mass: 0.9 }).start();
+    } else if (mounted) {
+      Animated.timing(v, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: nativeDriver }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  if (!mounted) return null;
+  return (
+    <Modal transparent visible animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5,15,10,0.45)', opacity: v }]}>
+          <Pressable accessibilityLabel="Close" style={{ flex: 1 }} onPress={onClose} />
+        </Animated.View>
+        <Animated.View
+          style={{
+            backgroundColor: colors.card,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingHorizontal: spacing.lg,
+            paddingTop: 10,
+            paddingBottom: insets.bottom + spacing.lg,
+            width: '100%',
+            maxWidth: 520,
+            alignSelf: 'center',
+            transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [420, 0] }) }],
+          }}
+        >
+          <View style={{ alignSelf: 'center', width: 38, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: spacing.md }} />
+          {title ? (
+            <T size={18} weight="800" style={{ marginBottom: spacing.md }}>
+              {title}
+            </T>
+          ) : null}
+          {children}
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+export interface SheetAction {
+  label: string;
+  icon: IconName;
+  color?: string;
+  subtitle?: string;
+  destructive?: boolean;
+  onPress: () => void;
+}
+
+/** A list of actions in a bottom sheet (replaces Alert menus, which don't exist on web). */
+export function ActionSheet({
+  visible,
+  onClose,
+  title,
+  actions,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title?: string;
+  actions: SheetAction[];
+}) {
+  const { colors } = useTheme();
+  return (
+    <Sheet visible={visible} onClose={onClose} title={title}>
+      {actions.map((a) => {
+        const color = a.destructive ? colors.danger : a.color ?? colors.primary;
+        return (
+          <PressScale
+            key={a.label}
+            scaleTo={0.98}
+            accessibilityRole="button"
+            onPress={() => {
+              onClose();
+              setTimeout(a.onPress, 180);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11 }}
+          >
+            <IconTile icon={a.icon} color={color} size={42} />
+            <View style={{ flex: 1 }}>
+              <T weight="700" color={a.destructive ? colors.danger : undefined}>
+                {a.label}
+              </T>
+              {a.subtitle ? (
+                <T size={13} muted style={{ marginTop: 1 }}>
+                  {a.subtitle}
+                </T>
+              ) : null}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </PressScale>
+        );
+      })}
+    </Sheet>
   );
 }

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
-import { useTheme } from '@/theme';
+import { FONTS, useTheme } from '@/theme';
 import { T } from './ui';
+import { useTween } from './motion';
 
 export interface BarDatum {
   label: string;
@@ -25,6 +26,7 @@ export function BarChart({
 }) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
+  const grow = useTween(width > 0 ? 1 : 0, 900);
   const labelH = 18;
   const topPad = 14;
   const chartH = height - labelH - topPad;
@@ -39,7 +41,7 @@ export function BarChart({
       {width > 0 && (
         <Svg width={width} height={height}>
           {data.map((d, i) => {
-            const h = (d.value / max) * chartH;
+            const h = (d.value / max) * chartH * grow;
             const over = goal !== undefined && d.value > goal * 1.05;
             return (
               <React.Fragment key={i}>
@@ -53,7 +55,7 @@ export function BarChart({
                   opacity={d.highlight === false ? 0.5 : 1}
                 />
                 {i % showEvery === 0 && (
-                  <SvgText x={i * slot + slot / 2} y={height - 4} fontSize={11} fill={colors.textMuted} textAnchor="middle">
+                  <SvgText fontFamily={FONTS.medium} x={i * slot + slot / 2} y={height - 4} fontSize={11} fill={colors.textMuted} textAnchor="middle">
                     {d.label}
                   </SvgText>
                 )}
@@ -63,7 +65,7 @@ export function BarChart({
           {goal !== undefined && goal > 0 && (
             <>
               <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.textMuted} strokeDasharray="4 4" strokeWidth={1} />
-              <SvgText x={width - 2} y={y(goal) - 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
+              <SvgText fontFamily={FONTS.medium} x={width - 2} y={y(goal) - 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
                 {`Goal ${format(goal)}`}
               </SvgText>
             </>
@@ -118,7 +120,7 @@ export function LineChart({
           {[max, (max + min) / 2, min].map((v, i) => (
             <React.Fragment key={i}>
               <Line x1={padX} x2={width - 8} y1={y(v)} y2={y(v)} stroke={colors.border} strokeWidth={1} />
-              <SvgText x={padX - 6} y={y(v) + 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
+              <SvgText fontFamily={FONTS.medium} x={padX - 6} y={y(v) + 4} fontSize={10} fill={colors.textMuted} textAnchor="end">
                 {format(v)}
               </SvgText>
             </React.Fragment>
@@ -128,7 +130,7 @@ export function LineChart({
             <React.Fragment key={i}>
               <Circle cx={x(i)} cy={y(p.value)} r={3.5} fill={color} />
               {i % every === 0 && (
-                <SvgText x={x(i)} y={height - 4} fontSize={10} fill={colors.textMuted} textAnchor="middle">
+                <SvgText fontFamily={FONTS.medium} x={x(i)} y={height - 4} fontSize={10} fill={colors.textMuted} textAnchor="middle">
                   {p.label}
                 </SvgText>
               )}

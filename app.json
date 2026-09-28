@@ -38,7 +38,15 @@
           "cameraPermission": "Fitness Buddy uses the camera to scan food barcodes."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fitness Buddy uses your photos so AI can estimate the nutrition of your meals.",
+          "cameraPermission": "Fitness Buddy uses the camera to scan barcodes and photograph meals for AI nutrition estimates."
+        }
+      ],
+      "expo-secure-store"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",

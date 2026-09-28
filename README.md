@@ -4,22 +4,30 @@ A nutrition and fitness tracker for iOS and Android, in the spirit of Yazio and 
 
 ## Features
 
-- **Today dashboard** with rings for calories (food minus exercise), protein, carbs, fat and water, each against your daily goal.
-- **Barcode scanner** that looks products up in [Open Food Facts](https://openfoodfacts.org) (about 3 million packaged foods, no account or API key). Unknown barcodes can be saved as a custom food and are recognized next time.
-- **Food search** across ~100 built-in common foods (works offline), your custom and favorite foods, and Open Food Facts online.
-- **Logging by meal**: breakfast, lunch, dinner and snacks, with serving sizes (package serving, 100 g, oz, g) and amounts. Tap an entry to edit it, long-press to delete.
-- **Tracks** water, weight, steps (synced from the phone's motion sensor), exercise (calories estimated from activity and your weight), fiber, sugar, sodium, potassium, calcium, iron, vitamin C and vitamin D.
-- **Custom foods and quick add** for anything that isn't in the database.
-- **Saved meals and recipes**: save a group of foods and re-log it in one tap, or build a recipe that makes N portions and log it per portion. "Save as meal" works on any meal you've logged. Recent and favorite foods are one tap away.
-- **Calendar**: tap any day to see what you logged, then jump in to edit it. Days are color-coded (on target, over, under), with current and best streaks.
-- **Progress charts** over 7, 30 or 90 days for calories, protein, weight, water and steps.
-- **Tips and nudges**: a daily nutrition or hydration tip, plus smart nudges based on what you've logged ("You're low on protein today", behind on water, sodium over the limit, streak milestones and more).
-- **Onboarding** that sets calorie, macro, water and micronutrient goals from your age, sex, height, weight, activity level and goal (lose, maintain, gain) using the Mifflin–St Jeor equation. Every goal can be fine-tuned afterwards.
-- **Reminders** to log breakfast, lunch and dinner, and to drink water every 1–3 hours (local notifications).
-- **US or metric units** (lb/ft/fl oz or kg/cm/ml), and **light, dark or automatic theme**, with green as the main color.
-- **Export** a JSON backup of your data, or erase everything.
+- **Premium Today dashboard**: a greeting with your streak, a week strip with a mini calorie ring per day, a deep-green hero card with calories left (goal + exercise − food), and animated bars for protein, carbs, fat and fiber. Everything counts up and fades in.
+- **Protein at 1 g per lb of body weight** by default (editable in Daily goals). There is no water goal; water is still tracked by the glass.
+- **Snap a meal (AI)**: take or pick a photo and Claude identifies each food, estimates portions in grams and returns calories, protein, carbs, fat, fiber, sugar and sodium, with a confidence level and a health score. Adjust the portion, pick the meal and log it with the photo.
+- **Coach (AI chat)**: a chatbot that knows your goals, today's log and the last week. Ask what to eat to hit protein, how your day looks, or attach a meal photo and ask about it. "Ask Coach about this meal" hands a photo estimate straight to the chat.
+- **Huge food database**: ~100 built-in common foods (offline), plus live search across **USDA FoodData Central** (~400,000 generic and branded foods) and **Open Food Facts** (~3 million packaged products), merged into one list.
+- **Barcode scanner** backed by Open Food Facts. Unknown barcodes can be saved as a custom food.
+- **Meal detail** with a hero photo, 2×2 nutrition tiles, an overall health score (0–100 with a letter grade), vitamins and minerals.
+- **Logging by meal** with per-meal calorie rings (each meal has a share of your daily goal), entry times, photo thumbnails and an AI badge for photo-logged meals.
+- **Center + button** for quick actions: snap a meal, scan, search, add water, log a workout or weight.
+- **Tracks** water, weight, steps (motion sensor), exercise, fiber, sugar, sodium, potassium, calcium, iron, vitamin C and vitamin D.
+- **Saved meals, recipes, favorites and custom foods** (Profile → My foods & meals).
+- **Diary calendar** with color-coded days and streaks, and **Progress** charts over 7, 30 or 90 days.
+- **Tips and smart nudges**, **onboarding** that builds your plan (Mifflin–St Jeor), **reminders** for meals and water, **US or metric units**, and **light, dark or automatic theme**.
 
-Photo recognition of meals was left out: every reliable food-photo API needs a paid key, and this app is meant to run with no accounts or keys.
+### AI setup (needs your own Claude API key)
+
+Snap a meal and Coach call the Claude API directly from your phone, so they need a key:
+
+1. Create a key at [console.anthropic.com](https://console.anthropic.com/settings/keys). Usage is billed to that account (a photo estimate or chat reply costs a few cents at most).
+2. In the app, tap your avatar on Today → **AI Coach & meal photos** → paste the key → **Save key**.
+
+The key is stored in the phone's secure keychain/keystore (expo-secure-store) and is only sent to Anthropic. Requests use `claude-opus-5` with Anthropic's server-side fallbacks turned on, so a busy model falls back to another Claude model instead of failing. Without a key, the rest of the app works normally, and Snap a meal offers a clearly labeled sample result so you can see the flow.
+
+Photo estimates are estimates: portion sizes from a picture can be off by 20% or more, so adjust the portion or edit the entry if you know better.
 
 ## Run it on your phone with Expo Go
 
@@ -35,7 +43,7 @@ Photo recognition of meals was left out: every reliable food-photo API needs a p
 4. Scan the QR code in the terminal:
    - **iPhone**: open the Camera app and tap the banner.
    - **Android**: open Expo Go and tap **Scan QR code**.
-5. The app opens in Expo Go. Allow camera access when you first scan a barcode, motion access for steps, and notifications when you turn on reminders.
+5. The app opens in Expo Go. Allow camera and photo access when you first scan a barcode or snap a meal, motion access for steps, and notifications when you turn on reminders.
 
 If your phone and computer aren't on the same Wi-Fi (or the QR code won't connect), run `npx expo start --tunnel` instead.
 
@@ -47,7 +55,7 @@ If your phone and computer aren't on the same Wi-Fi (or the QR code won't connec
 ## Development
 
 ```bash
-npm test            # unit tests (goal math, Open Food Facts mapping, streaks, nudges, state)
+npm test            # unit tests (goal math, USDA/Open Food Facts mapping, AI estimate parsing, health score, streaks, nudges, state)
 npm run typecheck   # TypeScript
 npx expo start      # dev server (press i / a for simulators, w for web)
 ```
@@ -57,17 +65,19 @@ npx expo start      # dev server (press i / a for simulators, w for web)
 ```
 src/
   app/              Expo Router screens
-    (tabs)/         Today, Calendar, Progress, Meals, Me
+    (tabs)/         Today, Diary, Coach (AI chat), Progress
+    snap-meal.tsx   photo → AI nutrition estimate
     onboarding.tsx  goal setup
-    add-food.tsx    search, recents, favorites, saved meals
-    food.tsx        food details and logging
+    add-food.tsx    search (built-in + USDA + Open Food Facts), recents, favorites, saved meals
+    food.tsx        meal/food detail with health score
+    profile.tsx     profile, AI key, units, theme
     scan.tsx        barcode scanner
     ...
-  components/       UI kit, progress rings, charts
-  lib/              nutrition math, food database, Open Food Facts client, tips, units, dates, reminders
+  components/       UI kit, animated rings, sheets, tab bar, charts
+  lib/              nutrition math, food databases (built-in, USDA, Open Food Facts), Claude client, tips, units, dates, reminders
   store/            app state (reducer + AsyncStorage persistence)
 ```
 
 Data is stored with AsyncStorage under a single versioned key. Nutrients for each diary entry are snapshotted when logged, so editing or deleting a custom food never changes your history.
 
-Food data from Open Food Facts is available under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/).
+Food data comes from USDA FoodData Central (public domain, via the free DEMO_KEY, which is rate limited per device) and Open Food Facts, available under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/).

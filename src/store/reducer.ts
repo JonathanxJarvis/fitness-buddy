@@ -1,5 +1,7 @@
+import { proteinTarget } from '@/lib/nutrition';
 import type {
   AppState,
+  ChatMessage,
   DiaryEntry,
   ExerciseEntry,
   Food,
@@ -35,11 +37,13 @@ export const initialState: AppState = {
   customFoods: [],
   favorites: [],
   savedMeals: [],
+  chat: [],
 };
 
 export type Action =
   | { type: 'hydrate'; state: AppState }
   | { type: 'setProfile'; profile: Profile; goals: Goals; date: string }
+  | { type: 'setName'; name: string }
   | { type: 'updateGoals'; goals: Goals }
   | { type: 'updateSettings'; settings: Partial<Settings> }
   | { type: 'addEntries'; entries: DiaryEntry[] }
@@ -56,7 +60,20 @@ export type Action =
   | { type: 'toggleFavorite'; food: Food }
   | { type: 'saveMeal'; meal: SavedMeal }
   | { type: 'deleteMeal'; id: string }
+  | { type: 'addChat'; message: ChatMessage }
+  | { type: 'clearChat' }
   | { type: 'reset' };
+
+const MAX_CHAT = 80;
+
+/** States saved before the redesign: move protein to 1 g per lb, keeping calories. */
+function migrate(saved: AppState): AppState {
+  if ((saved as Partial<AppState>).chat !== undefined || !saved.profile || !saved.goals) return saved;
+  const g = saved.goals;
+  const protein = proteinTarget(saved.profile.weightKg);
+  const carbs = Math.max(0, Math.round((g.calories - protein * 4 - g.fat * 9) / 4));
+  return { ...saved, goals: { ...g, protein, carbs } };
+}
 
 function latestWeightDate(weights: Record<string, number>): string | undefined {
   return Object.keys(weights).sort().pop();
@@ -67,7 +84,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'hydrate':
       return {
         ...initialState,
-        ...action.state,
+        ...migrate(action.state),
         settings: {
           ...DEFAULT_SETTINGS,
           ...action.state.settings,
@@ -81,6 +98,8 @@ export function reducer(state: AppState, action: Action): AppState {
         goals: action.goals,
         weights: { ...state.weights, [action.date]: action.profile.weightKg },
       };
+    case 'setName':
+      return state.profile ? { ...state, profile: { ...state.profile, name: action.name.trim() || undefined } } : state;
     case 'updateGoals':
       return { ...state, goals: action.goals };
     case 'updateSettings':
@@ -152,6 +171,10 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case 'deleteMeal':
       return { ...state, savedMeals: state.savedMeals.filter((m) => m.id !== action.id) };
+    case 'addChat':
+      return { ...state, chat: [...state.chat, action.message].slice(-MAX_CHAT) };
+    case 'clearChat':
+      return { ...state, chat: [] };
     case 'reset':
       return initialState;
   }

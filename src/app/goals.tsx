@@ -3,9 +3,8 @@ import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, Field, Screen, T } from '@/components/ui';
 import { useStore } from '@/store/StoreProvider';
-import { calculateGoals } from '@/lib/nutrition';
-import { flOzToMl, mlToFlOz } from '@/lib/units';
-import { spacing } from '@/theme';
+import { calculateGoals, proteinTarget } from '@/lib/nutrition';
+import { spacing, useTheme } from '@/theme';
 import type { Goals } from '@/lib/types';
 
 type Key = keyof Goals;
@@ -18,11 +17,10 @@ const ROWS: { key: Key; label: string; unit: string }[][] = [
     { key: 'fat', label: 'Fat', unit: 'g' },
   ],
   [
-    { key: 'waterMl', label: 'Water', unit: 'water' },
     { key: 'steps', label: 'Steps', unit: 'steps' },
+    { key: 'fiber', label: 'Fiber', unit: 'g' },
   ],
   [
-    { key: 'fiber', label: 'Fiber', unit: 'g' },
     { key: 'sugar', label: 'Sugar (max)', unit: 'g' },
     { key: 'sodium', label: 'Sodium (max)', unit: 'mg' },
   ],
@@ -39,16 +37,14 @@ const ROWS: { key: Key; label: string; unit: string }[][] = [
 
 export default function GoalsScreen() {
   const { state, dispatch } = useStore();
-  const us = state.settings.units === 'us';
-  const toInput = (g: Goals) =>
-    Object.fromEntries(
-      (Object.keys(g) as Key[]).map((k) => [k, String(k === 'waterMl' && us ? Math.round(mlToFlOz(g[k])) : g[k])]),
-    ) as Record<Key, string>;
+  const { colors } = useTheme();
+  const keys = ROWS.flat().map((f) => f.key);
+  const toInput = (g: Goals) => Object.fromEntries(keys.map((k) => [k, String(g[k] ?? 0)])) as Record<Key, string>;
+  const perLb = state.profile ? proteinTarget(state.profile.weightKg) : null;
   const [values, setValues] = useState(() => toInput(state.goals!));
 
-  const parsed = (Object.keys(values) as Key[]).reduce((acc, k) => {
-    const n = parseFloat(values[k]);
-    acc[k] = k === 'waterMl' && us ? flOzToMl(n) : n;
+  const parsed = keys.reduce((acc, k) => {
+    acc[k] = parseFloat(values[k]);
     return acc;
   }, {} as Goals);
   const valid = Object.values(parsed).every((n) => Number.isFinite(n) && n >= 0) && parsed.calories > 0;
@@ -68,11 +64,21 @@ export default function GoalsScreen() {
                   value={values[f.key]}
                   onChangeText={(t) => setValues((v) => ({ ...v, [f.key]: t }))}
                   keyboardType="decimal-pad"
-                  suffix={f.unit === 'water' ? (us ? 'fl oz' : 'ml') : f.unit === 'steps' ? '' : f.unit}
+                  suffix={f.unit === 'steps' ? '' : f.unit}
                 />
               ))}
             </View>
           ))}
+          {perLb !== null && (
+            <T size={13} muted style={{ marginBottom: 6 }}>
+              Protein target: 1 g per lb of body weight is {perLb} g.{' '}
+              {String(perLb) !== values.protein && (
+                <T size={13} weight="700" color={colors.primary} onPress={() => setValues((v) => ({ ...v, protein: String(perLb) }))}>
+                  Use {perLb} g
+                </T>
+              )}
+            </T>
+          )}
           <T muted size={13}>
             Macros add up to {Math.round(macroCals) || 0} kcal
             {Math.abs(macroCals - parsed.calories) > 50 ? ` (your calorie goal is ${Math.round(parsed.calories) || 0})` : ''}.

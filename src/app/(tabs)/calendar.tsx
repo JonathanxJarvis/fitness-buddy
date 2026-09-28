@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Card, IconButton, Screen, T } from '@/components/ui';
+import { Button, Card, CountUp, IconButton, Screen, T } from '@/components/ui';
 import { useStore } from '@/store/StoreProvider';
 import { currentStreak, longestStreak, MONTH_NAMES, monthGrid, prettyDate, todayKey, WEEKDAY_LETTERS, fromKey } from '@/lib/dates';
 import { daySummary, loggedDays, totalsByDate } from '@/lib/selectors';
@@ -44,18 +44,18 @@ export default function CalendarScreen() {
   };
 
   return (
-    <Screen topInset>
-      <T size={28} weight="800" style={{ marginBottom: spacing.lg }}>Calendar</T>
+    <Screen topInset tabs>
+      <T size={30} weight="800" style={{ marginBottom: spacing.lg }}>Diary</T>
 
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Card style={{ flex: 1, alignItems: 'center' }}>
           <Ionicons name="flame" size={24} color={colors.warning} />
-          <T size={24} weight="800">{currentStreak(logged)}</T>
+          <CountUp value={currentStreak(logged)} size={26} weight="800" />
           <T muted size={12}>Current streak</T>
         </Card>
         <Card style={{ flex: 1, alignItems: 'center' }}>
           <Ionicons name="trophy" size={24} color={colors.primary} />
-          <T size={24} weight="800">{longestStreak(logged)}</T>
+          <CountUp value={longestStreak(logged)} size={26} weight="800" />
           <T muted size={12}>Best streak</T>
         </Card>
         <Card style={{ flex: 1, alignItems: 'center' }}>
