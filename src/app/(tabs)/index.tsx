@@ -1,32 +1,30 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Animated, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { ActionSheet, Badge, Card, CountUp, IconButton, IconTile, ProgressBar, Screen, SectionTitle, T, type IconName, type SheetAction } from '@/components/ui';
-import { FadeIn, PressScale } from '@/components/motion';
+import { ActionSheet, Card, CountUp, IconButton, IconTile, Screen, SectionTitle, T, type SheetAction } from '@/components/ui';
+import { FadeIn, PressScale, usePulse } from '@/components/motion';
 import { Ring } from '@/components/Ring';
-import { FoodThumb, clockTime } from '@/components/FoodThumb';
+import { NutritionPanel } from '@/components/today/NutritionPanel';
+import { MealCard } from '@/components/today/MealCard';
+import { MEAL_ACCENT } from '@/components/today/MealIcons';
+import { greetingFor, nextMealHint, waterGoalMl, type MealHint } from '@/components/today/dayContext';
 import { useStore } from '@/store/StoreProvider';
 import { nutrientColors, radius, spacing, useTheme } from '@/theme';
-import { addDays, currentStreak, fromKey, prettyDate, todayKey, WEEKDAY_LETTERS } from '@/lib/dates';
+import { addDays, fromKey, prettyDate, todayKey, WEEKDAY_LETTERS } from '@/lib/dates';
 import { activeDays, streakInfo } from '@/lib/quests';
 import { PetCard } from '@/components/PetCard';
 import { DailyQuests } from '@/components/Quests';
 import { CelebrationDemoCard } from '@/components/Celebrate';
 import { PREVIEW } from '@/lib/pro';
-import { daySummary, loggedDays, totalsByDate } from '@/lib/selectors';
-import { itemNutrients, MEAL_SHARES } from '@/lib/nutrition';
+import { daySummary, totalsByDate } from '@/lib/selectors';
+import { MEAL_SHARES } from '@/lib/nutrition';
 import { buildNudges, tipForDate } from '@/lib/tips';
-import { formatWater, formatWeight, glassMl } from '@/lib/units';
+import { formatWeight, glassMl } from '@/lib/units';
 import { usePedometer } from '@/lib/usePedometer';
-import { MEALS, type DiaryEntry, type MealType } from '@/lib/types';
-
-function greeting(d = new Date()) {
-  const h = d.getHours();
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-}
+import { MEALS, type MealType } from '@/lib/types';
 
 /** Sunday-start week containing `date`. */
 function weekOf(date: string): string[] {
@@ -88,98 +86,19 @@ function WeekStrip({ date, onSelect }: { date: string; onSelect: (d: string) => 
   );
 }
 
-function HeroCard({ eaten, burned, goal }: { eaten: number; burned: number; goal: number }) {
+/** A live line under the header: what to eat next, with a softly pulsing dot. */
+function HintLine({ hint, onPress }: { hint: MealHint; onPress: () => void }) {
   const { colors } = useTheme();
-  const budget = goal + burned;
-  const remaining = budget - eaten;
-  const over = remaining < 0;
-  const pct = budget ? eaten / budget : 0;
-  const stat = (icon: IconName, label: string, value: number) => (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name={icon} size={15} color="#fff" />
-      </View>
-      <View>
-        <CountUp value={value} size={15} weight="800" color="#fff" />
-        <T size={11} color="rgba(255,255,255,0.7)">{label}</T>
-      </View>
-    </View>
-  );
+  const pulse = usePulse(1800);
+  const accent = MEAL_ACCENT[hint.meal];
   return (
-    <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 24, padding: spacing.lg + 2, marginBottom: spacing.md, overflow: 'hidden' }}>
-      {/* soft decorative glows */}
-      <View style={{ position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.06)', top: -90, right: -60 }} />
-      <View style={{ position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.04)', bottom: -60, left: -30 }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ flex: 1 }}>
-          <T size={13} weight="600" color="rgba(255,255,255,0.75)">
-            {over ? 'Over today’s budget' : 'Calories left'}
-          </T>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 2 }}>
-            <CountUp value={Math.abs(Math.round(remaining))} size={40} weight="800" color="#fff" />
-            <T size={15} weight="600" color="rgba(255,255,255,0.75)" style={{ marginBottom: 7 }}>
-              kcal
-            </T>
-          </View>
-          <T size={12} color="rgba(255,255,255,0.65)">Goal {goal.toLocaleString()} + exercise {Math.round(burned).toLocaleString()}</T>
-        </View>
-        <Ring size={90} stroke={9} progress={pct} color="#fff" gradient={over ? ['#FFD29A', '#F2A93B'] : ['#B9F6D2', '#FFFFFF']} trackColor="rgba(255,255,255,0.16)">
-          <CountUp value={Math.round(Math.min(999, pct * 100))} size={20} weight="800" color="#fff" />
-          <T size={10} weight="700" color="rgba(255,255,255,0.7)">% EATEN</T>
-        </Ring>
+    <PressScale onPress={onPress} scaleTo={0.98} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.md, paddingHorizontal: 2 }}>
+      <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View style={{ position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: accent, opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }] }} />
+        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: accent }} />
       </View>
-      <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: spacing.md }} />
-      <View style={{ flexDirection: 'row' }}>
-        {stat('flag', 'Goal', goal)}
-        {stat('restaurant', 'Eaten', eaten)}
-        {stat('flame', 'Burned', burned)}
-      </View>
-    </LinearGradient>
-  );
-}
-
-function MacroRow({ icon, label, value, goal, color, hint, delay }: { icon: IconName; label: string; value: number; goal: number; color: string; hint?: string; delay: number }) {
-  const left = Math.round(goal - value);
-  return (
-    <FadeIn delay={delay} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
-      <IconTile icon={icon} color={color} size={32} />
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 5 }}>
-          <T weight="700" style={{ flex: 1 }}>
-            {label}
-            {hint ? <T size={12} muted weight="500">{`  ${hint}`}</T> : null}
-          </T>
-          <T size={11} muted>{left > 0 ? `${left} g left  ` : left === 0 ? 'on target  ' : `${-left} g over  `}</T>
-          <T size={14} weight="800">{Math.round(value)}</T>
-          <T size={13} muted>{` / ${Math.round(goal)} g`}</T>
-        </View>
-        <ProgressBar value={value} max={goal} color={color} height={6} />
-      </View>
-    </FadeIn>
-  );
-}
-
-function EntryRow({ e, onPress }: { e: DiaryEntry; onPress: () => void }) {
-  const { colors } = useTheme();
-  const n = itemNutrients(e);
-  return (
-    <PressScale onPress={onPress} scaleTo={0.98} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 }}>
-      <FoodThumb food={e.food} photo={e.photo} />
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <T weight="700" numberOfLines={1} style={{ flexShrink: 1 }}>
-            {e.food.name}
-          </T>
-          {e.food.source === 'ai' && <Badge label="AI" color={colors.primary} icon="sparkles" />}
-        </View>
-        <T size={12} muted numberOfLines={1} style={{ marginTop: 2 }}>
-          {clockTime(e.createdAt)} · {Math.round(n.protein)} g protein
-        </T>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <T weight="800">{Math.round(n.calories)}</T>
-        <T size={11} muted>kcal</T>
-      </View>
+      <T size={13} weight="600" style={{ flex: 1 }} color={colors.text}>{hint.text}</T>
+      <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
     </PressScale>
   );
 }
@@ -220,7 +139,22 @@ export default function Today() {
 
   const latestWeightDate = Object.keys(state.weights).sort().pop();
   const glass = glassMl(units);
-  const glasses = Math.round(day.waterMl / glass);
+  const waterGoal = waterGoalMl(profile.weightKg);
+
+  // Re-render each minute so the greeting and next-meal hint follow the clock.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const hour = now.getHours();
+  const hint = useMemo(
+    () =>
+      isToday
+        ? nextMealHint({ hour, logged: new Set(day.entries.map((e) => e.meal)), remaining: goals.calories + day.burned - day.totals.calories, goal: goals.calories })
+        : null,
+    [isToday, hour, day, goals.calories],
+  );
 
   const setWater = (ml: number) => {
     Haptics.selectionAsync().catch(() => {});
@@ -264,7 +198,7 @@ export default function Today() {
           </LinearGradient>
         </PressScale>
         <View style={{ flex: 1 }}>
-          <T size={13} muted weight="600">{greeting()}</T>
+          <T size={13} muted weight="600">{greetingFor(hour)}</T>
           <T size={18} weight="800" numberOfLines={1}>{profile.name || prettyDate(date)}</T>
         </View>
         {streak > 0 && (
@@ -298,8 +232,25 @@ export default function Today() {
         <WeekStrip date={date} onSelect={setSelectedDate} />
       </FadeIn>
 
+      {hint && (
+        <FadeIn delay={next()}>
+          <HintLine hint={hint} onPress={() => setMenu(hint.meal)} />
+        </FadeIn>
+      )}
+
       <FadeIn delay={next()}>
-        <HeroCard eaten={day.totals.calories} burned={day.burned} goal={goals.calories} />
+        <NutritionPanel
+          date={date}
+          totals={day.totals}
+          entries={day.entries}
+          goals={goals}
+          burned={day.burned}
+          waterMl={day.waterMl}
+          waterGoal={waterGoal}
+          glass={glass}
+          units={units}
+          onSetWater={setWater}
+        />
       </FadeIn>
 
       {isToday && (
@@ -310,22 +261,20 @@ export default function Today() {
         </FadeIn>
       )}
 
-      {/* Macros */}
-      <FadeIn delay={next()}>
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            <T size={17} weight="800" style={{ flex: 1 }}>Macros today</T>
-            <Pressable onPress={() => router.push({ pathname: '/nutrients', params: { date } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              <T size={13} weight="700" color={colors.primary}>All nutrients</T>
-              <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-            </Pressable>
-          </View>
-          <MacroRow icon="barbell" label="Protein" hint="1 g/lb" value={day.totals.protein} goal={goals.protein} color={nutrientColors.protein} delay={200} />
-          <MacroRow icon="flash" label="Carbs" value={day.totals.carbs} goal={goals.carbs} color={nutrientColors.carbs} delay={260} />
-          <MacroRow icon="water" label="Fat" value={day.totals.fat} goal={goals.fat} color={nutrientColors.fat} delay={320} />
-          <MacroRow icon="leaf" label="Fiber" value={day.totals.fiber ?? 0} goal={goals.fiber} color={nutrientColors.fiber} delay={380} />
-        </Card>
-      </FadeIn>
+      {/* Meals */}
+      <SectionTitle right={<T size={13} muted weight="600">{`${Math.round(day.totals.calories).toLocaleString('en-US')} kcal logged`}</T>}>Meals</SectionTitle>
+      {MEALS.map((m) => (
+        <MealCard
+          key={m.key}
+          meal={m.key}
+          label={m.label}
+          items={day.entries.filter((e) => e.meal === m.key)}
+          target={Math.round(goals.calories * MEAL_SHARES[m.key])}
+          current={hint?.meal === m.key && !day.entries.some((e) => e.meal === m.key)}
+          onAdd={() => setMenu(m.key)}
+          delay={next()}
+        />
+      ))}
 
       {/* AI */}
       <FadeIn delay={next()}>
@@ -363,60 +312,8 @@ export default function Today() {
         );
       })}
 
-      {/* Meals */}
-      <SectionTitle>Nutrition</SectionTitle>
-      {MEALS.map((m) => {
-        const items = day.entries.filter((e) => e.meal === m.key);
-        const kcal = items.reduce((s, e) => s + itemNutrients(e).calories, 0);
-        const target = Math.round(goals.calories * MEAL_SHARES[m.key]);
-        return (
-          <FadeIn key={m.key} delay={next()}>
-            <Card style={{ paddingVertical: spacing.sm + 2, marginBottom: spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ring size={38} stroke={4} progress={target ? kcal / target : 0} color={kcal > target * 1.15 ? colors.warning : nutrientColors.calories}>
-                  <Ionicons name={m.icon as never} size={15} color={colors.text} />
-                </Ring>
-                <Pressable style={{ flex: 1 }} onPress={() => setMenu(m.key)} accessibilityLabel={`${m.label} options`}>
-                  <T size={15} weight="800">{m.label}</T>
-                  <T size={13} muted>
-                    {Math.round(kcal)} / {target} kcal
-                  </T>
-                </Pressable>
-                <PressScale
-                  accessibilityLabel={`Add food to ${m.label}`}
-                  onPress={() => setMenu(m.key)}
-                  style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Ionicons name="add" size={20} color={colors.onInk} />
-                </PressScale>
-              </View>
-              {items.length > 0 && <View style={{ height: 1, backgroundColor: colors.border, marginTop: spacing.sm, marginBottom: 2 }} />}
-              {items.map((e) => (
-                <EntryRow key={e.id} e={e} onPress={() => router.push({ pathname: '/food', params: { entryId: e.id } })} />
-              ))}
-            </Card>
-          </FadeIn>
-        );
-      })}
-
       {/* Water, activity, weight */}
-      <SectionTitle>Body & activity</SectionTitle>
-      <FadeIn delay={next()}>
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <IconTile icon="water" color={nutrientColors.water} size={36} />
-            <View style={{ flex: 1 }}>
-              <T size={16} weight="800">{formatWater(day.waterMl, units)}</T>
-              <T size={12} muted>
-                {glasses} {glasses === 1 ? 'glass' : 'glasses'} of water
-              </T>
-            </View>
-            <IconButton filled label="Remove a glass" icon="remove" onPress={() => setWater(day.waterMl - glass)} />
-            <IconButton filled label="Add a glass" icon="add" onPress={() => setWater(day.waterMl + glass)} />
-          </View>
-        </Card>
-      </FadeIn>
-
+      <SectionTitle>Activity & body</SectionTitle>
       <FadeIn delay={next()} style={{ flexDirection: 'row', gap: spacing.md }}>
         <PressScale style={{ flex: 1 }} onPress={() => router.push({ pathname: '/log-exercise', params: { date } })}>
           <Card style={{ alignItems: 'center' }}>

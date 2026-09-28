@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Share, View } from 'react-native';
+import { Linking, ScrollView, Share, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Badge, Button, Card, Field, ListRow, Screen, Segmented, Sheet, T } from '@/components/ui';
-import { FadeIn } from '@/components/motion';
+import { FadeIn, PressScale } from '@/components/motion';
+import { Avatar } from '@/components/Avatar';
+import { AvatarEditor } from '@/components/people/AvatarEditor';
+import { avatarFor } from '@/components/people/avatarConfig';
+import { pickProfilePhoto } from '@/components/people/photo';
+import { stateProgression } from '@/lib/progression';
+import { todayKey } from '@/lib/dates';
 import { useStore } from '@/store/StoreProvider';
 import { ACTIVITY_LEVELS } from '@/lib/nutrition';
 import { formatHeight, formatWeight } from '@/lib/units';
@@ -15,7 +20,7 @@ import { isPro, mascotSkin, petName, petSpecies, PREVIEW } from '@/lib/pro';
 import { Kettle, type Species } from '@/components/Mascot';
 import { Pressable } from 'react-native';
 import { spacing, useTheme } from '@/theme';
-import type { FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
+import type { AvatarConfig, FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
 
 const chevron = (color: string) => <Ionicons name="chevron-forward" size={18} color={color} />;
 
@@ -32,9 +37,37 @@ export default function ProfileScreen() {
   const [keyDraft, setKeyDraft] = useState('');
   const [editingKey, setEditingKey] = useState(false);
   const [confirmErase, setConfirmErase] = useState(false);
+  const [pictureOpen, setPictureOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draft, setDraft] = useState<AvatarConfig | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const pro = isPro(state);
   const mascotOn = state.settings.mascot !== false;
   const skin = mascotSkin(state);
+  const stage = stateProgression(state, todayKey()).stage.index;
+  const me = { name: p.name || 'Lifter', avatar: state.settings.avatar, photo: state.settings.photo };
+
+  const choosePhoto = async () => {
+    setPhotoError(null);
+    try {
+      const photo = await pickProfilePhoto();
+      if (photo) {
+        dispatch({ type: 'updateSettings', settings: { photo } });
+        setPictureOpen(false);
+      }
+    } catch (e) {
+      setPhotoError((e as Error).message);
+    }
+  };
+  const openEditor = () => {
+    setDraft(avatarFor(me));
+    setPictureOpen(false);
+    setEditorOpen(true);
+  };
+  const saveAvatar = () => {
+    if (draft) dispatch({ type: 'updateSettings', settings: { avatar: draft, photo: undefined } });
+    setEditorOpen(false);
+  };
 
   useEffect(() => {
     getApiKey().then(setKey);
@@ -52,22 +85,23 @@ export default function ProfileScreen() {
   return (
     <Screen>
       <FadeIn>
-        <LinearGradient colors={colors.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 24, padding: spacing.lg, marginBottom: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <View style={{ width: 58, height: 58, borderRadius: 29, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' }}>
-              <T size={24} weight="800" color="#fff">{(p.name || 'You').charAt(0).toUpperCase()}</T>
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <PressScale onPress={() => setPictureOpen(true)} accessibilityLabel="Change profile picture">
+            <Avatar person={me} stage={stage} size={76} frame="compact" pet={state.settings.pet ?? 'kettle'} skin={skin} petBadge={false} />
+            <View style={{ position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: colors.ink, borderWidth: 2, borderColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="camera" size={13} color={colors.onInk} />
             </View>
-            <View style={{ flex: 1 }}>
-              <T size={20} weight="800" color="#fff">{p.name || 'Your profile'}</T>
-              <T size={13} color="rgba(255,255,255,0.75)">
-                {goalText} · {formatWeight(p.weightKg, units)}
-              </T>
-              <T size={13} color="rgba(255,255,255,0.75)">
-                {p.age} yrs · {formatHeight(p.heightCm, units)} · {ACTIVITY_LEVELS.find((a) => a.key === p.activity)?.label}
-              </T>
-            </View>
+          </PressScale>
+          <View style={{ flex: 1 }}>
+            <T size={20} weight="800">{p.name || 'Your profile'}</T>
+            <T size={13} muted>
+              {goalText} · {formatWeight(p.weightKg, units)}
+            </T>
+            <T size={13} muted>
+              {p.age} yrs · {formatHeight(p.heightCm, units)} · {ACTIVITY_LEVELS.find((a) => a.key === p.activity)?.label}
+            </T>
           </View>
-        </LinearGradient>
+        </Card>
       </FadeIn>
 
       <Card>
@@ -104,7 +138,7 @@ export default function ProfileScreen() {
         <ListRow
           icon={pro ? 'diamond' : 'diamond-outline'}
           title={pro ? (PREVIEW ? 'Pro · unlocked in preview' : 'Fitness Buddy Pro') : 'Upgrade to Pro'}
-          subtitle={pro ? 'AI coach, snap a meal, unlimited crew, all pets' : 'AI coach, snap a meal, unlimited crew and 5 more pets'}
+          subtitle={pro ? 'AI coach, snap a meal, unlimited friends, all pets' : 'AI coach, snap a meal, unlimited friends and 5 more pets'}
           onPress={() => router.push('/pro')}
           right={pro ? <Badge label="PRO" color={colors.primary} /> : chevron(colors.textMuted)}
         />
@@ -209,6 +243,29 @@ export default function ProfileScreen() {
       <T muted size={12} center style={{ marginTop: spacing.md }}>
         Fitness Buddy stores your logs on this phone only. Food data comes from USDA FoodData Central and Open Food Facts (openfoodfacts.org, ODbL).
       </T>
+
+      <Sheet visible={pictureOpen} onClose={() => setPictureOpen(false)} title="Profile picture">
+        <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+          <Avatar person={me} stage={stage} size={132} frame="ornate" pet={state.settings.pet ?? 'kettle'} skin={skin} />
+          <T size={12} muted center style={{ marginTop: spacing.xs }}>
+            Your picture sits in your rank frame. Photos stay on this phone; friends see your illustrated avatar.
+          </T>
+        </View>
+        <Button title="Choose a photo" icon="image-outline" onPress={choosePhoto} />
+        <Button title="Design my avatar" variant="secondary" icon="brush-outline" onPress={openEditor} style={{ marginTop: spacing.sm }} />
+        {state.settings.photo ? (
+          <Button title="Remove photo" variant="ghost" onPress={() => dispatch({ type: 'updateSettings', settings: { photo: undefined } })} style={{ marginTop: spacing.sm }} />
+        ) : null}
+        {photoError && <T size={13} color={colors.danger} center style={{ marginTop: spacing.sm }}>{photoError}</T>}
+      </Sheet>
+
+      <Sheet visible={editorOpen} onClose={() => setEditorOpen(false)} title="Your avatar">
+        <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+          {draft && <AvatarEditor value={draft} onChange={setDraft} />}
+          <View style={{ height: spacing.lg }} />
+        </ScrollView>
+        <Button title="Save avatar" onPress={saveAvatar} style={{ marginTop: spacing.sm }} />
+      </Sheet>
 
       <Sheet visible={confirmErase} onClose={() => setConfirmErase(false)} title="Erase everything?">
         <T muted style={{ marginBottom: spacing.lg }}>This deletes all logs, foods, chats and goals from this phone. It can’t be undone.</T>

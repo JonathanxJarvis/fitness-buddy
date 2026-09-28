@@ -46,8 +46,74 @@ const polar = (r: number, deg: number): [number, number] => [50 + r * Math.cos(r
  * (children render there), with ornaments that escalate by tier and the
  * division on a plate at the bottom. Everything fits in a size×size box.
  */
-export function RankFrame({ stage, size = 64, locked, children }: { stage: Stage; size?: number; locked?: boolean; children?: React.ReactNode }) {
+export function RankFrame({
+  stage,
+  size = 64,
+  locked,
+  compact,
+  children,
+}: {
+  stage: Stage;
+  size?: number;
+  locked?: boolean;
+  /** A slim metal ring with a big slot, for list rows and chat heads. */
+  compact?: boolean;
+  children?: React.ReactNode;
+}) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
+  if (compact) return <CompactFrame stage={stage} size={size} locked={locked} id={id}>{children}</CompactFrame>;
+  return <OrnateFrame stage={stage} size={size} locked={locked} id={id}>{children}</OrnateFrame>;
+}
+
+/** Share of `size` taken by the round slot inside a compact frame. */
+export const COMPACT_FRAME_SLOT = 0.84;
+
+function CompactFrame({ stage, size, locked, id, children }: { stage: Stage; size: number; locked?: boolean; id: string; children?: React.ReactNode }) {
+  const t = Math.max(0, ORDER.indexOf(stage.tier.key));
+  const base = LOOKS[stage.tier.key] ?? LOOKS.rookie;
+  const ring = base.ring.map((c) => (locked ? grey(c) : c));
+  const trim = base.trim.map((c) => (locked ? grey(c) : c));
+  const slot = size * COMPACT_FRAME_SLOT;
+  // Thicker ring on bigger frames so it reads as metal, not a hairline.
+  const w = size >= 64 ? 7 : 8.5;
+  const r = 50 - w / 2 - 0.5;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={{
+          position: 'absolute',
+          left: (size - slot) / 2,
+          top: (size - slot) / 2,
+          width: slot,
+          height: slot,
+          borderRadius: slot / 2,
+          overflow: 'hidden',
+          backgroundColor: '#15181E',
+          opacity: locked ? 0.6 : 1,
+        }}
+      >
+        {children}
+      </View>
+      <Svg width={size} height={size} viewBox="0 0 100 100" style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none">
+        <Defs>
+          <LinearGradient id={`crg${id}`} x1="0.1" y1="0" x2="0.9" y2="1">
+            {ring.map((c, i) => (
+              <Stop key={i} offset={i / (ring.length - 1)} stopColor={c} />
+            ))}
+          </LinearGradient>
+        </Defs>
+        <Circle cx="50" cy="50" r={r} fill="none" stroke={`url(#crg${id})`} strokeWidth={w} />
+        <Circle cx="50" cy="50" r={r - w / 2} fill="none" stroke="#000" strokeOpacity={0.25} strokeWidth={0.8} />
+        <Path d={describeArc(r, 200, 280)} fill="none" stroke="#fff" strokeOpacity={0.55} strokeWidth={1.6} strokeLinecap="round" />
+        {t >= 4 && (
+          <Polygon points={`50,${w * 0.1} ${50 + w * 0.55},${w / 2 + 0.5} 50,${w + 1} ${50 - w * 0.55},${w / 2 + 0.5}`} fill={base.gem ? (locked ? grey(base.gem) : base.gem) : trim[0]} stroke={trim[2]} strokeWidth={0.6} />
+        )}
+      </Svg>
+    </View>
+  );
+}
+
+function OrnateFrame({ stage, size, locked, id, children }: { stage: Stage; size: number; locked?: boolean; id: string; children?: React.ReactNode }) {
   const { tier, division } = stage;
   const t = Math.max(0, ORDER.indexOf(tier.key));
   const base = LOOKS[tier.key] ?? LOOKS.rookie;

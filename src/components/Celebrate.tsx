@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -6,11 +6,18 @@ import { RankBadge } from './RankBadge';
 import { T } from './ui';
 import { nativeDriver, useTween } from './motion';
 import { useStore } from '@/store/StoreProvider';
-import { STAGES, stateProgression } from '@/lib/progression';
+import { STAGES, stateProgression, TIERS } from '@/lib/progression';
+import { LinearGradient as ExpoGradient } from 'expo-linear-gradient';
+import { Pet, PETS, type Species } from './Mascot';
+import { EVOLUTION } from './pet/Gear';
+import { usePetLook } from './pet/usePetLook';
+import { CATALOG, itemById, RARITY, type LootItem } from '@/lib/loot';
+import type { AppState } from '@/lib/types';
 import { todayKey } from '@/lib/dates';
 
 export type Celebration =
-  | { kind: 'chest'; xp: number; title?: string; color?: string }
+  /** `claim` is the reward id (e.g. "path:4") so the opening can show that chest's drop; `drop` forces an item (demo). */
+  | { kind: 'chest'; xp: number; title?: string; color?: string; claim?: string; drop?: string }
   | { kind: 'rankUp'; from: number; to: number };
 
 const Ctx = createContext<(c: Celebration | Celebration[]) => void>(() => {});
@@ -73,12 +80,13 @@ function useSpin(duration = 7000) {
 /** Light rays that slowly turn behind the prize. */
 function Rays({ color, size, opacity }: { color: string; size: number; opacity: Animated.Value | Animated.AnimatedInterpolation<number> }) {
   const rotate = useSpin();
+  const gid = 'ray' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const rays = 14;
   return (
     <Animated.View pointerEvents="none" style={{ position: 'absolute', width: size, height: size, opacity, transform: [{ rotate }] }}>
       <Svg width={size} height={size} viewBox="-100 -100 200 200">
         <Defs>
-          <RadialGradient id="rayfade" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse">
+          <RadialGradient id={gid} cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={color} stopOpacity={0.95} />
             <Stop offset="1" stopColor={color} stopOpacity={0} />
           </RadialGradient>
@@ -90,11 +98,11 @@ function Rays({ color, size, opacity }: { color: string; size: number; opacity: 
             <Polygon
               key={i}
               points={`0,0 ${Math.cos(a - w) * 100},${Math.sin(a - w) * 100} ${Math.cos(a + w) * 100},${Math.sin(a + w) * 100}`}
-              fill="url(#rayfade)"
+              fill={`url(#${gid})`}
             />
           );
         })}
-        <Circle r="34" fill="url(#rayfade)" />
+        <Circle r="34" fill={`url(#${gid})`} opacity={0.4} />
       </Svg>
     </Animated.View>
   );
@@ -265,31 +273,84 @@ function ChestArt({ size, color, open }: { size: number; color: string; open: An
   );
 }
 
+/** How long to hold before the bonus drop, skippable with a tap. */
+function useSkippableDelay() {
+  const skip = useRef<(() => void) | null>(null);
+  const wait = (ms: number) =>
+    new Promise<void>((resolve) => {
+      const t = setTimeout(() => {
+        skip.current = null;
+        resolve();
+      }, ms);
+      skip.current = () => {
+        clearTimeout(t);
+        skip.current = null;
+        resolve();
+      };
+    });
+  return { wait, skip };
+}
+
+interface Drop {
+  item: LootItem;
+  dup: boolean;
+  bonusXp: number;
+}
+
 function ChestOpening({ c, onDone }: { c: Extract<Celebration, { kind: 'chest' }>; onDone: () => void }) {
+  const { state } = useStore();
   const color = c.color ?? '#E5A914';
+  const mountedAt = useRef(Date.now()).current;
+  const loot = useRef(state.loot);
+  loot.current = state.loot;
   const enter = useRef(new Animated.Value(0)).current;
   const shake = useRef(new Animated.Value(0)).current;
+  const tell = useRef(new Animated.Value(0)).current;
   const open = useRef(new Animated.Value(0)).current;
   const burst = useRef(new Animated.Value(0)).current;
   const text = useRef(new Animated.Value(0)).current;
+  const lift = useRef(new Animated.Value(0)).current;
+  const card = useRef(new Animated.Value(0)).current;
+  const burst2 = useRef(new Animated.Value(0)).current;
   const hint = useRef(new Animated.Value(0)).current;
   const [xp, setXp] = useState(0);
+  const [drop, setDrop] = useState<Drop | null>(null);
   const shown = useTween(xp, 1100);
   const bits = useMemo(() => makeBits(26, ['#5FD4FF', '#FF6FA8', '#9B5CF6', '#FFE380'], ['coin', 'coin', 'gem', 'spark']), []);
+  const rar = drop ? RARITY[drop.item.rarity] : null;
+  const dropBits = useMemo(() => (rar ? makeBits(30, [rar.color, rar.glow, '#FFFFFF'], ['spark', 'gem', 'strip'], 210) : []), [rar]);
   const done = useRef(false);
+  const canFinish = useRef(false);
+  const { wait, skip } = useSkippableDelay();
   const finish = useCallback(() => {
     if (done.current) return;
     done.current = true;
     onDone();
   }, [onDone]);
 
+  // The chest this celebration is for: matched by claim id, or the one just claimed.
+  const findDrop = (): Drop | null => {
+    if (c.drop) {
+      const item = itemById(c.drop);
+      return item ? { item, dup: false, bonusXp: 0 } : null;
+    }
+    const last = loot.current?.last;
+    if (!last?.item) return null;
+    const match = c.claim ? last.claim === c.claim : last.at >= mountedAt - 8000;
+    const item = match ? itemById(last.item) : undefined;
+    return item ? { item, dup: !!last.dup, bonusXp: last.bonusXp } : null;
+  };
+
   useEffect(() => {
     let alive = true;
     let auto: ReturnType<typeof setTimeout> | undefined;
     (async () => {
       await run(Animated.spring(enter, { toValue: 1, friction: 5, tension: 70, useNativeDriver: nativeDriver }));
-      // Wobble, harder each time, before it bursts open.
-      const steps = [-1, 1, -1.4, 1.4, -1.8, 1.8, 0];
+      const d = findDrop();
+      const r = d?.item.rarity;
+      // Wobble, harder each time. Rarer finds shake longer and leak their color.
+      const steps = [-1, 1, -1.4, 1.4, -1.8, 1.8, ...(r === 'epic' || r === 'legendary' ? [-2.2, 2.2] : []), ...(r === 'legendary' ? [-2.6, 2.6] : []), 0];
+      if (d) timing(tell, 1, steps.length * 90, Easing.in(Easing.quad)).start();
       for (const s of steps) {
         if (!alive) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -298,41 +359,210 @@ function ChestOpening({ c, onDone }: { c: Extract<Celebration, { kind: 'chest' }
       if (!alive) return;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setXp(c.xp);
+      canFinish.current = true;
       Animated.parallel([timing(open, 1, 650, Easing.out(Easing.back(1.4))), timing(burst, 1, 1500, Easing.out(Easing.quad)), timing(text, 1, 500)]).start();
-      await run(Animated.sequence([Animated.delay(900), timing(hint, 1, 400)]));
-      auto = setTimeout(() => alive && finish(), 2600);
+      if (d) {
+        await wait(1500);
+        if (!alive) return;
+        setDrop(d);
+        Haptics.impactAsync(d.item.rarity === 'legendary' || d.item.rarity === 'epic' ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        await run(timing(lift, 1, 420, Easing.inOut(Easing.cubic)));
+        if (!alive) return;
+        Animated.parallel([
+          Animated.spring(card, { toValue: 1, friction: 6, tension: 60, useNativeDriver: nativeDriver }),
+          timing(burst2, 1, 1600, Easing.out(Easing.quad)),
+        ]).start();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        await run(Animated.sequence([Animated.delay(900), timing(hint, 1, 400)]));
+        auto = setTimeout(() => alive && finish(), 4200);
+      } else {
+        await run(Animated.sequence([Animated.delay(900), timing(hint, 1, 400)]));
+        auto = setTimeout(() => alive && finish(), 2600);
+      }
     })();
     return () => {
       alive = false;
       if (auto) clearTimeout(auto);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [c.xp, enter, shake, open, burst, text, hint, finish]);
 
+  const onPress = () => {
+    if (skip.current) skip.current();
+    else if (canFinish.current) finish();
+  };
+
+  const tellColor = drop ? RARITY[drop.item.rarity].color : '#FFFFFF';
   return (
-    <Backdrop color={color} onPress={finish} hint={hint}>
-      <Rays color={color} size={420} opacity={open} />
+    <Backdrop color={drop ? tellColor : color} onPress={onPress} hint={hint}>
+      <Rays color={color} size={420} opacity={Animated.multiply(open, lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }))} />
+      {rar && <Rays color={rar.color} size={rar === RARITY.legendary ? 520 : 440} opacity={card.interpolate({ inputRange: [0, 1], outputRange: [0, rar === RARITY.common ? 0.35 : 0.8], extrapolate: 'clamp' })} />}
       <Burst bits={bits} progress={burst} />
+      {rar && rar !== RARITY.common && <Burst bits={dropBits} progress={burst2} />}
       <Animated.View
         style={{
           alignItems: 'center',
+          opacity: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.9] }),
           transform: [
-            { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) },
-            { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [-200, 0] }) },
-            { rotate: shake.interpolate({ inputRange: [-2, 2], outputRange: ['-9deg', '9deg'] }) },
+            { translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [0, -230] }) },
+            { scale: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }) },
           ],
         }}
       >
-        <ChestArt size={190} color={color} open={open} />
+        <Animated.View
+          style={{
+            alignItems: 'center',
+            transform: [
+              { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) },
+              { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [-200, 0] }) },
+              { rotate: shake.interpolate({ inputRange: [-3, 3], outputRange: ['-13deg', '13deg'] }) },
+            ],
+          }}
+        >
+          {/* A drop leaks its rarity color while the chest shakes. */}
+          <Animated.View pointerEvents="none" style={{ position: 'absolute', top: -30, opacity: tell, transform: [{ scale: tell.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.25] }) }] }}>
+            <Svg width={260} height={220} viewBox="0 0 260 220">
+              <Defs>
+                <RadialGradient id="tell" cx="50%" cy="50%" r="50%">
+                  <Stop offset="0" stopColor={tellColorFor(c, loot.current, mountedAt)} stopOpacity={0.85} />
+                  <Stop offset="1" stopColor={tellColorFor(c, loot.current, mountedAt)} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Ellipse cx={130} cy={110} rx={130} ry={110} fill="url(#tell)" />
+            </Svg>
+          </Animated.View>
+          <ChestArt size={190} color={color} open={open} />
+        </Animated.View>
+        <Animated.View style={{ alignItems: 'center', marginTop: 26, opacity: text, transform: [{ scale: text.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
+          <T size={13} weight="800" color="rgba(255,255,255,0.75)" style={{ letterSpacing: 2 }}>{(c.title ?? 'Chest opened').toUpperCase()}</T>
+          <T size={48} weight="800" color="#FFE380" style={{ marginTop: 2 }}>+{Math.round(shown)} XP</T>
+        </Animated.View>
       </Animated.View>
-      <Animated.View style={{ alignItems: 'center', marginTop: 26, opacity: text, transform: [{ scale: text.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
-        <T size={13} weight="800" color="rgba(255,255,255,0.75)" style={{ letterSpacing: 2 }}>{(c.title ?? 'Chest opened').toUpperCase()}</T>
-        <T size={48} weight="800" color="#FFE380" style={{ marginTop: 2 }}>+{Math.round(shown)} XP</T>
-      </Animated.View>
+      {drop && <DropCard drop={drop} v={card} />}
     </Backdrop>
   );
 }
 
+/** The rarity color a pending drop leaks (read once, before the reveal). */
+function tellColorFor(c: Extract<Celebration, { kind: 'chest' }>, loot: AppState['loot'], mountedAt: number): string {
+  const id = c.drop ?? (loot?.last?.item && (c.claim ? loot.last.claim === c.claim : loot.last.at >= mountedAt - 8000) ? loot.last.item : undefined);
+  const item = id ? itemById(id) : undefined;
+  return item ? RARITY[item.rarity].glow : '#000000';
+}
+
+const KIND_LABEL: Record<string, string> = { pet: 'New pet', skin: 'New outfit', aura: 'New aura' };
+
+/** The collectible, dealt face-up like a trading card, with a sheen for rare pulls. */
+function DropCard({ drop, v }: { drop: Drop; v: Animated.Value }) {
+  const look = usePetLook();
+  const rar = RARITY[drop.item.rarity];
+  const sheen = useRef(new Animated.Value(0)).current;
+  const fancy = drop.item.rarity === 'epic' || drop.item.rarity === 'legendary';
+  useEffect(() => {
+    if (!fancy) return;
+    const a = Animated.sequence([Animated.delay(500), Animated.timing(sheen, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver })]);
+    a.start();
+    return () => a.stop();
+  }, [fancy, sheen]);
+  const no = CATALOG.findIndex((i) => i.id === drop.item.id) + 1;
+  const petDef = drop.item.kind === 'pet' ? PETS.find((p) => p.key === drop.item.key) : undefined;
+  const preview =
+    drop.item.kind === 'pet' ? (
+      <Pet species={drop.item.key as Species} size={150} mood="proud" />
+    ) : drop.item.kind === 'skin' ? (
+      <Pet species={look.species} size={150} mood="proud" skin={drop.item.key} tier={look.tier} />
+    ) : (
+      <Pet species={look.species} size={150} mood="wink" skin={look.skin} tier={look.tier} aura={drop.item.key} />
+    );
+  const W = 236;
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        alignItems: 'center',
+        opacity: v.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 1], extrapolate: 'clamp' }),
+        transform: [
+          { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [160, 40] }) },
+          { scaleX: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.05, 0.9, 1] }) },
+          { scaleY: v.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
+        ],
+      }}
+    >
+      <View style={{ width: W, borderRadius: 24, backgroundColor: '#0D1310', borderWidth: 1.5, borderColor: rar.color, overflow: 'hidden', alignItems: 'center', paddingBottom: 16 }}>
+        <ExpoGradient colors={[rar.color + '66', rar.color + '00']} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 220 }} />
+        <View style={{ alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 12 }}>
+          <T size={10} weight="800" color="rgba(255,255,255,0.6)" style={{ letterSpacing: 1.6 }}>BONUS FIND</T>
+          <T size={10} weight="800" color="rgba(255,255,255,0.45)" style={{ letterSpacing: 1 }}>
+            NO. {String(no).padStart(2, '0')}/{CATALOG.length}
+          </T>
+        </View>
+        <T size={13} weight="800" color={rar.glow} style={{ letterSpacing: 5, marginTop: 8 }}>{rar.label.toUpperCase()}</T>
+        <View style={{ marginTop: 2 }}>{preview}</View>
+        <T size={26} weight="800" color="#fff" style={{ marginTop: 2 }}>{drop.item.name}</T>
+        <T size={13} color="rgba(255,255,255,0.7)" center style={{ marginTop: 2, paddingHorizontal: 16 }}>
+          {drop.dup ? `Already in your collection · +${drop.bonusXp} bonus XP` : petDef ? `${KIND_LABEL.pet} · ${petDef.kind}` : KIND_LABEL[drop.item.kind]}
+        </T>
+        {fancy && (
+          <Animated.View
+            pointerEvents="none"
+            style={{ position: 'absolute', top: -40, bottom: -40, width: 70, transform: [{ translateX: sheen.interpolate({ inputRange: [0, 1], outputRange: [-W, W] }) }, { rotate: '18deg' }] }}
+          >
+            <ExpoGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ flex: 1 }} />
+          </Animated.View>
+        )}
+      </View>
+      <T size={12} weight="700" color="rgba(255,255,255,0.55)" style={{ marginTop: 10 }}>{drop.dup ? 'Repeats turn into XP' : 'Equip it in Pets › Collection'}</T>
+    </Animated.View>
+  );
+}
+
 // ---------- rank up ----------
+
+/** Your pet cheering beside the new badge; on a new tier it evolves with a flash and shows its new gear. */
+function PetEvolve({ fromTier, toTier }: { fromTier: number; toTier: number }) {
+  const look = usePetLook();
+  const evolves = toTier > fromTier;
+  const [tier, setTier] = useState(evolves ? fromTier : toTier);
+  const pop = useRef(new Animated.Value(0)).current;
+  const flash = useRef(new Animated.Value(0)).current;
+  const label = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      await run(Animated.spring(pop, { toValue: 1, friction: 5, tension: 80, useNativeDriver: nativeDriver }));
+      if (!evolves || !alive) {
+        timing(label, 1, 300).start();
+        return;
+      }
+      await run(Animated.delay(500));
+      await run(timing(flash, 1, 220, Easing.in(Easing.quad)));
+      if (!alive) return;
+      setTier(toTier);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      Animated.parallel([timing(flash, 0, 520), timing(label, 1, 400)]).start();
+      pop.setValue(0.75);
+      Animated.spring(pop, { toValue: 1, friction: 4, tension: 90, useNativeDriver: nativeDriver }).start();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [evolves, toTier, pop, flash, label]);
+  const glow = TIERS[toTier]?.glow ?? '#fff';
+  return (
+    <View style={{ alignItems: 'center', marginTop: 12 }}>
+      <Animated.View style={{ transform: [{ scale: pop }], opacity: pop.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }) }}>
+        <Pet species={look.species} size={118} mood="proud" skin={look.skin} tier={tier} aura={look.aura} />
+        <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 14, top: 14, width: 90, height: 90, borderRadius: 45, backgroundColor: '#FFFFFF', opacity: flash, transform: [{ scale: flash.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.5] }) }] }} />
+      </Animated.View>
+      <Animated.View style={{ opacity: label, alignItems: 'center' }}>
+        <T size={13} weight="800" color={glow} style={{ letterSpacing: 1.4 }}>
+          {evolves ? `${look.name.toUpperCase()} EVOLVED` : `${look.name.toUpperCase()} IS HYPED`}
+        </T>
+        {evolves && <T size={12} color="rgba(255,255,255,0.75)">{EVOLUTION[toTier]?.gear} unlocked</T>}
+      </Animated.View>
+    </View>
+  );
+}
 
 function RankUp({ from, to, onDone }: { from: number; to: number; onDone: () => void }) {
   const a = STAGES[from] ?? STAGES[0];
@@ -419,7 +649,7 @@ function RankUp({ from, to, onDone }: { from: number; to: number; onDone: () => 
               ],
         }}
       >
-        <RankBadge key={stage.index} stage={stage} size={190} />
+        <RankBadge key={stage.index} stage={stage} size={swapped ? 150 : 190} />
       </Animated.View>
       <Animated.View style={{ alignItems: 'center', marginTop: 10, opacity: swapped ? text : enter }}>
         <T size={34} weight="800" color="#fff">{stage.label}</T>
@@ -432,8 +662,9 @@ function RankUp({ from, to, onDone }: { from: number; to: number; onDone: () => 
               <T size={13} weight="800" color={b.tier.glow}>{b.label}</T>
             </View>
             {newTier && (
-              <T size={12} weight="700" color="rgba(255,255,255,0.7)" style={{ marginTop: 10 }}>New {b.tier.name} frame unlocked for your avatar</T>
+              <T size={12} weight="700" color="rgba(255,255,255,0.7)" style={{ marginTop: 8 }}>New {b.tier.name} frame unlocked for your avatar</T>
             )}
+            <PetEvolve fromTier={TIERS.findIndex((t) => t.key === a.tier.key)} toTier={TIERS.findIndex((t) => t.key === b.tier.key)} />
           </>
         ) : (
           <T size={13} color="rgba(255,255,255,0.6)" style={{ marginTop: 2 }}>Charging…</T>
@@ -451,7 +682,7 @@ export function demoCelebrations(stageIndex: number): Celebration[] {
   const tierStart = STAGES.findIndex((s) => s.tier.key === cur.tier.key);
   const from = Math.min(tierStart + 1, STAGES.length - 3);
   return [
-    { kind: 'chest', xp: 100, title: 'World chest' },
+    { kind: 'chest', xp: 100, title: 'World chest', drop: 'pet:nova' },
     { kind: 'rankUp', from, to: from + 1 },
     { kind: 'rankUp', from: from + 1, to: from + 2 },
   ];

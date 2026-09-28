@@ -12,7 +12,7 @@ import { currentOffset, CHEST_XP_PATH, WorldMap } from '@/components/WorldMap';
 import { useCelebrate } from '@/components/Celebrate';
 import { LineChart } from '@/components/Charts';
 import { useStore } from '@/store/StoreProvider';
-import { mascotSkin } from '@/lib/pro';
+import { mascotSkin, petAura, petSpecies } from '@/lib/pro';
 import { LEVEL_NAMES, RANK_WEIGHTS, SESSIONS_FOR_MAX, stateProgression, STAGES } from '@/lib/progression';
 import { formatWeight } from '@/lib/units';
 import { shortDate, todayKey } from '@/lib/dates';
@@ -44,7 +44,7 @@ export default function RankScreen() {
   const claimed = useMemo(() => new Set((state.questLog ?? []).map((q) => q.id)), [state.questLog]);
   const celebrate = useCelebrate();
   const openChest = (id: string) => {
-    celebrate({ kind: 'chest', xp: CHEST_XP_PATH, title: 'World chest', color: cur.tier.color });
+    celebrate({ kind: 'chest', xp: CHEST_XP_PATH, title: 'World chest', color: cur.tier.color, claim: id });
     dispatch({ type: 'claimReward', entry: { id, date: todayKey(), xp: CHEST_XP_PATH } });
   };
   const parts: { key: keyof typeof p.parts; label: string; icon: string; color: string; tip: string }[] = [
@@ -106,7 +106,7 @@ export default function RankScreen() {
         {/* How ranks work */}
         <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.md }}>
           <Card style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <Kettle species={(state.settings.pet ?? 'kettle') as Species} size={54} mood={p.weakest ? 'pumped' : 'wink'} band={cur.tier.color} skin={mascotSkin(state)} />
+            <Kettle species={petSpecies(state) as Species} size={54} mood={p.weakest ? 'pumped' : 'wink'} band={cur.tier.color} skin={mascotSkin(state)} />
             <View style={{ flex: 1 }}>
               <T size={13} weight="800">
                 {p.lifts.length === 0
@@ -158,7 +158,7 @@ export default function RankScreen() {
           }}
           style={{ marginHorizontal: spacing.md, marginTop: spacing.sm }}
         >
-          {width > 0 && <WorldMap width={width} current={cur.index} claimed={claimed} onChest={openChest} pet={state.settings.pet} skin={mascotSkin(state)} />}
+          {width > 0 && <WorldMap width={width} current={cur.index} claimed={claimed} onChest={openChest} pet={petSpecies(state)} skin={mascotSkin(state)} aura={petAura(state)} />}
         </View>
 
         {/* Lift breakdown */}

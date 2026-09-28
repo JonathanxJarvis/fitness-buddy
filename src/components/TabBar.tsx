@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { ActionSheet, T, type IconName } from './ui';
 import { nativeDriver } from './motion';
+import { Glass } from './Glass';
 import { useStore } from '@/store/StoreProvider';
 import { nutrientColors, useTheme } from '@/theme';
 import { glassMl } from '@/lib/units';
@@ -16,12 +17,15 @@ import { useStartWorkout } from '@/lib/useStartWorkout';
 const TABS: Record<string, { label: string; icon: IconName; active: IconName }> = {
   index: { label: 'Today', icon: 'home-outline', active: 'home' },
   train: { label: 'Train', icon: 'barbell-outline', active: 'barbell' },
-  crew: { label: 'Crew', icon: 'people-outline', active: 'people' },
+  friends: { label: 'Friends', icon: 'people-outline', active: 'people' },
   coach: { label: 'Coach', icon: 'sparkles-outline', active: 'sparkles' },
 };
 
 /** Height of the bar above the bottom inset; screens pad by this much. */
-export const tabBarHeight = (bottomInset: number) => 58 + Math.max(bottomInset, 10);
+export const tabBarHeight = (bottomInset: number) => BAR_H + barBottom(bottomInset) + 8;
+
+const BAR_H = 64;
+const barBottom = (bottomInset: number) => Math.max(bottomInset - 8, 12);
 
 export function useKeyboardVisible() {
   const [visible, setVisible] = useState(false);
@@ -46,7 +50,7 @@ export function mealForNow(d = new Date()): MealType {
 }
 
 function TabItem({ name, focused, onPress }: { name: string; focused: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   const t = TABS[name];
   const v = useRef(new Animated.Value(focused ? 1 : 0)).current;
   useEffect(() => {
@@ -54,14 +58,30 @@ function TabItem({ name, focused, onPress }: { name: string; focused: boolean; o
   }, [focused, v]);
   if (!t) return null;
   return (
-    <Pressable accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={t.label} onPress={onPress} style={{ flex: 1, alignItems: 'center', paddingTop: 10 }}>
-      <Animated.View style={{ transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }] }}>
-        <Ionicons name={focused ? t.active : t.icon} size={23} color={focused ? colors.text : colors.textMuted} />
+    <Pressable accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={t.label} onPress={onPress} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: BAR_H }}>
+      {/* the lens: a brighter capsule that swells in behind the active tab */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 7,
+          bottom: 7,
+          left: 3,
+          right: 3,
+          borderRadius: 22,
+          backgroundColor: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.75)',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: dark ? 'rgba(255,255,255,0.14)' : 'rgba(15,26,20,0.06)',
+          opacity: v,
+          transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }],
+        }}
+      />
+      <Animated.View style={{ transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }, { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -1] }) }] }}>
+        <Ionicons name={focused ? t.active : t.icon} size={22} color={focused ? colors.primary : colors.textMuted} />
       </Animated.View>
-      <T size={11} weight={focused ? '700' : '500'} color={focused ? colors.text : colors.textMuted} style={{ marginTop: 3 }}>
+      <T size={10.5} weight={focused ? '800' : '600'} color={focused ? colors.text : colors.textMuted} style={{ marginTop: 2 }}>
         {t.label}
       </T>
-      <Animated.View style={{ width: 4, height: 4, borderRadius: 2, marginTop: 3, backgroundColor: colors.primary, opacity: v }} />
     </Pressable>
   );
 }
@@ -100,59 +120,43 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
 
   return (
     <>
-      <View
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingBottom: Math.max(insets.bottom, 10),
-          backgroundColor: colors.card,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: colors.border,
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          shadowColor: '#000',
-          shadowOpacity: dark ? 0 : 0.06,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 12,
-        }}
-      >
-        {left.map(renderTab)}
-        <View style={{ width: 76, alignItems: 'center' }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-              setOpen(true);
-            }}
-            style={{ marginTop: -22 }}
-          >
-            <Animated.View
-              style={{
-                borderRadius: 32,
-                shadowColor: colors.primary,
-                shadowOpacity: 0.45,
-                shadowRadius: 14,
-                shadowOffset: { width: 0, height: 6 },
-                elevation: 8,
-                transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }],
+      <View pointerEvents="box-none" style={{ position: 'absolute', left: 14, right: 14, bottom: barBottom(insets.bottom) }}>
+        <Glass radius={32} style={{ height: BAR_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
+          {left.map(renderTab)}
+          <View style={{ width: 70, alignItems: 'center' }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                setOpen(true);
               }}
             >
-              <LinearGradient
-                colors={[colors.hero[1], colors.hero[2]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.background }}
+              <Animated.View
+                style={{
+                  borderRadius: 26,
+                  shadowColor: colors.hero[1],
+                  shadowOpacity: dark ? 0.6 : 0.4,
+                  shadowRadius: 12,
+                  shadowOffset: { width: 0, height: 5 },
+                  elevation: 8,
+                  transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }],
+                }}
               >
-                <Ionicons name="add" size={30} color="#fff" />
-              </LinearGradient>
-            </Animated.View>
-          </Pressable>
-        </View>
-        {right.map(renderTab)}
+                <LinearGradient
+                  colors={[colors.hero[2], colors.hero[1], colors.hero[0]]}
+                  start={{ x: 0.2, y: 0 }}
+                  end={{ x: 0.8, y: 1 }}
+                  style={{ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+                >
+                  <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26 }} />
+                  <Ionicons name="add" size={28} color="#fff" />
+                </LinearGradient>
+              </Animated.View>
+            </Pressable>
+          </View>
+          {right.map(renderTab)}
+        </Glass>
       </View>
 
       <ActionSheet

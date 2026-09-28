@@ -8,6 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { IconButton, T } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
 import { Kettle, PETS, SKINS } from '@/components/Mascot';
+
+const PRO_PETS = PETS.filter((p) => p.source === 'pro');
 import { useStore } from '@/store/StoreProvider';
 import { isPro, PLANS, PREVIEW, PRO_FEATURES } from '@/lib/pro';
 import { radius, spacing } from '@/theme';
@@ -18,7 +20,7 @@ const INK = '#0B120E';
 const REASON: Record<string, string> = {
   snap: 'Snap a meal is a Pro feature',
   coach: 'The AI coach is a Pro feature',
-  friends: 'Your crew is full',
+  friends: 'Your friends list is full',
   skins: 'Outfits are a Pro feature',
   pets: 'That pet comes with Pro',
 };
@@ -53,7 +55,7 @@ export default function ProScreen() {
           </View>
           <FadeIn style={{ alignItems: 'center' }}>
             <Pressable onPress={() => setSkin((s) => s + 1)} accessibilityLabel="Show another pet">
-              <Kettle species={PETS[skin % PETS.length].key} size={110} mood="proud" band={GOLD} skin={skins[skin % skins.length]} />
+              <Kettle species={PRO_PETS[skin % PRO_PETS.length].key} size={110} mood="proud" band={GOLD} skin={skins[skin % skins.length]} />
             </Pressable>
             <T size={11} color="rgba(255,255,255,0.5)" style={{ marginTop: 2 }}>Tap to meet the Pro pets</T>
             {feature && REASON[feature] ? (
@@ -63,7 +65,7 @@ export default function ProScreen() {
               Fitness Buddy <T size={30} weight="800" color={GOLD}>Pro</T>
             </T>
             <T size={14} color="rgba(255,255,255,0.7)" center style={{ marginTop: 6, maxWidth: 300 }}>
-              Everything you need is free. Pro adds the AI, your whole crew and a little style.
+              Everything you need is free. Pro adds the AI, all your friends and a little style.
             </T>
           </FadeIn>
         </LinearGradient>

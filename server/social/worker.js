@@ -1,4 +1,4 @@
-// Fitness Buddy crew server: friend codes, progression snapshots and 1:1 chat.
+// Fitness Buddy friends server: friend codes, progression snapshots and 1:1 chat.
 // Cloudflare Worker + D1. See README.md for setup.
 //
 // Auth: /register returns { id, code, secret }. Every other call sends
@@ -28,6 +28,16 @@ async function sha256(text) {
 const num = (v, max = 1e9) => (typeof v === 'number' && isFinite(v) ? Math.max(0, Math.min(max, v)) : 0);
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 
+// Illustrated avatar: small integer indexes into the app's palettes (see
+// src/components/people/avatarConfig.ts). Photos are never uploaded; they stay on the phone.
+const AVATAR_LIMITS = { face: 4, skin: 7, hair: 11, hairColor: 8, beard: 4, glasses: 3, top: 4, topColor: 9, bg: 6 };
+function cleanAvatar(a) {
+  if (!a || typeof a !== 'object') return undefined;
+  const out = {};
+  for (const [k, n] of Object.entries(AVATAR_LIMITS)) out[k] = Math.min(n - 1, Math.round(num(a[k], n)));
+  return out;
+}
+
 /** Keep only the fields the app shares, with sane bounds. Never food or body data. */
 function cleanSnapshot(s) {
   if (!s || typeof s !== 'object') return null;
@@ -46,6 +56,7 @@ function cleanSnapshot(s) {
     skin: str(s.skin, 20) || undefined,
     pet: str(s.pet, 20) || undefined,
     petName: str(s.petName, 24) || undefined,
+    avatar: cleanAvatar(s.avatar),
     parts: s.parts && typeof s.parts === 'object' ? { strength: num(s.parts.strength, 100), consistency: num(s.parts.consistency, 100), momentum: num(s.parts.momentum, 100) } : undefined,
     streak: Math.round(num(s.streak, 100000)),
     recent: (Array.isArray(s.recent) ? s.recent : [])
@@ -135,7 +146,7 @@ export default {
       if (!other) return fail('No one has that code. Check it and try again.', 404);
       if (other.id === me.id) return fail('That’s your own code.');
       const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM friends WHERE user_id = ?').bind(me.id).first();
-      if (count.n >= MAX_FRIENDS) return fail('Your crew is full.');
+      if (count.n >= MAX_FRIENDS) return fail('Your friends list is full.');
       const now = Date.now();
       // Adding someone's code links you both ways, like swapping numbers.
       await env.DB.batch([
@@ -158,7 +169,7 @@ export default {
       const to = str(body.to, 40);
       const text = str(body.text, MAX_TEXT).trim();
       if (!text) return fail('Empty message');
-      if (!(await isFriend(env, me.id, to))) return fail('You can only message your crew.', 403);
+      if (!(await isFriend(env, me.id, to))) return fail('You can only message your friends.', 403);
       const message = { id: `m_${random(16, 'abcdefghijklmnopqrstuvwxyz0123456789')}`, from: me.id, to, text, at: Date.now() };
       await env.DB.prepare('INSERT INTO messages (id, sender, recipient, body, at) VALUES (?, ?, ?, ?, ?)').bind(message.id, me.id, to, text, message.at).run();
       return json({ message });
@@ -167,7 +178,7 @@ export default {
     const thread = /^\/messages\/([\w-]+)$/.exec(path);
     if (req.method === 'GET' && thread) {
       const other = thread[1];
-      if (!(await isFriend(env, me.id, other))) return fail('Not in your crew', 403);
+      if (!(await isFriend(env, me.id, other))) return fail('Not in your friends', 403);
       const since = Number(url.searchParams.get('since')) || 0;
       const { results } = await env.DB.prepare(
         'SELECT id, sender, recipient, body, at FROM messages WHERE ((sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)) AND at > ? ORDER BY at LIMIT 200',

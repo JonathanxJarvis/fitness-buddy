@@ -5,7 +5,10 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgGradient, Path, Pol
 import { T } from './ui';
 import { usePulse } from './motion';
 import { RankBadge } from './RankBadge';
-import { Kettle, type Species } from './Mascot';
+import { Pet, type Species } from './Mascot';
+import { MiniChest } from './pet/MiniChest';
+import { EVOLUTION } from './pet/Gear';
+import type { PetCareLevels } from './Mascot';
 import { STAGES, TIERS, type Stage, type Tier } from '@/lib/progression';
 
 /*
@@ -306,6 +309,8 @@ export function WorldMap({
   onChest,
   pet,
   skin,
+  aura,
+  care,
 }: {
   width: number;
   current: number;
@@ -313,6 +318,8 @@ export function WorldMap({
   onChest: (id: string) => void;
   pet?: string;
   skin?: string;
+  aura?: string;
+  care?: PetCareLevels;
 }) {
   const tiers = [...TIERS].reverse();
   return (
@@ -324,6 +331,7 @@ export function WorldMap({
         const worldNo = TIERS.length - ti;
         const firstStage = STAGES.find((s) => s.tier.key === tier.key)!;
         const reached = current >= firstStage.index;
+        const tierIdx = TIERS.length - 1 - ti;
         // Node centers, bottom to top.
         const pts = nodes.map((_, i) => ({ x: (world.xs[i] ?? 0.5) * width, y: h - 20 - (i + 0.5) * STEP }));
         const full = [{ x: width / 2, y: h }, ...pts, { x: width / 2, y: 0 }];
@@ -361,6 +369,16 @@ export function WorldMap({
                 <T size={15} weight="800" color="#fff">{world.name}</T>
               </View>
               {!reached && <Ionicons name="lock-closed" size={16} color="#fff" />}
+              <View style={{ flex: 1 }} />
+              {/* Your pet's form in this world: what it earns when you get here. */}
+              <View style={{ alignItems: 'center' }} accessibilityLabel={`${tier.name} form: ${EVOLUTION[tierIdx].gear}`}>
+                <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(0,0,0,0.28)', borderWidth: 1.5, borderColor: reached ? tier.glow : 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <Pet species={(pet ?? 'kettle') as Species} size={50} skin={skin} tier={tierIdx} animate={false} silhouette={reached ? undefined : 'rgba(255,255,255,0.28)'} />
+                </View>
+                <T size={9} weight="800" color="#fff" style={{ marginTop: 2, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' }}>
+                  {EVOLUTION[tierIdx].gear.toUpperCase()}
+                </T>
+              </View>
             </View>
 
             {nodes.map((n, i) => {
@@ -379,7 +397,7 @@ export function WorldMap({
                     )}
                     {state === 'current' && (
                       <View style={{ position: 'absolute', top: size / 2 - 30, [p.x < width / 2 ? 'left' : 'right']: size + 2 } as never}>
-                        <Kettle species={(pet ?? 'kettle') as Species} size={56} mood="pumped" band={tier.color} skin={skin} />
+                        <Pet species={(pet ?? 'kettle') as Species} size={64} mood="pumped" tier={tierIdx} skin={skin} aura={aura} care={care} />
                         <View style={{ backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginTop: -4, alignSelf: 'center' }}>
                           <T size={10} weight="800" color="#111">YOU</T>
                         </View>
@@ -400,8 +418,8 @@ export function WorldMap({
                     style={{ position: 'absolute', left: p.x - 22, top: p.y - 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                   >
                     {ready && <Pulse color="#FFD66B" size={58} />}
-                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: open ? 'rgba(255,255,255,0.35)' : ready ? '#F5B82E' : 'rgba(0,0,0,0.35)', borderWidth: 2, borderColor: ready ? '#FFF1C2' : 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={open ? 'checkmark' : ready ? 'gift' : 'lock-closed'} size={open ? 18 : 20} color={ready ? '#5A3B00' : '#fff'} />
+                    <View style={{ opacity: open ? 0.7 : 1 }}>
+                      <MiniChest size={44} state={open ? 'open' : ready ? 'ready' : 'locked'} />
                     </View>
                     {ready && (
                       <View style={{ position: 'absolute', top: -16, width: 64, alignItems: 'center' }}>
@@ -416,6 +434,11 @@ export function WorldMap({
               const beaten = current >= n.next.index;
               return (
                 <View key={i} style={{ position: 'absolute', left: p.x - 70, top: p.y - 26, width: 140, alignItems: 'center' }}>
+                  {!beaten && EVOLUTION[tierIdx + 1] && (
+                    <T size={9} weight="800" color={tier.glow} numberOfLines={1} style={{ position: 'absolute', top: -17, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' }}>
+                      PET UNLOCKS {EVOLUTION[tierIdx + 1].gear.toUpperCase()}
+                    </T>
+                  )}
                   <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: beaten ? '#22B573' : '#1B1B1F', borderWidth: 3, borderColor: tier.glow, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name={beaten ? 'shield-checkmark' : 'skull'} size={24} color={beaten ? '#fff' : tier.glow} />
                   </View>

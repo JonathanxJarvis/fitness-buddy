@@ -162,6 +162,12 @@ export interface Settings {
   pet?: string;
   /** The name you gave your pet. */
   petName?: string;
+  /** Equipped aura (see AURAS in lib/loot), won from chests. */
+  petAura?: string;
+  /** Illustrated profile picture (used when there's no photo, and shared with friends). */
+  avatar?: AvatarConfig;
+  /** Profile photo as a small JPEG data URI. Stays on this phone: friends see `avatar`. */
+  photo?: string;
 }
 
 /** A claimed reward: daily quest ("q:<id>"), daily chest ("chest"), weekly challenge ("week") or path chest ("path:<n>"). */
@@ -243,9 +249,38 @@ export interface AppState {
   restSeconds?: number;
   social?: SocialState;
   questLog?: QuestLogEntry[];
+  /** Pet collection: items won from chests (see lib/loot). */
+  loot?: import('./loot').LootState;
+  /** Weekly training split (see lib/plan). */
+  plan?: TrainingPlan;
+  /** Tap-to-confirm quest check-ins: date -> quest ids confirmed that day (e.g. "sleep"). */
+  checkins?: Record<string, string[]>;
+}
+
+/** Which days you train and what. `week` is Monday-first; null is a rest day. */
+export interface TrainingPlan {
+  split: string;
+  week: (string | null)[];
+  /** One-off changes for a single date: session id, or 'rest'. */
+  overrides?: Record<string, string>;
+  /** Date the plan was first set; planned rest days before it don't count. */
+  since: string;
 }
 
 /** What friends can see about you: progression only, never food or body data. */
+/** An illustrated person: each field indexes a palette or shape list in components/people/avatarConfig. */
+export interface AvatarConfig {
+  face: number;
+  skin: number;
+  hair: number;
+  hairColor: number;
+  beard: number;
+  glasses: number;
+  top: number;
+  topColor: number;
+  bg: number;
+}
+
 export interface SocialSnapshot {
   name: string;
   score: number;
@@ -262,10 +297,12 @@ export interface SocialSnapshot {
   skin?: string;
   pet?: string;
   petName?: string;
+  /** Illustrated profile picture. Photos are never synced (no image server), only this config. */
+  avatar?: AvatarConfig;
   /** Rank score parts: strength, consistency, momentum (0–100 each). */
   parts?: { strength: number; consistency: number; momentum: number };
   streak?: number;
-  /** Recent highlights for the crew feed, newest first. */
+  /** Recent highlights for the friends feed, newest first. */
   recent?: SocialEvent[];
   updatedAt: number;
 }

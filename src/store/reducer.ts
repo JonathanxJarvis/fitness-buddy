@@ -1,4 +1,6 @@
 import { proteinTarget } from '@/lib/nutrition';
+import { claimWithLoot } from '@/lib/lootChest';
+import { isPro } from '@/lib/pro';
 import type {
   QuestLogEntry,
   Friend,
@@ -16,6 +18,7 @@ import type {
   Profile,
   SavedMeal,
   Settings,
+  TrainingPlan,
 } from '@/lib/types';
 
 /** German-language phones get German supermarket products first. */
@@ -98,6 +101,8 @@ export type Action =
   | { type: 'addMessages'; friendId: string; messages: SocialMessage[] }
   | { type: 'markRead'; friendId: string; at: number }
   | { type: 'claimReward'; entry: QuestLogEntry }
+  | { type: 'setPlan'; plan: TrainingPlan | null }
+  | { type: 'setCheckin'; date: string; id: string; on: boolean }
   | { type: 'reset' };
 
 const EMPTY_SOCIAL: SocialState = { friends: [], chats: {}, read: {} };
@@ -277,7 +282,17 @@ export function reducer(state: AppState, action: Action): AppState {
       const log = state.questLog ?? [];
       const e = action.entry;
       if (log.some((q) => q.id === e.id && q.date === e.date)) return state;
-      return { ...state, questLog: [...log, e] };
+      // Chests roll for a bonus collectible (duplicates become bonus XP).
+      const won = claimWithLoot(state, e, isPro(state));
+      return { ...state, questLog: [...log, won.entry], loot: won.loot };
+    }
+    case 'setPlan':
+      return { ...state, plan: action.plan ?? undefined };
+    case 'setCheckin': {
+      const all = state.checkins ?? {};
+      const had = all[action.date] ?? [];
+      const next = action.on ? [...new Set([...had, action.id])] : had.filter((x) => x !== action.id);
+      return { ...state, checkins: { ...all, [action.date]: next } };
     }
     case 'reset':
       return initialState;

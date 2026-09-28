@@ -16,6 +16,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { font, radius, spacing, useTheme } from '@/theme';
 import { nativeDriver, PressScale, useTween } from './motion';
@@ -158,7 +160,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   small?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   const bg = {
     primary: colors.primary,
     secondary: colors.primarySoft,
@@ -166,39 +168,59 @@ export function Button({
     danger: 'transparent',
   }[variant];
   const fg = {
-    primary: colors.onPrimary,
+    primary: '#FFFFFF',
     secondary: colors.primary,
     ghost: colors.primary,
     danger: colors.danger,
   }[variant];
+  const primary = variant === 'primary';
   return (
     <PressScale
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
       disabled={disabled || loading}
+      scaleTo={0.96}
       style={[
         {
           backgroundColor: bg,
           borderRadius: radius.pill,
-          paddingVertical: small ? 9 : 13,
-          paddingHorizontal: small ? 14 : 22,
+          paddingVertical: small ? 9 : 14,
+          paddingHorizontal: small ? 15 : 22,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
           opacity: disabled ? 0.45 : 1,
-          borderWidth: variant === 'danger' ? 1 : 0,
-          borderColor: colors.danger,
+          borderWidth: variant === 'danger' ? 1 : variant === 'secondary' ? StyleSheet.hairlineWidth : 0,
+          borderColor: variant === 'danger' ? colors.danger : colors.primary + '40',
+          overflow: 'hidden',
+        },
+        primary && {
+          shadowColor: colors.hero[1],
+          shadowOpacity: dark ? 0.5 : 0.35,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 6,
         },
         style,
       ]}
     >
+      {primary && (
+        <>
+          <LinearGradient colors={[colors.hero[2], colors.hero[1], colors.hero[0]]} start={{ x: 0, y: 0 }} end={{ x: 0.4, y: 1.4 }} style={StyleSheet.absoluteFill} />
+          {/* glossy top edge */}
+          <LinearGradient colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '55%' }} />
+        </>
+      )}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
         <>
           {icon && <Ionicons name={icon} size={small ? 16 : 18} color={fg} />}
-          <Text numberOfLines={1} style={{ color: fg, ...font('700'), fontSize: small ? 14 : 16 }}>{title}</Text>
+          <Text numberOfLines={1} style={{ color: fg, ...font('700'), fontSize: small ? 14 : 16, letterSpacing: 0.2 }}>{title}</Text>
         </>
       )}
     </PressScale>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import { initialState, reducer } from '@/store/reducer';
 import { offlineReply } from '@/lib/offlineCoach';
-import { addFriend, demoCrew, demoReplyText, formatCode, levelsGained, makeSnapshot, normalizeCode, scoreGained, unreadCount } from '@/lib/social';
+import { avatarFor, avatarFromSeed, AVATAR_LIMITS, cleanAvatar } from '@/components/people/avatarConfig';
+import { addFriend, demoCrew, demoFriends, demoReplyText, formatCode, levelsGained, makeSnapshot, normalizeCode, scoreGained, unreadCount } from '@/lib/social';
 import type { AppState, Workout } from '@/lib/types';
 
 const today = '2026-09-28';
@@ -125,6 +126,34 @@ describe('social snapshot', () => {
       expect(levelsGained(f)).toBeGreaterThan(0);
     }
     expect(demoReplyText({ name: 'Lena', level: 20 }, 'new PR today!')).toBeTruthy();
+  });
+});
+
+describe('avatars', () => {
+  it('draws the same person for the same seed, within bounds', () => {
+    const a = avatarFromSeed('Lena');
+    expect(avatarFromSeed('lena ')).toEqual(a);
+    for (const seed of ['a', 'b', 'Marco', 'ZZ9ZZ9', '']) {
+      const c = avatarFromSeed(seed);
+      for (const [k, n] of Object.entries(AVATAR_LIMITS)) expect(c[k as keyof typeof c]).toBeLessThan(n);
+      expect(c.hair).not.toBe(10); // headscarf is a choice, never random
+    }
+  });
+
+  it('clamps untrusted configs from friends', () => {
+    expect(cleanAvatar(null)).toBeUndefined();
+    const c = cleanAvatar({ face: 99, skin: -3, hair: 'x', bg: 2.4 })!;
+    expect(c).toMatchObject({ face: AVATAR_LIMITS.face - 1, skin: 0, hair: 0, bg: 2 });
+    expect(avatarFor({ name: 'Tom' })).toEqual(avatarFromSeed('Tom'));
+  });
+
+  it('gives demo friends distinct portraits and shares yours in the snapshot', () => {
+    const looks = demoFriends(today).map((f) => JSON.stringify(f.avatar));
+    expect(new Set(looks).size).toBe(looks.length);
+    const custom = { face: 1, skin: 2, hair: 3, hairColor: 1, beard: 0, glasses: 1, top: 2, topColor: 4, bg: 5 };
+    const snap = makeSnapshot({ ...state, settings: { ...state.settings, avatar: custom, photo: 'data:image/jpeg;base64,xx' } }, today)!;
+    expect(snap.avatar).toEqual(custom);
+    expect(JSON.stringify(snap)).not.toContain('data:image');
   });
 });
 

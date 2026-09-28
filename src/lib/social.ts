@@ -1,14 +1,18 @@
-import type { AppState, Friend, SocialEvent, SocialMessage, SocialSnapshot, SocialState } from './types';
+import type { AppState, AvatarConfig, Friend, SocialEvent, SocialMessage, SocialSnapshot, SocialState } from './types';
 import { levelFor, STAGES, stageFor, stateProgression, totalXp } from './progression';
 import { addDays, fromKey, todayKey } from './dates';
 import { doneSets, findExercise, prExercises } from './training';
 import { activeDays, streakInfo } from './quests';
 import { PREVIEW } from './pro';
+import { avatarFromSeed, cleanAvatar } from '@/components/people/avatarConfig';
 
 /**
  * Friends and chat. With EXPO_PUBLIC_SOCIAL_URL set, this talks to the small
  * Cloudflare Worker in server/social. Without it (and always in the preview)
- * it runs a local demo crew so every screen can be tried.
+ * it runs a local demo friends list so every screen can be tried.
+ *
+ * Profile photos stay on this phone: there's no image server, so friends get
+ * your illustrated avatar config (settings.avatar) instead.
  */
 const BASE = (process.env.EXPO_PUBLIC_SOCIAL_URL ?? '').replace(/\/$/, '');
 export const DEMO = PREVIEW || !BASE;
@@ -63,6 +67,7 @@ export function makeSnapshot(state: AppState, today = todayKey()): SocialSnapsho
     skin: state.settings.mascotSkin,
     pet: state.settings.pet ?? 'kettle',
     petName: state.settings.petName,
+    avatar: cleanAvatar(state.settings.avatar) ?? avatarFromSeed(p.name?.trim() || 'Lifter'),
     parts: prog.parts,
     streak,
     recent: recent.slice(0, 6),
@@ -103,15 +108,15 @@ function randomCode(r: () => number = Math.random): string {
   return Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(r() * CODE_CHARS.length)]).join('');
 }
 
-// ---------- Demo crew ----------
+// ---------- Demo friends ----------
 
-type DemoPerson = { name: string; code: string; base: number; growth: number; level: number; pace: number; skin: string; last: string; pet: string; petName: string; streak: number };
+type DemoPerson = { name: string; code: string; base: number; growth: number; level: number; pace: number; skin: string; last: string; pet: string; petName: string; streak: number; avatar?: AvatarConfig };
 const DEMO_PEOPLE: DemoPerson[] = [
-  { name: 'Lena', code: 'LENA26', base: 52, growth: 9, level: 23, pace: 4, skin: 'cherry', last: 'Leg day', pet: 'avo', petName: 'Guac', streak: 19 },
-  { name: 'Marco', code: 'MRC777', base: 70, growth: 4, level: 31, pace: 5, skin: 'midnight', last: 'Push', pet: 'dumbbell', petName: 'Tank', streak: 41 },
-  { name: 'Aisha', code: 'AISHA1', base: 30, growth: 14, level: 11, pace: 3, skin: 'classic', last: 'Full body', pet: 'flame', petName: 'Sparky', streak: 8 },
-  { name: 'Tom', code: 'TOMFIT', base: 41, growth: 6, level: 17, pace: 2, skin: 'classic', last: 'Upper body', pet: 'shaker', petName: 'Wheyne', streak: 3 },
-  { name: 'Sofia', code: 'SOFIA9', base: 58, growth: 11, level: 26, pace: 4, skin: 'gold', last: 'Pull', pet: 'egg', petName: 'Yolko', streak: 12 },
+  { name: 'Lena', code: 'LENA26', base: 52, growth: 9, level: 23, pace: 4, skin: 'cherry', last: 'Leg day', pet: 'avo', petName: 'Guac', streak: 19, avatar: { face: 0, skin: 1, hair: 9, hairColor: 4, beard: 0, glasses: 0, top: 3, topColor: 2, bg: 0 } },
+  { name: 'Marco', code: 'MRC777', base: 70, growth: 4, level: 31, pace: 5, skin: 'midnight', last: 'Push', pet: 'dumbbell', petName: 'Tank', streak: 41, avatar: { face: 2, skin: 3, hair: 1, hairColor: 0, beard: 2, glasses: 0, top: 2, topColor: 5, bg: 2 } },
+  { name: 'Aisha', code: 'AISHA1', base: 30, growth: 14, level: 11, pace: 3, skin: 'classic', last: 'Full body', pet: 'flame', petName: 'Sparky', streak: 8, avatar: { face: 3, skin: 5, hair: 10, hairColor: 0, beard: 0, glasses: 0, top: 0, topColor: 0, bg: 3 } },
+  { name: 'Tom', code: 'TOMFIT', base: 41, growth: 6, level: 17, pace: 2, skin: 'classic', last: 'Upper body', pet: 'shaker', petName: 'Wheyne', streak: 3, avatar: { face: 1, skin: 0, hair: 0, hairColor: 3, beard: 1, glasses: 1, top: 0, topColor: 1, bg: 1 } },
+  { name: 'Sofia', code: 'SOFIA9', base: 58, growth: 11, level: 26, pace: 4, skin: 'gold', last: 'Pull', pet: 'egg', petName: 'Yolko', streak: 12, avatar: { face: 0, skin: 2, hair: 5, hairColor: 2, beard: 0, glasses: 0, top: 1, topColor: 3, bg: 4 } },
 ];
 const PR_LIFTS = ['Squat', 'Bench press', 'Deadlift', 'Overhead press', 'Pull-up', 'Hip thrust'];
 const DEMO_NAMES = ['Jonas', 'Mia', 'Tariq', 'Sofia', 'Ben', 'Nora', 'Luca', 'Emma', 'Yusuf', 'Clara'];
@@ -125,7 +130,7 @@ function demoFriend(p: DemoPerson, today: string): Friend {
     { kind: 'workout' as const, text: `finished ${p.last} · ${14 + Math.floor(r() * 10)} sets`, at: Date.now() - (2 + Math.floor(r() * 30)) * hour },
     { kind: 'quests' as const, text: 'cleared all daily quests', at: Date.now() - (5 + Math.floor(r() * 40)) * hour },
     ...(p.growth > 8 ? [{ kind: 'rank' as const, text: `reached ${stageFor(p.base).label}`, at: Date.now() - (20 + Math.floor(r() * 50)) * hour }] : []),
-    ...(p.streak >= 7 ? [{ kind: 'streak' as const, text: `is on a ${p.streak}-day streak`, at: Date.now() - 3 * hour }] : []),
+    ...(p.streak >= 7 ? [{ kind: 'streak' as const, text: `is on a ${p.streak}-day streak`, at: Date.now() - (2 + (p.streak % 9)) * hour }] : []),
   ].sort((a, b) => b.at - a.at);
   const strength = Math.min(100, Math.round(p.base * 1.1));
   const history = Array.from({ length: 8 }, (_, i) => Math.round(Math.max(0, p.base - p.growth + (p.growth * i) / 7 + (r() - 0.5) * 2)));
@@ -148,6 +153,7 @@ function demoFriend(p: DemoPerson, today: string): Friend {
     skin: p.skin,
     pet: p.pet,
     petName: p.petName,
+    avatar: p.avatar ?? avatarFromSeed(p.code),
     parts: { strength, consistency: Math.min(100, Math.round((p.pace * 4 * 100) / 14)), momentum: Math.min(100, Math.round(p.growth * 5)) },
     streak: p.streak,
     recent,
@@ -177,15 +183,18 @@ function demoFromCode(code: string, today: string): Friend {
   );
 }
 
-export function demoCrew(today = todayKey()): Friend[] {
+export function demoFriends(today = todayKey()): Friend[] {
   return DEMO_PEOPLE.map((p) => demoFriend(p, today));
 }
 
+/** @deprecated Use demoFriends. */
+export const demoCrew = demoFriends;
+
 const DEMO_OPENERS: Record<string, string> = {
-  'demo-LENA26': 'Saw your last session 👀 what are you squatting these days?',
+  'demo-LENA26': 'Saw your last session. What are you squatting these days?',
   'demo-MRC777': 'Bet you can’t out-train me this week 😤',
-  'demo-AISHA1': 'Just hit a new deadlift PR!! 🎉',
-  'demo-SOFIA9': 'Race you to Gold I this week? 🏁',
+  'demo-AISHA1': 'Just hit a new deadlift PR!!',
+  'demo-SOFIA9': 'Race you to Gold I this week?',
 };
 
 export function demoOpener(friendId: string, at = Date.now()): SocialMessage | null {
