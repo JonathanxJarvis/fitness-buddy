@@ -7,9 +7,11 @@
  *   npm run photos -- --only shakshuka,lasagna
  *   npm run photos -- --list       print the search queries, no network
  *
- * Pexels first when PEXELS_API_KEY is set (free key at pexels.com/api; the
- * Pexels license allows commercial use). Openverse (only CC0 and Public
- * Domain Mark) fills gaps, or is the only source without a key.
+ * Sources, all free for commercial use without credit: Pixabay when
+ * PIXABAY_API_KEY is set (free key at pixabay.com/api/docs; Pixabay asks that
+ * images be downloaded, not hotlinked, which is what this does), then Pexels
+ * when PEXELS_API_KEY is set. Without any key it falls back to Openverse
+ * (CC0 / Public Domain Mark only), whose food matches are unreliable.
  *
  * Writes assets/meals/<mealId>.jpg, assets/meals/credits.json (for our
  * records) and src/components/meal/mealPhotos.ts, which the app imports.
@@ -308,6 +310,19 @@ async function searchPexels(query, key) {
   })).filter((c) => c.url);
 }
 
+async function searchPixabay(query, key) {
+  const p = new URLSearchParams({ key, q: query, image_type: 'photo', category: 'food', orientation: 'horizontal', safesearch: 'true', per_page: '20' });
+  const data = await getJson(`https://pixabay.com/api/?${p}`);
+  return (data.hits ?? []).map((h) => ({
+    url: h.largeImageURL ?? h.webformatURL,
+    title: h.tags ?? '',
+    creator: h.user ?? '',
+    license: 'Pixabay Content License',
+    source: h.pageURL,
+    via: 'pixabay',
+  })).filter((c) => c.url);
+}
+
 async function download(url) {
   const res = await fetch(url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(30000), redirect: 'follow' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -361,6 +376,7 @@ export async function main(argv) {
 
   mkdirSync(PHOTO_DIR, { recursive: true });
   const pexelsKey = process.env.PEXELS_API_KEY?.trim();
+  const pixabayKey = process.env.PIXABAY_API_KEY?.trim();
   const credits = readCredits();
   const found = [];
   const missing = [];
@@ -375,8 +391,12 @@ export async function main(argv) {
     process.stdout.write(`[${i + 1}/${meals.length}] ${meal.id} … `);
     let got = null;
     try {
-      // Pexels first when there's a key: its food photos are far more reliable than Openverse's.
-      const sources = pexelsKey ? [(q) => searchPexels(q, pexelsKey), searchOpenverse] : [searchOpenverse];
+      // Keyed stock sites only when a key is set: Openverse's food matches were too unreliable to ship.
+      const sources = [
+        ...(pixabayKey ? [(q) => searchPixabay(q, pixabayKey)] : []),
+        ...(pexelsKey ? [(q) => searchPexels(q, pexelsKey)] : []),
+        ...(pixabayKey || pexelsKey ? [] : [searchOpenverse]),
+      ];
       for (const search of sources) {
         for (const q of queriesFor(meal)) {
           got = await tryCandidates(await search(q), file);
@@ -407,7 +427,7 @@ export async function main(argv) {
   console.log(`\nDone. New: ${found.length}, already had: ${skipped}, missing: ${missing.length}. The app now has ${total} of ${parseMeals(readFileSync(MEALS_TS, 'utf8')).length} photos.`);
   if (missing.length) {
     console.log(`Missing: ${missing.join(', ')}`);
-    if (!pexelsKey) console.log('Tip: set PEXELS_API_KEY (free at pexels.com/api) and run again to fill the gaps.');
+    if (!pixabayKey && !pexelsKey) console.log('Tip: set PIXABAY_API_KEY (free at pixabay.com/api/docs) and run again.');
   }
   console.log('Check the photos in assets/meals before shipping; delete any you don’t like and run again.');
 }
