@@ -79,6 +79,8 @@ export default function FriendsScreen() {
   const myPlace = rows.findIndex((r) => r.you) + 1;
   const best = Math.max(1, ...rows.map((r) => def.value(r)));
 
+  const [allActivity, setAllActivity] = useState(false);
+  const feedTotal = rows.reduce((n, r) => n + Math.min(2, r.recent?.length ?? 0), 0);
   const feed = useMemo(() => {
     const items: { who: Row; e: SocialEvent }[] = [];
     rows.forEach((r) => (r.recent ?? []).forEach((e) => items.push({ who: r, e })));
@@ -87,7 +89,7 @@ export default function FriendsScreen() {
     const sorted = items
       .sort((a, b) => b.e.at - a.e.at)
       .filter((it) => (per[it.who.id] = (per[it.who.id] ?? 0) + 1) <= 2)
-      .slice(0, 10);
+      .slice(0, allActivity ? 10 : 3);
     const groups: { title: string; items: typeof sorted }[] = [];
     sorted.forEach((it) => {
       const t = dayBucket(it.e.at);
@@ -96,7 +98,7 @@ export default function FriendsScreen() {
       else groups.push({ title: t, items: [it] });
     });
     return groups;
-  }, [rows]);
+  }, [rows, allActivity]);
 
   const chats = useMemo(
     () =>
@@ -330,9 +332,9 @@ export default function FriendsScreen() {
                 const st = EVENT_STYLE[e.kind];
                 const done = cheered[key];
                 return (
-                  <View key={key + i} style={{ flexDirection: 'row', gap: 12, paddingVertical: 10 }}>
+                  <View key={key + i} style={{ flexDirection: 'row', gap: 10, paddingVertical: 7 }}>
                     <Pressable onPress={() => open(who)}>
-                      <Avatar person={who} stage={who.stage} size={42} petBadge={false} />
+                      <Avatar person={who} stage={who.stage} size={36} petBadge={false} />
                     </Pressable>
                     <View style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
                       <T size={15}>
@@ -359,6 +361,11 @@ export default function FriendsScreen() {
               })}
             </View>
           ))}
+          {feedTotal > 3 && (
+            <Pressable onPress={() => setAllActivity((v) => !v)} accessibilityRole="button" hitSlop={6} style={{ alignSelf: 'center', paddingVertical: 8 }}>
+              <T size={13} weight="800" color={colors.primary}>{allActivity ? 'Show less' : 'Show more'}</T>
+            </Pressable>
+          )}
         </>
       )}
 

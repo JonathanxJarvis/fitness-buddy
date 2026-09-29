@@ -11,7 +11,7 @@ import { Kettle, PETS, SKINS } from '@/components/Mascot';
 
 const PRO_PETS = PETS.filter((p) => p.source === 'pro');
 import { useStore } from '@/store/StoreProvider';
-import { isPro, PLANS, PREVIEW, PRO_FEATURES } from '@/lib/pro';
+import { isPro, PLANS, PREVIEW, PRO_EXTRAS, PRO_HEADLINES } from '@/lib/pro';
 import { radius, spacing } from '@/theme';
 
 const GOLD = '#FFD66B';
@@ -75,19 +75,33 @@ export default function ProScreen() {
         </LinearGradient>
 
         <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
-          {PRO_FEATURES.map((f, i) => (
-            <FadeIn key={f.title} delay={80 + i * 60}>
-              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
-                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,214,107,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={f.icon as never} size={18} color={GOLD} />
+          <FadeIn delay={80} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {PRO_HEADLINES.map((f) => (
+              <View key={f.title} style={{ width: '48%', flexGrow: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', gap: 8 }}>
+                <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: 'rgba(255,214,107,0.14)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={f.icon as never} size={17} color={GOLD} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <T weight="800" color="#fff">{f.title}</T>
-                  <T size={13} color="rgba(255,255,255,0.65)" style={{ marginTop: 2 }}>{f.body}</T>
+                <View>
+                  <T weight="800" color="#fff" numberOfLines={1}>{f.title}</T>
+                  <T size={12} color="rgba(255,255,255,0.6)" numberOfLines={1}>{f.line}</T>
                 </View>
               </View>
-            </FadeIn>
-          ))}
+            ))}
+          </FadeIn>
+
+          <FadeIn delay={140} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+            {PRO_EXTRAS.map((x) => (
+              <View key={x.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                <Ionicons name={x.icon as never} size={13} color={GOLD} />
+                <T size={12} weight="700" color="rgba(255,255,255,0.8)">{x.label}</T>
+              </View>
+            ))}
+          </FadeIn>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: spacing.xs }}>
+            <Ionicons name="heart" size={13} color="rgba(255,255,255,0.5)" />
+            <T size={12} color="rgba(255,255,255,0.5)">Support a growing app. No ads, no selling your data.</T>
+          </View>
 
           {!pro && (
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>

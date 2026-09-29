@@ -15,16 +15,20 @@ export function isPro(state: Pick<AppState, 'settings'>): boolean {
 /** Friends you can link without Pro. */
 export const FREE_FRIEND_LIMIT = 3;
 
-export const PRO_FEATURES: { icon: string; title: string; body: string }[] = [
-  { icon: 'camera', title: 'Snap a meal', body: 'Photograph your plate. AI finds every food, weighs the portions and logs the macros.' },
-  { icon: 'sparkles', title: 'AI Coach', body: 'Chat with an AI coach that sees your log, workouts and rank, and breaks down meal photos.' },
-  { icon: 'trending-up', title: 'Smart progression', body: 'Every set comes with a suggested weight and reps, based on how your last sessions went.' },
-  { icon: 'stats-chart', title: 'Deep stats', body: 'Estimated 1-rep max per lift, weekly sets per muscle and your strength trend over months.' },
-  { icon: 'body', title: 'Recovery map', body: 'See which muscles are fresh and which still need a day, so you know what to train.' },
-  { icon: 'restaurant', title: 'Meal plans', body: 'A week of meals that hit your calories and protein, with a ready shopping list.' },
-  { icon: 'people', title: 'Unlimited friends', body: `Link up with as many friends as you want (free: ${FREE_FRIEND_LIMIT}) and race them up the ranks.` },
-  { icon: 'paw', title: 'Pro pets and outfits', body: 'Dumbo and Blaze join your pets, Gold and Midnight join your wardrobe, and your chests get a little extra luck.' },
-  { icon: 'heart', title: 'Support a growing app', body: 'No ads and no selling your data. Pro pays for everything that comes next.' },
+/** The four reasons to buy, shown as tiles on the Pro screen. */
+export const PRO_HEADLINES: { icon: string; title: string; line: string }[] = [
+  { icon: 'camera', title: 'Snap a meal', line: 'Photo in, macros out' },
+  { icon: 'trending-up', title: 'Smart progression', line: 'Know what to lift next' },
+  { icon: 'restaurant', title: 'Meal plans', line: 'Your week, planned' },
+  { icon: 'sparkles', title: 'AI Coach', line: 'Answers from your data' },
+];
+
+/** Everything else Pro adds, shown as small chips under the tiles. */
+export const PRO_EXTRAS: { icon: string; label: string }[] = [
+  { icon: 'stats-chart', label: 'Deep stats' },
+  { icon: 'body', label: 'Recovery map' },
+  { icon: 'people', label: `Unlimited friends (free: ${FREE_FRIEND_LIMIT})` },
+  { icon: 'paw', label: 'Pro pets and outfits' },
 ];
 
 export const PLANS = [

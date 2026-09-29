@@ -27,7 +27,16 @@ export function useTween(target: number, duration = 900, delay = 0): number {
       if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    // Browsers pause animation frames in background or throttled tabs; never leave a number stuck mid-way.
+    const settle = setTimeout(() => {
+      cancelAnimationFrame(raf);
+      current.current = target;
+      setValue(target);
+    }, delay + duration + 250);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(settle);
+    };
   }, [target, duration, delay]);
 
   return value;

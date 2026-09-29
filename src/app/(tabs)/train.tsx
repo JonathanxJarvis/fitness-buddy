@@ -11,7 +11,7 @@ import { stateProgression } from '@/lib/progression';
 import { unreadCount } from '@/lib/social';
 import { RankBadge } from '@/components/RankBadge';
 import { TodayPlan } from '@/components/plan/TodayPlan';
-import { planDay, planSessions, SESSIONS, type Session } from '@/lib/plan';
+import { planDay, planSessions, type Session } from '@/lib/plan';
 import { doneSets, findExercise, routineFromWorkout } from '@/lib/training';
 import type { Routine } from '@/lib/types';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
@@ -65,8 +65,6 @@ function LinkRow({ icon, title, subtitle, onPress, first }: { icon: IconName; ti
   );
 }
 
-const MINE = '#2BA89A';
-
 /** Your own routine behind a session, to edit; a built-in opens the builder pre-filled. */
 function editSession(s: Session, routines: Routine[]) {
   const mine = s.id.startsWith('r:') ? s.routine : routines.find((r) => r.name.trim().toLowerCase() === s.name.toLowerCase());
@@ -116,6 +114,22 @@ function WorkoutCard({ s, badge, onStart, onEdit }: { s: Session; badge?: { labe
   );
 }
 
+/** One compact line per recent session: name, when, and a small play button to do it again. */
+function LatestRow({ s, date, first, onStart }: { s: Session; date: string; first: boolean; onStart: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: first ? 0 : 1, borderTopColor: colors.border }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <T weight="700" numberOfLines={1}>{s.name}</T>
+        <T size={12} muted numberOfLines={1}>{prettyDate(date)} · {s.routine.exercises.length} exercises</T>
+      </View>
+      <PressScale onPress={onStart} accessibilityRole="button" accessibilityLabel={`Do ${s.name} again`} style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft }}>
+        <Ionicons name="play" size={14} color={colors.primary} />
+      </PressScale>
+    </View>
+  );
+}
+
 function Heading({ title, hint, right }: { title: string; hint?: string; right?: React.ReactNode }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: spacing.md, marginBottom: spacing.sm }}>
@@ -145,18 +159,16 @@ export default function Train() {
   // Derived from the plan every render, so a new plan brings its own workouts.
   const planned = useMemo(() => planSessions(state), [state.plan, state.routines]); // eslint-disable-line react-hooks/exhaustive-deps
   const shownNames = new Set(planned.map((s) => s.name.trim().toLowerCase()));
-  const saved: Session[] = state.routines
-    .filter((r) => !shownNames.has(r.name.trim().toLowerCase()))
-    .map((r) => ({ id: `r:${r.id}`, name: r.name, short: '', color: SESSIONS.find((x) => x.name.toLowerCase() === r.name.trim().toLowerCase())?.color ?? MINE, routine: r }));
-  saved.forEach((s) => shownNames.add(s.name.trim().toLowerCase()));
-  // Recent sessions you haven't saved as a workout: one tap to do them again.
-  const latest: Session[] = [];
+  // Recent sessions outside the plan: one tap to do them again.
+  const clearedAt = state.settings.latestClearedAt ?? 0;
+  const latest: { s: Session; date: string }[] = [];
   for (let i = state.workouts.length - 1; i >= 0 && latest.length < 3; i--) {
     const w = state.workouts[i];
     const key = w.name.trim().toLowerCase();
+    if (w.startedAt <= clearedAt) break;
     if (!w.exercises.length || doneSets(w) === 0 || shownNames.has(key)) continue;
     shownNames.add(key);
-    latest.push({ id: `w:${w.id}`, name: w.name, short: '', color: colors.primary, routine: routineFromWorkout(w, `w:${w.id}`) });
+    latest.push({ s: { id: `w:${w.id}`, name: w.name, short: '', color: colors.primary, routine: routineFromWorkout(w, `w:${w.id}`) }, date: w.date });
   }
   const doneToday = new Set(state.workouts.filter((w) => w.date === today && doneSets(w) > 0).map((w) => w.name.trim().toLowerCase()));
   const badgeFor = (s: Session): { label: string; icon?: IconName } | undefined =>
@@ -240,21 +252,21 @@ export default function Train() {
         </FadeIn>
       )}
 
-      {saved.length > 0 && (
-        <FadeIn delay={180}>
-          <Heading title={planned.length ? 'Your other workouts' : 'Your workouts'} />
-          {saved.map((s) => (
-            <WorkoutCard key={s.id} s={s} badge={badgeFor(s)} onStart={() => startOrAsk(s.routine)} onEdit={() => editSession(s, state.routines)} />
-          ))}
-        </FadeIn>
-      )}
-
       {latest.length > 0 && (
         <FadeIn delay={190}>
-          <Heading title="Latest workouts" hint="Do one again with the same exercises" />
-          {latest.map((s) => (
-            <WorkoutCard key={s.id} s={s} onStart={() => startOrAsk(s.routine)} />
-          ))}
+          <Heading
+            title="Latest workouts"
+            right={
+              <Pressable onPress={() => dispatch({ type: 'updateSettings', settings: { latestClearedAt: Date.now() } })} accessibilityRole="button" accessibilityLabel="Clear latest workouts" hitSlop={8}>
+                <T size={13} weight="800" color={colors.textMuted}>Clear</T>
+              </Pressable>
+            }
+          />
+          <Card style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.md }}>
+            {latest.map(({ s, date }, i) => (
+              <LatestRow key={s.id} s={s} date={date} first={i === 0} onStart={() => startOrAsk(s.routine)} />
+            ))}
+          </Card>
         </FadeIn>
       )}
 

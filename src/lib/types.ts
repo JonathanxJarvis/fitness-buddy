@@ -148,6 +148,8 @@ export type FoodRegion = 'de' | 'us' | 'world';
 export interface Settings {
   /** Preview builds only: show a maxed-out rank (default on in previews). */
   previewMax?: boolean;
+  /** Train tab hides workouts started before this time from "Latest workouts" (history is kept). */
+  latestClearedAt?: number;
   units: UnitSystem;
   foodRegion: FoodRegion;
   theme: ThemePref;

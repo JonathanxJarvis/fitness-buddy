@@ -182,12 +182,25 @@ export function stageProgress(score: number): number {
 // ---------- XP & levels ----------
 
 /** XP for one finished workout, given the workouts before it (for PRs). */
+/** Minutes a workout lasted, or null for old workouts saved without an end time. */
+export function workoutMinutes(w: Workout): number | null {
+  return w.endedAt && w.endedAt > w.startedAt ? (w.endedAt - w.startedAt) / 60000 : null;
+}
+
+// A real set plus a short rest takes at least this long, so tapping sets done in a rush earns little.
+const SECONDS_PER_SET = 40;
+
 export function workoutXp(w: Workout, earlier: Workout[]): number {
   const sets = doneSets(w);
   if (!sets) return 0;
-  const volumeBonus = Math.min(60, Math.floor(workoutVolume(w) / 500) * 5);
-  const prs = prExercises(w, earlier).length;
-  return 40 + sets * 8 + volumeBonus + prs * 60;
+  const minutes = workoutMinutes(w);
+  // Full base XP from 25 minutes on, nothing under 3.
+  const time = minutes === null ? 1 : Math.min(1, Math.max(0, (minutes - 3) / 22));
+  const countedSets = minutes === null ? sets : Math.min(sets, Math.floor((minutes * 60) / SECONDS_PER_SET));
+  const volumeBonus = Math.min(60, Math.floor(workoutVolume(w) / 500) * 5) * time;
+  const durationBonus = minutes === null ? 0 : Math.min(48, Math.floor(minutes / 10) * 8);
+  const prs = minutes === null || minutes >= 5 ? prExercises(w, earlier).length : 0;
+  return Math.round(40 * time + countedSets * 8 + volumeBonus + durationBonus + prs * 60);
 }
 
 export function totalXp(workouts: Workout[]): number {

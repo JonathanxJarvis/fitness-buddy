@@ -6,6 +6,7 @@ import { ProMark } from '@/components/ProMark';
 import { ProPreview } from '@/components/stats/ProPreview';
 import { RecoveryBody, RecoveryLegend, SAMPLE_RECOVERY, recoveryColors, recoveryInk } from '@/components/recovery/RecoveryMap';
 import { useRecoveryToday } from '@/components/recovery/useRecoveryToday';
+import { Dropdown } from '@/components/Dropdown';
 import { useStore } from '@/store/StoreProvider';
 import { isPro } from '@/lib/pro';
 import { prettyDate, toKey } from '@/lib/dates';
@@ -135,17 +136,13 @@ export default function RecoveryScreen() {
         </FadeIn>
       )}
 
-      <FadeIn delay={140}>
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <T size={17} weight="800">Give it a day</T>
-            <T size={12} muted>{sore.length ? `${sore.length} muscle${sore.length === 1 ? '' : 's'}` : ''}</T>
-          </View>
+      <FadeIn delay={140} style={{ gap: spacing.sm }}>
+        <Dropdown title="Needs rest" dot={tint.tired} summary={sore.length ? `${sore.length} muscle${sore.length === 1 ? '' : 's'}` : 'None'}>
           {sore.length === 0 ? (
-            <T muted size={14} style={{ marginTop: 6 }}>Nothing needs rest right now.</T>
+            <T muted size={14}>Nothing needs rest right now.</T>
           ) : (
             sore.map((r, i) => (
-              <View key={r.region} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border, marginTop: i ? 0 : 6 }}>
+              <View key={r.region} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
                 <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: tint[r.state] }} />
                 <View style={{ flex: 1 }}>
                   <T weight="700">{REGION_LABEL[r.region]}</T>
@@ -161,15 +158,8 @@ export default function RecoveryScreen() {
               </View>
             ))
           )}
-        </Card>
-      </FadeIn>
-
-      <FadeIn delay={200}>
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-            <T size={17} weight="800">Ready to train</T>
-            <T size={12} muted>{fresh.length} muscles</T>
-          </View>
+        </Dropdown>
+        <Dropdown title="Ready to train" dot={tint.fresh} summary={`${fresh.length} muscle${fresh.length === 1 ? '' : 's'}`}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {fresh.map((r: MuscleRegion) => (
               <View key={r} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.cardAlt }}>
@@ -178,12 +168,11 @@ export default function RecoveryScreen() {
               </View>
             ))}
           </View>
-        </Card>
+        </Dropdown>
       </FadeIn>
 
       <T muted size={12} center style={{ marginTop: spacing.sm, paddingHorizontal: spacing.lg, lineHeight: 17 }}>
-        Each set you finish tires the muscles it works (helpers count half). That fades over about 3 days for big muscles like legs, back and chest, 2 days for arms
-        and front delts and 1½ days for small ones. It’s a guide, not a rule: how you feel wins.
+        Big muscles recover in about 3 days, arms in 2, small ones in 1½. It’s a guide: how you feel wins.
       </T>
     </Screen>
   );

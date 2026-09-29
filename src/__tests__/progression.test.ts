@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { levelFor, liftResults, progression, STAGES, stageFor, standardScore, strengthScore, totalXp, xpForLevel } from '@/lib/progression';
+import { levelFor, liftResults, progression, STAGES, stageFor, standardScore, strengthScore, totalXp, workoutXp, xpForLevel } from '@/lib/progression';
 import type { Workout } from '@/lib/types';
 
 const w = (id: string, date: string, exerciseId: string, kg: number, reps: number, sets = 3): Workout => ({
@@ -59,8 +59,19 @@ describe('stages and levels', () => {
   it('gives XP for sets, PRs and consistent weeks', () => {
     const a = w('a', '2026-09-01', 'bench-press', 60, 8);
     const b = w('b', '2026-09-03', 'bench-press', 65, 8);
-    expect(totalXp([a])).toBe(40 + 24 + 10); // 1,440 kg volume earns 10 bonus XP
-    expect(totalXp([a, b])).toBeGreaterThan(2 * 74 + 50); // b is a PR (+60)
+    expect(totalXp([a])).toBe(40 + 24 + 10 + 48); // 1,440 kg volume earns 10, an hour earns 48
+    expect(totalXp([a, b])).toBeGreaterThan(2 * 122 + 50); // b is a PR (+60)
+  });
+
+  it('scales workout XP with the time actually trained', () => {
+    const hour = w('h', '2026-09-01', 'squat', 100, 5, 5);
+    const rushed = { ...hour, endedAt: hour.startedAt + 60_000 };
+    const short = { ...hour, endedAt: hour.startedAt + 15 * 60_000 };
+    const legacy = { ...hour, endedAt: undefined };
+    expect(workoutXp(rushed, [])).toBeLessThanOrEqual(8);
+    expect(workoutXp(short, [])).toBeLessThan(workoutXp(hour, []));
+    expect(workoutXp(rushed, [])).toBeLessThan(workoutXp(short, []) / 4);
+    expect(workoutXp(legacy, [])).toBeGreaterThan(0);
   });
 
   it('tracks growth over weeks', () => {

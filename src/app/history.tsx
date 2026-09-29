@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Badge, Card, EmptyState, Screen, SectionTitle, T } from '@/components/ui';
 import { FadeIn } from '@/components/motion';
+import { Dropdown } from '@/components/Dropdown';
 import { useStore } from '@/store/StoreProvider';
 import { MONTH_NAMES, shortDate } from '@/lib/dates';
 import { countPRs, durationMinutes, findExercise, personalRecords, workoutVolume } from '@/lib/training';
@@ -50,6 +51,25 @@ export default function History() {
 
   return (
     <Screen>
+      {prs.length > 0 && (
+        <View style={{ marginBottom: spacing.sm }}>
+          <Dropdown title="Personal records" summary={`${prs.length} lift${prs.length === 1 ? '' : 's'}`}>
+            {prs.map(([id, p], i) => (
+              <Pressable
+                key={id}
+                onPress={() => router.push({ pathname: '/exercise/[id]', params: { id } })}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}
+              >
+                <Ionicons name="trophy" size={16} color={nutrientColors.carbs} />
+                <T weight="700" style={{ flex: 1 }} numberOfLines={1}>{findExercise(id, state.customExercises)?.name ?? id}</T>
+                <T size={13} muted>{formatWeight(p.kg, units, 0)} × {p.reps}</T>
+                <T size={13} weight="800" style={{ width: 70, textAlign: 'right' }}>{formatWeight(p.e1rm, units, 0)}</T>
+              </Pressable>
+            ))}
+            <T size={11} muted style={{ marginTop: 4 }}>Right column is your estimated one-rep max.</T>
+          </Dropdown>
+        </View>
+      )}
       {months.map((m, mi) => (
         <FadeIn key={m.key} delay={Math.min(mi, 4) * 60}>
           <SectionTitle>{m.label}</SectionTitle>
@@ -83,26 +103,6 @@ export default function History() {
         </FadeIn>
       ))}
 
-      {prs.length > 0 && (
-        <>
-          <SectionTitle>Personal records</SectionTitle>
-          <Card style={{ paddingVertical: spacing.sm }}>
-            {prs.map(([id, p], i) => (
-              <Pressable
-                key={id}
-                onPress={() => router.push({ pathname: '/exercise/[id]', params: { id } })}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}
-              >
-                <Ionicons name="trophy" size={16} color={nutrientColors.carbs} />
-                <T weight="700" style={{ flex: 1 }} numberOfLines={1}>{findExercise(id, state.customExercises)?.name ?? id}</T>
-                <T size={13} muted>{formatWeight(p.kg, units, 0)} × {p.reps}</T>
-                <T size={13} weight="800" style={{ width: 70, textAlign: 'right' }}>{formatWeight(p.e1rm, units, 0)}</T>
-              </Pressable>
-            ))}
-            <T size={11} muted style={{ marginTop: 4 }}>Right column is your estimated one-rep max.</T>
-          </Card>
-        </>
-      )}
     </Screen>
   );
 }
