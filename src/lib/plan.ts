@@ -86,7 +86,10 @@ export function sessionChoices(state: Pick<AppState, 'plan' | 'routines'>): Sess
   return [...own, ...mine];
 }
 
-const routineSession = (r: Routine): Session => ({ id: `r:${r.id}`, name: r.name, short: r.name.slice(0, 4).toUpperCase(), color: '#2BA89A', routine: r });
+/** Color for your own routines; the theme swaps it for the Simple look. */
+export const SESSION_TINT = { routine: '#2BA89A' };
+
+const routineSession = (r: Routine): Session => ({ id: `r:${r.id}`, name: r.name, short: r.name.slice(0, 4).toUpperCase(), color: SESSION_TINT.routine, routine: r });
 
 /**
  * The session behind an id. Your own routine wins when its name matches a

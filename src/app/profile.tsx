@@ -19,8 +19,10 @@ import { hasBuiltInAi } from '@/lib/ai';
 import { isPro, mascotSkin, petName, petSpecies, PREVIEW } from '@/lib/pro';
 import { Kettle, type Species } from '@/components/Mascot';
 import { HealthRow } from '@/components/HealthRow';
+import { AccentChoice, LookChoice, TrainingChoice } from '@/components/personalize/Personalize';
+import { planRoutineChanges, restForGoal } from '@/lib/trainingPrefs';
 import { spacing, useTheme } from '@/theme';
-import type { AvatarConfig, FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
+import type { AvatarConfig, FoodRegion, ThemePref, TrainingPrefs, UnitSystem } from '@/lib/types';
 
 const chevron = (color: string) => <Ionicons name="chevron-forward" size={18} color={color} />;
 
@@ -46,6 +48,22 @@ export default function ProfileScreen() {
   const skin = mascotSkin(state);
   const stage = stateProgression(state, todayKey()).stage.index;
   const me = { name: p.name || 'Lifter', avatar: state.settings.avatar, photo: state.settings.photo };
+  const training = state.settings.training ?? {};
+  const planChanges = planRoutineChanges(state, training);
+  const planOutdated = planChanges.save.length + planChanges.remove.length > 0;
+  const [planUpdated, setPlanUpdated] = useState(false);
+
+  const setTraining = (next: TrainingPrefs, part: string) => {
+    dispatch({ type: 'updateSettings', settings: { training: next } });
+    const rest = part === 'goal' ? restForGoal(next.goal) : undefined;
+    if (rest) dispatch({ type: 'setRestSeconds', seconds: rest });
+    setPlanUpdated(false);
+  };
+  const updatePlanWorkouts = () => {
+    for (const routine of planChanges.save) dispatch({ type: 'saveRoutine', routine });
+    for (const id of planChanges.remove) dispatch({ type: 'deleteRoutine', id });
+    setPlanUpdated(true);
+  };
 
   const choosePhoto = async () => {
     setPhotoError(null);
@@ -225,8 +243,16 @@ export default function ProfileScreen() {
           ]}
           style={{ marginBottom: 6 }}
         />
-        <T size={12} muted style={{ marginBottom: spacing.lg }}>Which country’s supermarket products show first in search. Barcode scans work for every country.</T>
-        <T weight="700" style={{ marginBottom: spacing.sm }}>Appearance</T>
+        <T size={12} muted>Which country’s supermarket products show first in search. Barcode scans work for every country.</T>
+      </Card>
+
+      <Card>
+        <T weight="800" size={17} style={{ marginBottom: spacing.md }}>Personalize</T>
+        <T weight="700" style={{ marginBottom: spacing.sm }}>Look</T>
+        <LookChoice look={state.settings.look ?? 'colorful'} accent={state.settings.accent ?? 'emerald'} onChange={(l) => dispatch({ type: 'updateSettings', settings: { look: l } })} />
+        <T weight="700" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>Accent color</T>
+        <AccentChoice accent={state.settings.accent ?? 'emerald'} onChange={(a) => dispatch({ type: 'updateSettings', settings: { accent: a } })} />
+        <T weight="700" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>Appearance</T>
         <Segmented<ThemePref>
           value={state.settings.theme}
           onChange={(t) => dispatch({ type: 'updateSettings', settings: { theme: t } })}
@@ -236,6 +262,25 @@ export default function ProfileScreen() {
             { key: 'dark', label: 'Dark' },
           ]}
         />
+        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.lg }} />
+        <T weight="700" style={{ marginBottom: spacing.sm }}>Training</T>
+        <TrainingChoice value={training} onChange={setTraining} />
+        {state.plan && (planOutdated || planUpdated) ? (
+          <View style={{ marginTop: spacing.lg }}>
+            <Button
+              small
+              variant="secondary"
+              icon={planUpdated ? 'checkmark' : 'barbell-outline'}
+              title={planUpdated ? 'Plan workouts updated' : 'Update my plan workouts'}
+              onPress={updatePlanWorkouts}
+              disabled={planUpdated}
+              style={{ alignSelf: 'flex-start' }}
+            />
+            <T size={12} muted style={{ marginTop: 6 }}>
+              {planUpdated ? 'Exercises, sets and reps now match your choices.' : 'Swaps exercises, sets and reps to fit. Workouts you built yourself stay as they are.'}
+            </T>
+          </View>
+        ) : null}
       </Card>
 
       <Card>

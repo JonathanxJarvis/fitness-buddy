@@ -1,5 +1,5 @@
 import type { Mood } from '@/components/pet/Face';
-import type { GoalType, TrainingPlan } from '@/lib/types';
+import type { GoalType, LookPref, TrainingPlan } from '@/lib/types';
 import { planFromSplit } from '@/lib/plan';
 
 /** A short pep line or quote shown under the pet's speech bubble. */
@@ -68,6 +68,26 @@ export const DAYS_REPLY: Record<number, string> = {
   6: 'Six days. Push, pull, legs, twice. Bold.',
 };
 
+/** What the pet says for a training choice, keyed "part:value". */
+export const TRAINING_REPLY: Record<string, { reply: string; mood: Mood }> = {
+  'goal:muscle': { reply: 'Muscle it is. Steady volume, good form.', mood: 'pumped' },
+  'goal:strength': { reply: 'Heavy and focused. I’ll give you time to rest between sets.', mood: 'pumped' },
+  'goal:fitness': { reply: 'A bit of everything. Smart and sustainable.', mood: 'happy' },
+  'goal:fat': { reply: 'Higher reps, shorter rests. We’ll keep you moving.', mood: 'happy' },
+  'place:gym': { reply: 'The full toolbox. Nice.', mood: 'wink' },
+  'place:home': { reply: 'Dumbbells at home. I’ll pick moves that fit.', mood: 'happy' },
+  'place:bodyweight': { reply: 'No gear, no excuses. I like it.', mood: 'proud' },
+  'minutes:30': { reply: 'Short and sharp. I’ll keep it to the essentials.', mood: 'happy' },
+  'minutes:45': { reply: 'Forty-five minutes. Plenty to get real work done.', mood: 'happy' },
+  'minutes:60': { reply: 'A full hour. Room for everything.', mood: 'pumped' },
+  'minutes:75': { reply: 'Long sessions. You’re serious about this.', mood: 'pumped' },
+};
+
+export const LOOK_REPLY: Record<LookPref, { reply: string; mood: Mood }> = {
+  colorful: { reply: 'Bright and lively. Every number gets its own color.', mood: 'happy' },
+  simple: { reply: 'Clean and calm. Less color, same me.', mood: 'wink' },
+};
+
 /**
  * Short edit flow when a profile exists, the full new-user flow otherwise,
  * or when the route asks for it with `?fresh=1` ("Redo onboarding").
@@ -127,6 +147,10 @@ export const PEP: Record<string, Pep[]> = {
     { text: 'Consistency beats intensity. Pick what you can keep.' },
     { text: 'Energy and persistence conquer all things.', by: 'Benjamin Franklin' },
   ],
+  training: [
+    { text: 'The best workout is the one you actually do.' },
+    { text: 'Train where you are, with what you have.' },
+  ],
   obstacle: [
     { text: 'Name the obstacle and it gets smaller.' },
     { text: 'Fall seven times, stand up eight.', by: 'Japanese proverb' },
@@ -134,6 +158,10 @@ export const PEP: Record<string, Pep[]> = {
   sleep: [
     { text: 'Rest is not idleness.', by: 'John Lubbock' },
     { text: 'Muscles are built in the gym and finished in bed.' },
+  ],
+  look: [
+    { text: 'Make it yours. You’ll open it every day.' },
+    { text: 'Simplicity is the ultimate sophistication.', by: 'Leonardo da Vinci' },
   ],
   plan: [
     { text: 'Small steps, every day. That’s the whole secret.' },

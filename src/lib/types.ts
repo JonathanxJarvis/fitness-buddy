@@ -132,6 +132,20 @@ export interface Goals {
 
 export type UnitSystem = 'us' | 'metric';
 export type ThemePref = 'system' | 'light' | 'dark';
+/** Colorful (default) or Simple: calm, mostly monochrome with one accent. */
+export type LookPref = 'colorful' | 'simple';
+export type AccentKey = 'emerald' | 'blue' | 'violet' | 'orange' | 'graphite';
+
+export type TrainingGoal = 'muscle' | 'strength' | 'fitness' | 'fat';
+export type TrainingPlace = 'gym' | 'home' | 'bodyweight';
+
+/** Optional training preferences; seed plan workouts and rest times. */
+export interface TrainingPrefs {
+  goal?: TrainingGoal;
+  place?: TrainingPlace;
+  /** Preferred session length in minutes (30, 45, 60 or 75 for 75+). */
+  minutes?: number;
+}
 
 export interface ReminderSettings {
   meals: boolean;
@@ -153,6 +167,11 @@ export interface Settings {
   units: UnitSystem;
   foodRegion: FoodRegion;
   theme: ThemePref;
+  /** Colorful (default) or Simple look. */
+  look?: LookPref;
+  /** Accent color (default emerald). */
+  accent?: AccentKey;
+  training?: TrainingPrefs;
   reminders: ReminderSettings;
   /** Kettle the mascot pops up to cheer you on (default on). */
   mascot?: boolean;

@@ -6,6 +6,7 @@ import { FadeIn } from '@/components/motion';
 import { PETS, type Mood, type Species } from '@/components/Mascot';
 import { PetGuide } from '@/components/onboarding/PetGuide';
 import { ChoiceRow, NumberPicks, TrendGlyph, WeekStrip } from '@/components/onboarding/Choices';
+import { AccentChoice, LookChoice, TrainingChoice } from '@/components/personalize/Personalize';
 import {
   ACTIVITY_REPLY,
   DAYS_REPLY,
@@ -13,8 +14,10 @@ import {
   GOAL_REPLY,
   MOTIVATIONS,
   OBSTACLES,
+  LOOK_REPLY,
   PEP,
   SLEEP,
+  TRAINING_REPLY,
   onboardingMode,
   planForDays,
   splitForDays,
@@ -26,7 +29,8 @@ import { ACTIVITY_LEVELS, calculateGoals } from '@/lib/nutrition';
 import { inToCm, lbToKg, kgToLb, cmToIn, weightUnit } from '@/lib/units';
 import { todayKey } from '@/lib/dates';
 import { findSplit } from '@/lib/plan';
-import type { ActivityLevel, GoalType, OnboardingAnswers, Profile, Settings, Sex, UnitSystem } from '@/lib/types';
+import { planRoutineChanges, restForGoal } from '@/lib/trainingPrefs';
+import type { ActivityLevel, GoalType, OnboardingAnswers, Profile, Settings, Sex, TrainingPrefs, UnitSystem } from '@/lib/types';
 
 const GOALS: { key: GoalType; label: string; dir: 'down' | 'flat' | 'up'; hint: string }[] = [
   { key: 'lose', label: 'Lose weight', dir: 'down', hint: 'Eat in a calorie deficit' },
@@ -37,8 +41,8 @@ const GOALS: { key: GoalType; label: string; dir: 'down' | 'flat' | 'up'; hint: 
 const RATES_KG = [0.25, 0.5, 0.75, 1];
 const DAYS = [2, 3, 4, 5, 6].map((d) => ({ key: d, label: String(d) }));
 
-type StepKey = 'hello' | 'petName' | 'body' | 'activity' | 'goal' | 'motivation' | 'experience' | 'days' | 'obstacle' | 'sleep' | 'plan';
-const NEW_STEPS: StepKey[] = ['hello', 'petName', 'body', 'activity', 'goal', 'motivation', 'experience', 'days', 'obstacle', 'sleep', 'plan'];
+type StepKey = 'hello' | 'petName' | 'body' | 'activity' | 'goal' | 'motivation' | 'experience' | 'days' | 'training' | 'obstacle' | 'sleep' | 'look' | 'plan';
+const NEW_STEPS: StepKey[] = ['hello', 'petName', 'body', 'activity', 'goal', 'motivation', 'experience', 'days', 'training', 'obstacle', 'sleep', 'look', 'plan'];
 const EDIT_STEPS: StepKey[] = ['hello', 'body', 'activity', 'goal', 'plan'];
 
 export default function Onboarding() {
@@ -76,6 +80,9 @@ export default function Onboarding() {
   const [days, setDays] = useState<number | undefined>(prev?.daysPerWeek);
   const [obstacle, setObstacle] = useState<string | undefined>(prev?.obstacle);
   const [sleep, setSleep] = useState<number | undefined>(prev?.sleepHours);
+  const [training, setTraining] = useState<TrainingPrefs>(state.settings.training ?? {});
+  const look = state.settings.look ?? 'colorful';
+  const accent = state.settings.accent ?? 'emerald';
 
   // What the pet says after you answer (cleared on each new step).
   const [reaction, setReaction] = useState<{ line: string; mood: Mood } | null>(null);
@@ -137,10 +144,17 @@ export default function Onboarding() {
       if (obstacle) answers.obstacle = obstacle;
       if (sleep !== undefined) answers.sleepHours = sleep;
       settings.onboarding = answers;
+      if (Object.keys(training).length) settings.training = training;
     }
     dispatch({ type: 'updateSettings', settings });
     dispatch({ type: 'setProfile', profile, goals, date: todayKey() });
-    if (makePlan) dispatch({ type: 'setPlan', plan: planForDays(days, todayKey()) });
+    if (makePlan) {
+      const plan = planForDays(days, todayKey());
+      dispatch({ type: 'setPlan', plan });
+      for (const routine of planRoutineChanges({ plan, routines: state.routines }, training).save) dispatch({ type: 'saveRoutine', routine });
+      const rest = restForGoal(training.goal);
+      if (rest) dispatch({ type: 'setRestSeconds', seconds: rest });
+    }
     if (editing && router.canGoBack()) router.back();
     else router.replace('/');
   };
@@ -161,8 +175,10 @@ export default function Onboarding() {
     motivation: { line: 'And what’s driving you? Knowing your why helps me cheer you on.', mood: 'happy' },
     experience: { line: 'How much training have you done before? No wrong answers.', mood: 'happy' },
     days: { line: 'How many days a week can you realistically train? Be honest, I will be.', mood: 'wink' },
+    training: { line: 'How do you like to train? I’ll shape your workouts to fit.', mood: 'pumped' },
     obstacle: { line: 'What usually gets in the way? I’ll plan around it.', mood: 'happy' },
-    sleep: { line: 'Last question. How many hours do you sleep on a typical night?', mood: 'sleepy' },
+    sleep: { line: 'How many hours do you sleep on a typical night?', mood: 'sleepy' },
+    look: { line: 'Last one. How should the app look? Bright or calm, your call.', mood: 'wink' },
     plan: {
       line: editing
         ? 'Here’s your updated plan. Looking good.'
@@ -369,6 +385,19 @@ export default function Onboarding() {
         )}
       </View>
     ),
+    training: (
+      <View>
+        <TrainingChoice
+          value={training}
+          onChange={(next, part) => {
+            setTraining(next);
+            const r = TRAINING_REPLY[`${part}:${next[part]}`];
+            if (r) react(r.reply, r.mood);
+          }}
+        />
+        <T muted size={13} style={{ marginTop: spacing.md }}>Your workouts, reps and rest timer follow these. Change them any time in your profile.</T>
+      </View>
+    ),
     obstacle: (
       <View>
         {OBSTACLES.map((o, i) => (
@@ -380,6 +409,20 @@ export default function Onboarding() {
       <View>
         <NumberPicks options={SLEEP} value={sleep} onChange={(h) => pick(SLEEP, h, setSleep)} />
         <T muted size={13} center style={{ marginTop: spacing.sm }}>hours a night</T>
+      </View>
+    ),
+    look: (
+      <View>
+        <LookChoice
+          look={look}
+          accent={accent}
+          onChange={(l) => {
+            dispatch({ type: 'updateSettings', settings: { look: l } });
+            react(LOOK_REPLY[l].reply, LOOK_REPLY[l].mood);
+          }}
+        />
+        <T muted size={13} weight="600" style={{ marginTop: spacing.lg, marginBottom: 6 }}>Accent color</T>
+        <AccentChoice accent={accent} onChange={(a) => dispatch({ type: 'updateSettings', settings: { accent: a } })} />
       </View>
     ),
     plan: goals ? (
@@ -430,7 +473,7 @@ export default function Onboarding() {
   };
 
   // The extra questions can be skipped; the button says so until you answer.
-  const extras: Partial<Record<StepKey, unknown>> = { motivation, experience, days, obstacle, sleep };
+  const extras: Partial<Record<StepKey, unknown>> = { motivation, experience, days, obstacle, sleep, training: Object.keys(training).length ? training : undefined };
   const optional = !editing && key in extras;
   const answered = extras[key] !== undefined;
   const canNext = key !== 'body' || bodyValid;
