@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Button, Card, Field, IconButton, IconTile, ProgressBar, Segmented, Sheet, T, type IconName } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
 import { ProMark } from '@/components/ProMark';
-import { MealImage } from '@/components/meal/MealImage';
+import { MEAL_PHOTOS, MealImage } from '@/components/meal/MealImage';
 import { resolveFavoriteIds } from '@/components/meal/favoritesAi';
 import { MEAL_ACCENT } from '@/components/today/MealIcons';
 import { useStore } from '@/store/StoreProvider';
@@ -691,6 +691,11 @@ export default function MealPlanScreen() {
         ) : null}
 
         {tab === 'shop' && <ShoppingTab plan={plan} />}
+        {tab !== 'shop' && Object.keys(MEAL_PHOTOS).length > 0 ? (
+          <T size={11} muted center onPress={() => router.push('/photo-credits' as never)} style={{ marginTop: spacing.lg }}>
+            Photos: Flickr photographers, CC BY. See credits
+          </T>
+        ) : null}
       </ScrollView>
 
       <Sheet visible={!!swap} onClose={() => setSwap(null)} title={swap ? `Swap ${slotLabel(plan.days[swap.day].meals[swap.meal].slot).toLowerCase()}` : undefined}>

@@ -94,6 +94,7 @@ function RootNavigator() {
         <Stack.Screen name="pro" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="progress" options={{ title: 'Progress' }} />
         <Stack.Screen name="meal-plan" options={{ headerShown: false }} />
+        <Stack.Screen name="photo-credits" options={{ title: 'Photo credits' }} />
         <Stack.Screen name="recovery" options={{ title: 'Recovery' }} />
         <Stack.Screen name="pets" options={{ title: 'Your pet', presentation: 'modal' }} />
         <Stack.Screen name="friend/[id]" options={{ headerShown: false }} />

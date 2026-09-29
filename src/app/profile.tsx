@@ -296,6 +296,9 @@ export default function ProfileScreen() {
       <T muted size={12} center style={{ marginTop: spacing.md }}>
         Fitness Buddy stores your logs on this phone only. Food data comes from USDA FoodData Central and Open Food Facts (openfoodfacts.org, ODbL).
       </T>
+      <T size={12} center color={colors.primary} weight="700" onPress={() => router.push('/photo-credits' as never)} style={{ marginTop: spacing.sm }}>
+        Meal photo credits
+      </T>
 
       <Sheet visible={pictureOpen} onClose={() => setPictureOpen(false)} title="Profile picture">
         <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>

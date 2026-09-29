@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { T, type IconName } from '@/components/ui';
@@ -76,7 +76,11 @@ export function MealImage({
   const box: StyleProp<ViewStyle> = [frame, style];
   const photo = MEAL_PHOTOS[mealId];
   if (photo) {
-    return <Image source={photo} resizeMode="cover" accessibilityIgnoresInvertColors style={[frame, { backgroundColor: colors.cardAlt }, style as StyleProp<ImageStyle>]} />;
+    return (
+      <View style={[box, { backgroundColor: colors.cardAlt }]}>
+        <Image source={photo} resizeMode="cover" accessibilityIgnoresInvertColors style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+      </View>
+    );
   }
   const meal = findMeal(mealId);
   const { tint, icon } = meal ? mealFamily(meal) : FAMILIES.veg;
