@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Button, Card, IconButton, IconTile, ProgressBar, Segmented, Sheet, T, type IconName } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
 import { ProMark } from '@/components/ProMark';
+import { MealImage } from '@/components/meal/MealImage';
 import { MEAL_ACCENT } from '@/components/today/MealIcons';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
@@ -15,12 +16,15 @@ import { isPro } from '@/lib/pro';
 import { findMeal, INGREDIENTS } from '@/lib/meals';
 import {
   amountText,
+  applySwap,
   dayError,
   dayTotals,
   DIETS,
   generateMealPlan,
   itemsNutrients,
   newSeed,
+  PLAN_MODES,
+  PLAN_STYLES,
   plannedMealFood,
   shoppingAmount,
   shoppingList,
@@ -28,6 +32,8 @@ import {
   TOLERANCE,
   type MealDiet,
   type MealPlanState,
+  type PlanMode,
+  type PlanStyle,
   type PlanDay,
   type PlannedMeal,
   type ShoppingItem,
@@ -108,53 +114,79 @@ function MealBlock({
   const meal = findMeal(pm.mealId);
   const n = itemsNutrients(pm.items);
   const accent = MEAL_ACCENT[pm.slot];
+  const [open, setOpen] = useState(!!preview);
   if (!meal) return null;
   return (
-    <Card style={{ padding: spacing.lg, marginBottom: spacing.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accent }} />
-        <T size={11} weight="800" color={accent} style={{ letterSpacing: 0.8, flex: 1 }}>{slotLabel(pm.slot).toUpperCase()}</T>
-        <Ionicons name="time-outline" size={12} color={colors.textMuted} />
-        <T size={12} muted weight="600">{meal.prepMinutes} min</T>
-      </View>
-      <T size={16} weight="800">{meal.name}</T>
-      {meal.nameDe !== meal.name ? <T size={12} muted style={{ marginTop: 1 }}>{meal.nameDe}</T> : null}
-      <View style={{ marginTop: 8 }}>
-        <MacroLine kcal={n.calories} protein={n.protein} />
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-        {pm.items.map((it) => (
-          <View key={it.key} style={{ backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 4, flexDirection: 'row', gap: 4 }}>
-            <T size={12} weight="700">{amountText(it.key, it.grams)}</T>
-            <T size={12} muted>{it.key === 'egg' ? '' : shortName(it.key)}</T>
-          </View>
-        ))}
-      </View>
-      {!preview && (
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-          <PressScale
-            accessibilityRole="button"
-            accessibilityLabel={logged ? `${meal.name} logged today` : `Log ${meal.name}`}
-            disabled={logged}
-            onPress={onLog}
-            scaleTo={0.97}
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.pill, backgroundColor: logged ? colors.cardAlt : colors.primarySoft }}
-          >
-            <Ionicons name={logged ? 'checkmark-circle' : 'add-circle-outline'} size={17} color={logged ? colors.textMuted : colors.primary} />
-            <T size={14} weight="700" color={logged ? colors.textMuted : colors.primary}>{logged ? 'Logged today' : 'Log this meal'}</T>
-          </PressScale>
-          <PressScale
-            accessibilityRole="button"
-            accessibilityLabel={`Swap ${meal.name}`}
-            onPress={onSwap}
-            scaleTo={0.97}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
-          >
-            <Ionicons name="swap-horizontal" size={16} color={colors.text} />
-            <T size={14} weight="700">Swap</T>
-          </PressScale>
+    <Card style={{ padding: 0, marginBottom: spacing.md }}>
+      <View>
+        <MealImage mealId={pm.mealId} aspectRatio={2.2} rounded={0} iconSize={34} style={{ borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }} />
+        <View style={{ position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.card }}>
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: accent }} />
+          <T size={11} weight="800" color={accent} style={{ letterSpacing: 0.8 }}>{slotLabel(pm.slot).toUpperCase()}</T>
         </View>
-      )}
+        <View style={{ position: 'absolute', right: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.card }}>
+          <Ionicons name="time-outline" size={12} color={colors.textMuted} />
+          <T size={11} weight="700" muted>{meal.prepMinutes} min</T>
+        </View>
+      </View>
+      <View style={{ padding: spacing.lg }}>
+        <T size={17} weight="800">{meal.name}</T>
+        {meal.nameDe !== meal.name ? <T size={12} muted style={{ marginTop: 1 }}>{meal.nameDe}</T> : null}
+        <View style={{ marginTop: 8 }}>
+          <MacroLine kcal={n.calories} protein={n.protein} />
+        </View>
+        {!preview && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            accessibilityLabel={open ? 'Hide ingredients' : 'Show ingredients'}
+            onPress={() => {
+              tap();
+              setOpen((o) => !o);
+            }}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' }}
+          >
+            <T size={13} weight="700" muted>{pm.items.length} ingredients</T>
+            <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} />
+          </Pressable>
+        )}
+        {open && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {pm.items.map((it) => (
+              <View key={it.key} style={{ backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 4, flexDirection: 'row', gap: 4 }}>
+                <T size={12} weight="700">{amountText(it.key, it.grams)}</T>
+                <T size={12} muted>{it.key === 'egg' ? '' : shortName(it.key)}</T>
+              </View>
+            ))}
+          </View>
+        )}
+        {!preview && (
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+            <PressScale
+              accessibilityRole="button"
+              accessibilityLabel={logged ? `${meal.name} logged today` : `Log ${meal.name}`}
+              disabled={logged}
+              onPress={onLog}
+              scaleTo={0.97}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.pill, backgroundColor: logged ? colors.cardAlt : colors.primarySoft }}
+            >
+              <Ionicons name={logged ? 'checkmark-circle' : 'add-circle-outline'} size={17} color={logged ? colors.textMuted : colors.primary} />
+              <T size={14} weight="700" color={logged ? colors.textMuted : colors.primary}>{logged ? 'Logged today' : 'Log this meal'}</T>
+            </PressScale>
+            <PressScale
+              accessibilityRole="button"
+              accessibilityLabel={`Swap ${meal.name}`}
+              onPress={onSwap}
+              scaleTo={0.97}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+            >
+              <Ionicons name="swap-horizontal" size={16} color={colors.text} />
+              <T size={14} weight="700">Swap</T>
+            </PressScale>
+          </View>
+        )}
+      </View>
     </Card>
   );
 }
@@ -240,10 +272,14 @@ function DaySummary({ plan, index }: { plan: MealPlanState; index: number }) {
 }
 
 function DietChips({ value, onChange }: { value: MealDiet; onChange: (d: MealDiet) => void }) {
+  return <ChoiceChips options={DIETS} value={value} onChange={onChange} />;
+}
+
+function ChoiceChips<K extends string>({ options, value, onChange }: { options: { key: K; label: string; icon?: string }[]; value: K; onChange: (k: K) => void }) {
   const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-      {DIETS.map((d) => {
+      {options.map((d) => {
         const active = d.key === value;
         return (
           <Pressable
@@ -254,13 +290,67 @@ function DietChips({ value, onChange }: { value: MealDiet; onChange: (d: MealDie
               tap();
               onChange(d.key);
             }}
-            style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: active ? colors.ink : colors.cardAlt }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: active ? colors.ink : colors.cardAlt }}
           >
+            {d.icon ? <Ionicons name={d.icon as IconName} size={14} color={active ? colors.onInk : colors.text} /> : null}
             <T size={13} weight="700" color={active ? colors.onInk : colors.text}>{d.label}</T>
           </Pressable>
         );
       })}
     </View>
+  );
+}
+
+interface PlanChoice {
+  mode: PlanMode;
+  style: PlanStyle;
+  diet: MealDiet;
+}
+
+function PlanChoices({ value, onChange }: { value: PlanChoice; onChange: (v: PlanChoice) => void }) {
+  const style = PLAN_STYLES.find((x) => x.key === value.style);
+  const mode = PLAN_MODES.find((x) => x.key === value.mode);
+  return (
+    <>
+      <T size={15} weight="800" style={{ marginBottom: spacing.sm }}>How much variety?</T>
+      <Segmented
+        options={PLAN_MODES.map((m) => ({ key: m.key, label: m.label }))}
+        value={value.mode}
+        onChange={(mode) => {
+          tap();
+          onChange({ ...value, mode });
+        }}
+      />
+      <T size={12} muted style={{ marginTop: 6, marginBottom: spacing.lg }}>{mode?.blurb}</T>
+      <T size={15} weight="800" style={{ marginBottom: spacing.sm }}>Style</T>
+      <ChoiceChips options={PLAN_STYLES} value={value.style} onChange={(s) => onChange({ ...value, style: s })} />
+      <T size={12} muted style={{ marginTop: 6, marginBottom: spacing.lg }}>{style?.blurb}</T>
+      <T size={15} weight="800" style={{ marginBottom: spacing.sm }}>What do you eat?</T>
+      <DietChips value={value.diet} onChange={(d) => onChange({ ...value, diet: d })} />
+    </>
+  );
+}
+
+const choiceOf = (plan: MealPlanState): PlanChoice => ({ mode: plan.mode ?? 'varied', style: plan.style ?? 'mix', diet: plan.diet });
+
+function PlanSummary({ plan, onPress }: { plan: MealPlanState; onPress: () => void }) {
+  const { colors } = useTheme();
+  const c = choiceOf(plan);
+  const parts = [PLAN_MODES.find((m) => m.key === c.mode)?.label, PLAN_STYLES.find((x) => x.key === c.style)?.label, DIETS.find((d) => d.key === c.diet)?.label];
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Plan settings"
+      onPress={() => {
+        tap();
+        onPress();
+      }}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md, opacity: pressed ? 0.6 : 1 })}
+    >
+      <Ionicons name="options-outline" size={15} color={colors.textMuted} />
+      <T size={13} weight="600" muted style={{ flex: 1 }} numberOfLines={1}>{parts.filter(Boolean).join(' · ')}</T>
+      <T size={13} weight="700" color={colors.primary}>Change</T>
+    </Pressable>
   );
 }
 
@@ -315,7 +405,9 @@ function ShoppingTab({ plan }: { plan: MealPlanState }) {
     <>
       <Card>
         <T size={16} weight="800">For {plan.days.length} days</T>
-        <T size={12} muted style={{ marginBottom: spacing.md }}>{all.length} items by aisle, as you buy them (dry pasta, raw meat)</T>
+        <T size={12} muted style={{ marginBottom: spacing.md }}>
+          {all.length} items{plan.mode === 'simple' ? ' · Simple plan' : ''} · as you buy them
+        </T>
         <ProgressBar value={done} max={Math.max(1, all.length)} color={colors.primary} height={6} />
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
           <T size={12} muted weight="600" style={{ flex: 1 }}>{done === all.length && all.length ? 'All done. Enjoy the week!' : `${done} of ${all.length} in the basket`}</T>
@@ -372,6 +464,7 @@ function LockedPreview() {
   const sample = generateMealPlan({ calories, protein, seed: 'preview', startDate: PREVIEW_START, days: 1 });
   const perks: { icon: IconName; text: string }[] = [
     { icon: 'scale-outline', text: 'Portions in grams, scaled to your goals' },
+    { icon: 'sparkles-outline', text: 'Famous styles, simple or varied weeks' },
     { icon: 'swap-horizontal', text: 'Swap any meal, the day stays on target' },
     { icon: 'cart-outline', text: 'A shopping list sorted by aisle' },
   ];
@@ -394,7 +487,7 @@ function LockedPreview() {
       <FadeIn delay={120}>
         <T size={12} weight="800" muted style={{ letterSpacing: 0.8, marginTop: spacing.md, marginBottom: spacing.sm }}>A DAY FROM YOUR PLAN</T>
         <View pointerEvents="none" style={{ opacity: 0.9 }}>
-          {sample.days[0]?.meals.slice(0, 3).map((pm, i) => (
+          {sample.days[0]?.meals.slice(0, 2).map((pm, i) => (
             <MealBlock key={i} pm={pm} preview />
           ))}
           <LinearGradient
@@ -419,14 +512,16 @@ export default function MealPlanScreen() {
   const plan = state.mealPlan;
   const today = todayKey();
   const [tab, setTab] = useState<'meals' | 'shop'>('meals');
-  const [diet, setDiet] = useState<MealDiet>(plan?.diet ?? defaultDiet(state));
+  const [choice, setChoice] = useState<PlanChoice>(() => (plan ? choiceOf(plan) : { mode: 'simple', style: 'mix', diet: defaultDiet(state) }));
+  const [settings, setSettings] = useState(false);
   const todayIndex = plan ? Math.round((fromKey(today).getTime() - fromKey(plan.startDate).getTime()) / 86400000) : -1;
   const [selected, setSelected] = useState(() => (todayIndex >= 0 && todayIndex < (plan?.days.length ?? 0) ? todayIndex : 0));
   const [swap, setSwap] = useState<{ day: number; meal: number } | null>(null);
 
-  const make = (d: MealDiet = diet) => {
+  const make = (c: PlanChoice = choice) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    const next = generateMealPlan({ ...goals, diet: d, seed: newSeed(), startDate: today });
+    setChoice(c);
+    const next = generateMealPlan({ ...goals, ...c, seed: newSeed(), startDate: today });
     dispatch({ type: 'setMealPlan', plan: next });
     setSelected(0);
   };
@@ -454,11 +549,10 @@ export default function MealPlanScreen() {
           <FadeIn>
             <T size={26} weight="800" style={{ marginBottom: 6 }}>Plan your week</T>
             <T size={15} muted style={{ marginBottom: spacing.lg }}>
-              Seven days of meals from everyday German supermarket food, portioned to hit {fmt(goals.calories)} kcal and {fmt(goals.protein)} g protein a day.
+              Everyday supermarket food, portioned to hit {fmt(goals.calories)} kcal and {fmt(goals.protein)} g protein a day.
             </T>
             <Card>
-              <T size={15} weight="800" style={{ marginBottom: spacing.md }}>What do you eat?</T>
-              <DietChips value={diet} onChange={setDiet} />
+              <PlanChoices value={choice} onChange={setChoice} />
             </Card>
             <Button title="Create my plan" icon="sparkles" onPress={() => make()} style={{ marginTop: spacing.sm }} />
             <T size={12} muted center style={{ marginTop: spacing.md }}>Works offline. You can swap any meal later.</T>
@@ -479,10 +573,14 @@ export default function MealPlanScreen() {
   };
 
   const options = swap ? swapOptions(plan, swap.day, swap.meal) : [];
+  const openSettings = () => {
+    setChoice(choiceOf(plan));
+    setSettings(true);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header right={<IconButton label="New plan" icon="refresh" color={colors.text} onPress={() => make(plan.diet)} />} />
+      <Header right={<IconButton label="Plan settings" icon="options-outline" color={colors.text} onPress={() => openSettings()} />} />
       <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
         <Segmented
           options={[
@@ -503,12 +601,13 @@ export default function MealPlanScreen() {
             <T size={13} weight="600" style={{ flex: 1 }}>
               {ended ? 'This plan has run its week. Ready for the next one?' : `Your goals changed to ${fmt(goals.calories)} kcal and ${fmt(goals.protein)} g protein.`}
             </T>
-            <Button small title={ended ? 'New week' : 'Update'} variant="secondary" onPress={() => make(plan.diet)} />
+            <Button small title={ended ? 'New week' : 'Update'} variant="secondary" onPress={() => make(choiceOf(plan))} />
           </Card>
         )}
 
         {tab === 'meals' && day ? (
           <>
+            <PlanSummary plan={plan} onPress={openSettings} />
             <WeekStrip plan={plan} selected={selected} onSelect={setSelected} />
             <FadeIn key={`sum-${selected}-${plan.seed}`} offset={6}>
               <DaySummary plan={plan} index={selected} />
@@ -519,23 +618,12 @@ export default function MealPlanScreen() {
               </FadeIn>
             ))}
 
-            <Card style={{ marginTop: spacing.md }}>
-              <T size={15} weight="800">Food preference</T>
-              <T size={12} muted style={{ marginTop: 2, marginBottom: spacing.md }}>Changing it makes a fresh plan.</T>
-              <DietChips
-                value={plan.diet}
-                onChange={(d) => {
-                  setDiet(d);
-                  if (d !== plan.diet) make(d);
-                }}
-              />
-              {offDays > 0 && (
-                <T size={12} color={colors.warning} weight="600" style={{ marginTop: spacing.md }}>
-                  {offDays === 1 ? 'One day' : `${offDays} days`} couldn’t quite reach your protein with {DIETS.find((x) => x.key === plan.diet)?.label.toLowerCase()} meals, so we got as close as we could.
-                </T>
-              )}
-            </Card>
-            <Button title="Make a new plan" icon="refresh" variant="secondary" onPress={() => make(plan.diet)} />
+            {offDays > 0 && (
+              <T size={12} color={colors.warning} weight="600" style={{ marginVertical: spacing.sm }}>
+                {offDays === 1 ? 'One day' : `${offDays} days`} couldn’t quite reach your goals with {DIETS.find((x) => x.key === plan.diet)?.label.toLowerCase()} meals, so we got as close as we could.
+              </T>
+            )}
+            <Button title="Make a new plan" icon="refresh" variant="secondary" onPress={() => make(choiceOf(plan))} style={{ marginTop: spacing.sm }} />
           </>
         ) : null}
 
@@ -545,7 +633,9 @@ export default function MealPlanScreen() {
       <Sheet visible={!!swap} onClose={() => setSwap(null)} title={swap ? `Swap ${slotLabel(plan.days[swap.day].meals[swap.meal].slot).toLowerCase()}` : undefined}>
         {swap && (
           <>
-            <T size={13} muted style={{ marginBottom: spacing.sm }}>The rest of the day is re-portioned so it stays on target.</T>
+            <T size={13} muted style={{ marginBottom: spacing.sm }}>
+              {plan.mode === 'simple' ? 'Changes it on every day it’s planned. Portions adjust to stay on target.' : 'The rest of the day is re-portioned so it stays on target.'}
+            </T>
             {options.length ? (
               options.map((d) => {
                 const pm = d.meals[swap.meal];
@@ -559,11 +649,12 @@ export default function MealPlanScreen() {
                     accessibilityLabel={`Choose ${m.name}`}
                     onPress={() => {
                       tap();
-                      dispatch({ type: 'setMealPlan', plan: { ...plan, days: plan.days.map((x, i) => (i === swap.day ? d : x)) } });
+                      dispatch({ type: 'setMealPlan', plan: applySwap(plan, swap.day, swap.meal, d) });
                       setSwap(null);
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
                   >
+                    <MealImage mealId={pm.mealId} width={56} aspectRatio={1} rounded={radius.md} iconSize={18} />
                     <View style={{ flex: 1 }}>
                       <T size={15} weight="700">{m.name}</T>
                       <T size={12} muted style={{ marginBottom: 4 }}>{m.nameDe}</T>
@@ -578,6 +669,20 @@ export default function MealPlanScreen() {
             )}
           </>
         )}
+      </Sheet>
+
+      <Sheet visible={settings} onClose={() => setSettings(false)} title="Plan settings">
+        <PlanChoices value={choice} onChange={setChoice} />
+        <Button
+          title="Make a new plan"
+          icon="sparkles"
+          onPress={() => {
+            setSettings(false);
+            setTab('meals');
+            make(choice);
+          }}
+          style={{ marginTop: spacing.xl }}
+        />
       </Sheet>
     </View>
   );

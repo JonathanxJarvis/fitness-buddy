@@ -21,6 +21,22 @@ export const DIETS: { key: MealDiet; label: string }[] = [
   { key: 'no-pork', label: 'No pork' },
 ];
 
+export type PlanStyle = 'mix' | 'high-protein' | 'mediterranean' | 'german' | 'quick';
+export type PlanMode = 'simple' | 'varied';
+
+export const PLAN_STYLES: { key: PlanStyle; label: string; blurb: string; icon: string }[] = [
+  { key: 'mix', label: 'Mix it up', blurb: 'A bit of everything', icon: 'shuffle' },
+  { key: 'high-protein', label: 'High protein', blurb: 'Lean meat, eggs, quark and skyr', icon: 'barbell-outline' },
+  { key: 'mediterranean', label: 'Mediterranean', blurb: 'Fish, feta, chickpeas and olive oil', icon: 'sunny-outline' },
+  { key: 'german', label: 'Classic German', blurb: 'Quark, Vollkornbrot, Spätzle and home cooking', icon: 'home-outline' },
+  { key: 'quick', label: 'Quick & easy', blurb: 'Most meals in 15 minutes or less', icon: 'flash-outline' },
+];
+
+export const PLAN_MODES: { key: PlanMode; label: string; blurb: string }[] = [
+  { key: 'simple', label: 'Simple', blurb: 'Same breakfast, 2 lunches, 2 dinners. Short shopping list.' },
+  { key: 'varied', label: 'Varied', blurb: 'Something new most days. Longer shopping list.' },
+];
+
 export interface PlannedItem {
   key: string;
   grams: number;
@@ -47,6 +63,10 @@ export interface MealPlanState {
   calories: number;
   protein: number;
   diet: MealDiet;
+  /** Missing on plans saved before styles existed (treated as 'mix'). */
+  style?: PlanStyle;
+  /** Missing on plans saved before modes existed (treated as 'varied'). */
+  mode?: PlanMode;
   days: PlanDay[];
   /** Shopping list item ids ticked off. */
   checked: string[];
@@ -115,11 +135,39 @@ export function slotPool(slot: MealType, diet: MealDiet): Meal[] {
   return MEALS.filter((m) => m.meals.includes(slot) && plannable(m, diet));
 }
 
-/** How often a meal gets picked: German and international dishes first. */
-function weightOf(meal: Meal, proteinRatio: number): number {
+const MEDITERRANEAN = new Set([
+  'greek-yogurt-parfait', 'greek-yogurt-honey', 'skyr-honey-walnuts', 'egg-white-omelette', 'veggie-omelette', 'shakshuka', 'fruit-salad',
+  'greek-salad', 'greek-chicken-bowl', 'roast-veg-feta', 'chickpea-salad', 'falafel-plate', 'falafel-wrap', 'caprese-bread', 'minestrone',
+  'couscous-chicken-salad', 'salade-nicoise', 'tuna-salad', 'tuna-tomato-pasta', 'garlic-shrimp-pasta', 'pasta-primavera', 'pesto-pasta',
+  'gnocchi-tomato-mozzarella', 'salmon-potatoes-spinach', 'salmon-sweet-potato', 'salmon-rice-bowl', 'pollock-potatoes-veg', 'lentil-soup',
+  'quinoa-buddha-bowl', 'hummus-veggie-sticks', 'almonds', 'trail-mix', 'smoked-salmon-crispbread',
+]);
+
+/** How strongly a plan style favors a meal (1 = neutral). */
+export function styleFit(meal: Meal, style: PlanStyle = 'mix'): number {
+  switch (style) {
+    case 'high-protein':
+      return meal.tags.includes('high-protein') ? 3 : 0.5;
+    case 'mediterranean':
+      return MEDITERRANEAN.has(meal.id) ? 4 : 0.35;
+    case 'german':
+      return meal.cuisine === 'de' ? 3.5 : 0.35;
+    case 'quick':
+      return meal.prepMinutes <= 10 ? 3.5 : meal.prepMinutes <= 15 ? 2.5 : meal.prepMinutes <= 25 ? 0.6 : 0.15;
+    default:
+      return 1;
+  }
+}
+
+export function fitsStyle(meal: Meal, style: PlanStyle = 'mix'): boolean {
+  return styleFit(meal, style) > 1;
+}
+
+/** How often a meal gets picked: German and international dishes first, then the plan style. */
+function weightOf(meal: Meal, proteinRatio: number, style: PlanStyle = 'mix', strength = 1): number {
   let w = meal.cuisine === 'de' ? 1.6 : meal.cuisine === 'intl' ? 1.2 : 0.7;
   if (meal.tags.includes('high-protein')) w *= proteinRatio > 0.22 ? 1.8 : 1.2;
-  return w;
+  return w * Math.pow(styleFit(meal, style), strength);
 }
 
 // ---------- nutrients ----------
@@ -270,6 +318,9 @@ export interface PlanOptions {
   calories: number;
   protein: number;
   diet?: MealDiet;
+  style?: PlanStyle;
+  /** Defaults to 'varied'; the screen defaults new plans to 'simple'. */
+  mode?: PlanMode;
   seed: string;
   startDate: string;
   days?: number;
@@ -292,9 +343,34 @@ function pickWeighted<T>(rng: () => number, items: T[], weight: (t: T) => number
 
 const signature = (day: PlanDay) => day.meals.map((m) => `${m.slot}:${m.mealId}`).sort().join('|');
 
+type Resolved = Required<Omit<PlanOptions, 'mode'>> & { strength: number };
+
+/** Worst day's miss on calories or protein. */
+export function planError(plan: Pick<MealPlanState, 'days' | 'calories' | 'protein'>): number {
+  return plan.days.reduce((a, d) => Math.max(a, dayError(d, plan.calories, plan.protein)), 0);
+}
+
+/**
+ * A week of meals. The style only biases the picks: when a strong bias can't
+ * hit the goals (say, high protein on a big calorie budget), it is softened
+ * until every day lands on target.
+ */
 export function generateMealPlan(opts: PlanOptions): MealPlanState {
-  const { calories, protein, seed, startDate, diet = 'any', days = 7 } = opts;
-  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}`);
+  const { calories, protein, seed, startDate, diet = 'any', style = 'mix', mode = 'varied', days = 7 } = opts;
+  const gen = mode === 'simple' ? generateSimplePlan : generateVariedPlan;
+  let best: MealPlanState | null = null;
+  for (const strength of style === 'mix' ? [1] : [1, 0.5, 0]) {
+    const plan = gen({ calories, protein, seed, startDate, diet, style, days, strength });
+    const err = planError(plan);
+    if (!best || err < planError(best)) best = plan;
+    if (err <= TOLERANCE) break;
+  }
+  return best!;
+}
+
+function generateVariedPlan(opts: Resolved): MealPlanState {
+  const { calories, protein, seed, startDate, diet, style, days, strength } = opts;
+  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}${style === 'mix' ? '' : `|${style}`}`);
   const ratio = (protein * 4) / Math.max(1, calories);
   const slots = calories >= 2000 ? SLOTS_2 : SLOTS_1;
   const pools: Record<MealType, Meal[]> = {
@@ -323,7 +399,7 @@ export function generateMealPlan(opts: PlanOptions): MealPlanState {
         });
         // Relax the weekly cap rather than fail when a pool runs dry (strict diets).
         const from = pool.length ? pool : pools[slot].filter((m) => !chosen.includes(m));
-        const m = pickWeighted(rng, from, (x) => weightOf(x, ratio) / (1 + (uses.get(x.id) ?? 0)));
+        const m = pickWeighted(rng, from, (x) => weightOf(x, ratio, style, strength) / (1 + (uses.get(x.id) ?? 0)));
         if (!m) {
           ok = false;
           break;
@@ -336,7 +412,8 @@ export function generateMealPlan(opts: PlanOptions): MealPlanState {
       if (seen.has(signature(built.day))) continue;
       const repeats = chosen.reduce((a, m) => a + (uses.get(m.id) ?? 0), 0);
       // Accuracy first; then natural portions, fewer repeats, and a pinch of chance.
-      const score = Math.max(0, built.err - 0.03) * 10 + built.err + 0.1 * built.stretch + 0.015 * repeats + 0.01 * rng();
+      const offStyle = style === 'mix' ? 0 : chosen.filter((m) => !fitsStyle(m, style)).length * 0.012 * strength;
+      const score = Math.max(0, built.err - 0.03) * 10 + built.err + 0.1 * built.stretch + 0.015 * repeats + offStyle + 0.01 * rng();
       if (!best || score < best.score) best = { day: built.day, score };
     }
     if (!best) break;
@@ -346,7 +423,62 @@ export function generateMealPlan(opts: PlanOptions): MealPlanState {
     yesterday = new Set(best.day.meals.map((m) => m.mealId));
   }
 
-  return { seed, startDate, calories, protein, diet, days: out, checked: [], createdAt: Date.now() };
+  return { seed, startDate, calories, protein, diet, style, mode: 'varied', days: out, checked: [], createdAt: Date.now() };
+}
+
+const SIMPLE_TRIES = 700;
+
+/** Lunch and dinner for day d of a Simple week: A/B lunches against A/B dinners, so four pairings. */
+export function simplePairing(d: number): [number, number] {
+  return [d % 2, Math.floor(d / 2) % 2];
+}
+
+/**
+ * A Simple week: one breakfast, two lunches, two dinners and one snack, every
+ * day portioned on its own to hit the goals. Few meals means a short shopping
+ * list, so sets that share ingredients score a little better.
+ */
+function generateSimplePlan(opts: Resolved): MealPlanState {
+  const { calories, protein, seed, startDate, diet, style, days, strength } = opts;
+  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}|${style}|simple`);
+  const ratio = (protein * 4) / Math.max(1, calories);
+  const slots = SLOTS_1;
+  const pool = (slot: MealType) => slotPool(slot, diet);
+  const pools = { breakfast: pool('breakfast'), lunch: pool('lunch'), dinner: pool('dinner'), snacks: pool('snacks') };
+  const w = (m: Meal) => weightOf(m, ratio, style, strength);
+  const combos = Math.min(4, days);
+
+  let best: { days: PlanDay[]; score: number } | null = null;
+  for (let tr = 0; tr < SIMPLE_TRIES; tr++) {
+    const b = pickWeighted(rng, pools.breakfast, w);
+    const s = pickWeighted(rng, pools.snacks.filter((m) => m !== b), w);
+    const l1 = pickWeighted(rng, pools.lunch.filter((m) => m !== b), w);
+    const l2 = pickWeighted(rng, pools.lunch.filter((m) => m !== b && m !== l1 && m.ingredients[0].key !== l1?.ingredients[0].key), w);
+    if (!b || !s || !l1 || !l2) continue;
+    const lunchMains = new Set([l1, l2].map((m) => m.ingredients[0].key));
+    const dinnerPool = pools.dinner.filter((m) => m !== b && m !== l1 && m !== l2 && !lunchMains.has(m.ingredients[0].key));
+    const d1 = pickWeighted(rng, dinnerPool, w);
+    const d2 = pickWeighted(rng, dinnerPool.filter((m) => m !== d1 && m.ingredients[0].key !== d1?.ingredients[0].key), w);
+    if (!d1 || !d2) continue;
+    const lunches = [l1, l2];
+    const dinners = [d1, d2];
+    let err = 0;
+    let stretch = 0;
+    const built: PlanDay[] = [];
+    for (let c = 0; c < combos; c++) {
+      const [li, di] = simplePairing(c);
+      const r = buildDay([b, lunches[li], dinners[di], s], slots, calories, protein);
+      err = Math.max(err, r.err);
+      stretch += r.stretch / combos;
+      built.push(r.day);
+    }
+    const buys = new Set([b, s, l1, l2, d1, d2].flatMap((m) => m.ingredients.map((i) => buyInfo(i.key).id))).size;
+    const offStyle = style === 'mix' ? 0 : [b, s, l1, l2, d1, d2].filter((m) => !fitsStyle(m, style)).length * 0.012 * strength;
+    const score = Math.max(0, err - 0.03) * 10 + err + 0.1 * stretch + 0.004 * buys + offStyle + 0.01 * rng();
+    if (!best || score < best.score) best = { days: built, score };
+  }
+  const out = best ? Array.from({ length: days }, (_, d) => best.days[d % combos]) : [];
+  return { seed, startDate, calories, protein, diet, style, mode: 'simple', days: out, checked: [], createdAt: Date.now() };
 }
 
 /**
@@ -376,9 +508,41 @@ export function swapOptions(plan: MealPlanState, dayIndex: number, mealIndex: nu
     const built = buildDay(meals, slots, plan.calories, plan.protein);
     if (built.err > TOLERANCE || seen.has(signature(built.day))) continue;
     const jitter = (hashSeed(`${plan.seed}|${dayIndex}|${cand.id}`) % 1000) / 1000;
-    results.push({ day: built.day, score: built.err + 0.1 * built.stretch + 0.03 * (weekUses.get(cand.id) ?? 0) + (cand.cuisine === 'us' ? 0.02 : 0) + 0.02 * jitter });
+    const fit = fitsStyle(cand, plan.style) ? -0.03 : 0;
+    results.push({ day: built.day, score: built.err + 0.1 * built.stretch + 0.03 * (weekUses.get(cand.id) ?? 0) + (cand.cuisine === 'us' ? 0.02 : 0) + 0.02 * jitter + fit });
   }
   return results.sort((a, b) => a.score - b.score).slice(0, n).map((r) => r.day);
+}
+
+/**
+ * Puts a chosen swap into the plan. In a Simple plan the new meal also
+ * replaces the old one on every other day it was planned, as long as that
+ * day stays on target, so the week keeps its few meals.
+ */
+export function applySwap(plan: MealPlanState, dayIndex: number, mealIndex: number, chosen: PlanDay): MealPlanState {
+  const old = plan.days[dayIndex]?.meals[mealIndex];
+  const next = chosen.meals[mealIndex];
+  const days = plan.days.map((d, i) => (i === dayIndex ? chosen : d));
+  if (plan.mode !== 'simple' || !old || !next) return { ...plan, days };
+  const cand = findMeal(next.mealId);
+  if (!cand) return { ...plan, days };
+  return {
+    ...plan,
+    days: days.map((d, i) => {
+      if (i === dayIndex) return d;
+      const at = d.meals.findIndex((m) => m.slot === old.slot && m.mealId === old.mealId);
+      if (at < 0 || d.meals.some((m) => m.mealId === cand.id)) return d;
+      const meals = d.meals.map((m, j) => (j === at ? cand : findMeal(m.mealId)));
+      if (meals.some((m) => !m)) return d;
+      const built = buildDay(meals as Meal[], d.meals.map((m) => m.slot), plan.calories, plan.protein);
+      return built.err <= TOLERANCE ? built.day : d;
+    }),
+  };
+}
+
+/** Distinct library meals in a plan. */
+export function distinctMeals(plan: Pick<MealPlanState, 'days'>): number {
+  return new Set(plan.days.flatMap((d) => d.meals.map((m) => m.mealId))).size;
 }
 
 // ---------- logging ----------

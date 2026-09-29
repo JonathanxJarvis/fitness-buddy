@@ -1,17 +1,23 @@
 import { describe, expect, it } from '@jest/globals';
 import { INGREDIENTS, findMeal } from '@/lib/meals';
 import {
+  applySwap,
   buyInfo,
   dayError,
   dayTotals,
+  distinctMeals,
   fitsDiet,
+  fitsStyle,
   generateMealPlan,
+  planError,
+  PLAN_STYLES,
   plannedMealFood,
   shoppingAmount,
   shoppingList,
   swapOptions,
   TOLERANCE,
   type MealDiet,
+  type PlanStyle,
 } from '@/lib/mealPlan';
 
 const GOALS: { calories: number; protein: number; diet?: MealDiet }[] = [
@@ -156,5 +162,89 @@ describe('shopping list', () => {
       expect(staples).toEqual([...staples].sort((a, b) => Number(a) - Number(b)));
     }
     expect(shoppingAmount({ id: 'milk', name: 'Milk', nameDe: '', aisle: 'dairy', amount: 1450, unit: 'ml', staple: false })).toBe('1.5 l');
+  });
+});
+
+describe('simple plans', () => {
+  const simple = (g: (typeof GOALS)[number], seed = 'test', style: PlanStyle = 'mix') =>
+    generateMealPlan({ ...g, style, mode: 'simple', seed, startDate: '2026-09-28' });
+
+  it.each(GOALS)('uses at most 6 meals and hits %o within ±5 % every day', (g) => {
+    for (const seed of ['a', 'b']) {
+      const p = simple(g, seed);
+      expect(p.mode).toBe('simple');
+      expect(p.days).toHaveLength(7);
+      expect(distinctMeals(p)).toBeLessThanOrEqual(6);
+      expect(planError(p)).toBeLessThanOrEqual(TOLERANCE);
+      const bySlot = (slot: string) => new Set(p.days.flatMap((d) => d.meals.filter((m) => m.slot === slot).map((m) => m.mealId)));
+      expect(bySlot('breakfast').size).toBe(1);
+      expect(bySlot('lunch').size).toBeLessThanOrEqual(2);
+      expect(bySlot('dinner').size).toBeLessThanOrEqual(2);
+      expect(bySlot('snacks').size).toBe(1);
+      for (const d of p.days) for (const m of d.meals) expect(fitsDiet(findMeal(m.mealId)!, g.diet ?? 'any')).toBe(true);
+    }
+  });
+
+  it('has a much shorter shopping list than a varied week', () => {
+    for (const g of [GOALS[0], GOALS[2], GOALS[5]]) {
+      const short = shoppingList(simple(g)).flatMap((s) => s.items).length;
+      const long = shoppingList(plan(g)).flatMap((s) => s.items).length;
+      expect(short).toBeLessThanOrEqual(long * 0.5);
+    }
+  });
+
+  it('swaps a meal on every day it is planned and keeps those days on target', () => {
+    const p = simple(GOALS[1]);
+    const old = p.days[0].meals[0].mealId;
+    const opts = swapOptions(p, 0, 0);
+    expect(opts.length).toBeGreaterThan(0);
+    const next = applySwap(p, 0, 0, opts[0]);
+    const chosen = opts[0].meals[0].mealId;
+    expect(next.days.every((d) => d.meals[0].mealId !== old)).toBe(true);
+    expect(next.days.filter((d) => d.meals[0].mealId === chosen).length).toBeGreaterThan(1);
+    expect(planError(next)).toBeLessThanOrEqual(TOLERANCE);
+  });
+
+  it('only changes the chosen day in a varied or older saved plan', () => {
+    const p = plan(GOALS[0]);
+    const legacy = { ...p, style: undefined, mode: undefined };
+    const opt = swapOptions(legacy, 1, 1)[0];
+    const next = applySwap(legacy, 1, 1, opt);
+    expect(next.days[1]).toBe(opt);
+    next.days.forEach((d, i) => i !== 1 && expect(d).toBe(p.days[i]));
+  });
+});
+
+describe('plan styles', () => {
+  it.each(PLAN_STYLES.map((s) => s.key))('%s stays within ±5 % in both modes', (style) => {
+    for (const g of [GOALS[0], GOALS[3], GOALS[4], GOALS[7]]) {
+      for (const mode of ['simple', 'varied'] as const) {
+        const p = generateMealPlan({ ...g, style, mode, seed: 's', startDate: '2026-09-28' });
+        expect(p.style).toBe(style);
+        expect(planError(p)).toBeLessThanOrEqual(TOLERANCE);
+      }
+    }
+  });
+
+  it('leans the week toward the chosen style', () => {
+    const meals = (style: PlanStyle) =>
+      generateMealPlan({ ...GOALS[1], style, seed: 'lean', startDate: '2026-09-28' }).days.flatMap((d) => d.meals.map((m) => findMeal(m.mealId)!));
+    const mix = meals('mix');
+    const share = (list: typeof mix, style: PlanStyle) => list.filter((m) => fitsStyle(m, style)).length / list.length;
+    for (const style of ['mediterranean', 'german'] as PlanStyle[]) {
+      expect(share(meals(style), style)).toBeGreaterThan(share(mix, style) + 0.15);
+    }
+    expect(share(meals('high-protein'), 'high-protein')).toBeGreaterThan(share(mix, 'high-protein'));
+    const prep = (list: typeof mix) => list.reduce((a, m) => a + m.prepMinutes, 0) / list.length;
+    expect(prep(meals('quick'))).toBeLessThan(prep(mix) - 3);
+  });
+
+  it('includes well-known dishes, with nutrients computed from ingredients', () => {
+    for (const id of ['overnight-oats', 'shakshuka', 'chicken-burrito-bowl', 'spaghetti-bolognese', 'chili-con-carne', 'chicken-caesar-salad', 'quark-berries', 'kaesespaetzle-light', 'linsen-spaetzle', 'salade-nicoise']) {
+      const m = findMeal(id);
+      expect(m).toBeDefined();
+      const kcal = m!.ingredients.reduce((a, i) => a + (INGREDIENTS[i.key].per100.calories * i.grams) / 100, 0);
+      expect(m!.nutrients.calories).toBeCloseTo(kcal, 0);
+    }
   });
 });
