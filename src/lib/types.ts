@@ -187,6 +187,8 @@ export interface OnboardingAnswers {
   obstacle?: string;
   /** Typical hours of sleep a night. */
   sleepHours?: number;
+  /** Food preference for meal plans: 'any' | 'vegetarian' | 'pescatarian' | 'vegan' | 'no-pork'. */
+  diet?: string;
 }
 
 /** A claimed reward: daily quest ("q:<id>"), daily chest ("chest"), weekly challenge ("week") or path chest ("path:<n>"). */
@@ -228,6 +230,8 @@ export interface WorkoutSet {
 export interface WorkoutExercise {
   exerciseId: string;
   sets: WorkoutSet[];
+  /** Reps per set the routine aimed for (smart progression reads it). */
+  targetReps?: number;
 }
 
 export interface Workout {
@@ -274,6 +278,8 @@ export interface AppState {
   plan?: TrainingPlan;
   /** Tap-to-confirm quest check-ins: date -> quest ids confirmed that day (e.g. "sleep"). */
   checkins?: Record<string, string[]>;
+  /** Pro meal plan: a week of meals and its shopping list (see lib/mealPlan). */
+  mealPlan?: import('./mealPlan').MealPlanState;
 }
 
 /** Which days you train and what. `week` is Monday-first; null is a rest day. */

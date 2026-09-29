@@ -11,6 +11,10 @@ import { Ring } from '@/components/Ring';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { doneSets, findExercise, previousSets, routineFromWorkout, workoutCalories, workoutVolume } from '@/lib/training';
+import { suggestNext, type Suggestion } from '@/lib/progression-suggest';
+import { isPro } from '@/lib/pro';
+import { ProMark } from '@/components/ProMark';
+import { DragHandle, DragList, moveItem, useDragScroll } from '@/components/DragList';
 import { kgToLb, lbToKg, weightUnit } from '@/lib/units';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
 import type { UnitSystem, Workout, WorkoutSet } from '@/lib/types';
@@ -36,9 +40,12 @@ function SetRow({
   prev,
   units,
   bodyweight,
+  hint,
+  quiet,
   onChange,
   onToggle,
   onRemove,
+  onHint,
 }: {
   index: number;
   set: WorkoutSet;
@@ -48,11 +55,24 @@ function SetRow({
   onChange: (s: WorkoutSet) => void;
   onToggle: () => void;
   onRemove: () => void;
+  /** Smart progression target for this set (Pro). */
+  hint?: { kg: number; reps: number };
+  onHint?: () => void;
+  /** Hide the hint when the set already holds it (shown once per exercise, not on every row). */
+  quiet?: boolean;
 }) {
   const { colors } = useTheme();
   const [w, setW] = useState(toDisplay(set.kg, units));
   const [r, setR] = useState(set.reps ? String(set.reps) : '');
   useEffect(() => setW(toDisplay(set.kg, units)), [units]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Filled from outside (a suggestion tapped in): show the new numbers, but never fight your typing.
+  useEffect(() => {
+    if (Math.abs(fromDisplay(w, units) - set.kg) > 0.01) setW(toDisplay(set.kg, units));
+  }, [set.kg]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if ((parseInt(r, 10) || 0) !== set.reps) setR(set.reps ? String(set.reps) : '');
+  }, [set.reps]); // eslint-disable-line react-hooks/exhaustive-deps
+  const matches = !!hint && Math.abs(hint.kg - set.kg) < 0.01 && hint.reps === set.reps;
 
   const input = {
     backgroundColor: set.done ? 'transparent' : colors.cardAlt,
@@ -64,6 +84,7 @@ function SetRow({
     ...font('700'),
   };
   return (
+    <View>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, paddingHorizontal: 6, marginHorizontal: -6, borderRadius: 12, backgroundColor: set.done ? nutrientColors.calories + '1C' : 'transparent' }}>
       <Pressable onLongPress={onRemove} style={{ width: 26 }} accessibilityLabel={`Set ${index + 1}, long-press to remove`}>
         <T size={13} weight="800" muted center>{index + 1}</T>
@@ -105,6 +126,60 @@ function SetRow({
         <Ionicons name="checkmark" size={18} color={set.done ? '#fff' : colors.textMuted} />
       </PressScale>
     </View>
+    {hint && !set.done && !(matches && quiet) ? (
+      <Pressable
+        onPress={onHint}
+        accessibilityRole="button"
+        accessibilityLabel={`Suggested for set ${index + 1}: ${bodyweight || !hint.kg ? '' : `${toDisplay(hint.kg, units)} ${weightUnit(units)} for `}${hint.reps} reps${matches ? '' : ', tap to fill in'}`}
+        hitSlop={4}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 34, marginTop: -1, marginBottom: 3, alignSelf: 'flex-start', opacity: pressed ? 0.55 : 1 })}
+      >
+        <ProMark size={9} />
+        <T size={11} weight="700" color={matches ? colors.textMuted : colors.primary}>
+          {matches ? 'Suggested' : 'Try'} {bodyweight || !hint.kg ? `${hint.reps} reps` : `${toDisplay(hint.kg, units)} ${weightUnit(units)} × ${hint.reps}`}
+        </T>
+        <Ionicons name={matches ? 'information-circle-outline' : 'arrow-up-circle-outline'} size={12} color={matches ? colors.textMuted : colors.primary} />
+      </Pressable>
+    ) : null}
+    </View>
+  );
+}
+
+const KIND_LABEL: Record<Suggestion['kind'], string> = { increase: 'Level up', repeat: 'Same again', deload: 'Small deload' };
+
+/** Why the suggestion is what it is, shown under an exercise's sets. */
+function WhyNote({ s, onClose }: { s: Suggestion; onClose: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <FadeIn offset={6}>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, padding: 10, borderRadius: 12, backgroundColor: colors.primarySoft }}>
+        <ProMark size={11} style={{ marginTop: 3 }} />
+        <View style={{ flex: 1 }}>
+          <T size={12} weight="800" color={colors.primary}>Smart progression · {KIND_LABEL[s.kind]}</T>
+          <T size={12} style={{ marginTop: 2, lineHeight: 17 }}>{s.reason}</T>
+        </View>
+        <Pressable onPress={onClose} accessibilityLabel="Hide reason" hitSlop={8}>
+          <Ionicons name="close" size={16} color={colors.textMuted} />
+        </Pressable>
+      </View>
+    </FadeIn>
+  );
+}
+
+/** Free users: the suggestion row, locked. */
+function LockedHint() {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/pro', params: { feature: 'progression' } })}
+      accessibilityRole="button"
+      accessibilityLabel="Smart progression, a Pro feature: see what to lift next"
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, backgroundColor: colors.cardAlt, opacity: pressed ? 0.6 : 1 })}
+    >
+      <ProMark size={10} />
+      <T size={12} weight="700" muted style={{ flex: 1 }}>See what to lift next from your last sessions</T>
+      <Ionicons name="lock-closed" size={12} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
@@ -151,6 +226,10 @@ export default function WorkoutScreen() {
   const [finishOpen, setFinishOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [saveRoutine, setSaveRoutine] = useState(false);
+  const [why, setWhy] = useState<number | null>(null);
+  const [reorder, setReorder] = useState<string[] | null>(null);
+  const { scrollProps, dragScroll } = useDragScroll();
+  const pro = isPro(state);
   const restTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restSeconds = state.restSeconds ?? 90;
 
@@ -163,6 +242,12 @@ export default function WorkoutScreen() {
   }, []);
 
   const history = useMemo(() => state.workouts.filter((x) => x.id !== w?.id), [state.workouts, w?.id]);
+  // One suggestion per exercise, from your earlier sessions (not this one).
+  const shape = w?.exercises.map((e) => `${e.exerciseId}:${e.targetReps ?? ''}:${e.sets.length}`).join('|');
+  const suggestions = useMemo(
+    () => (w?.exercises ?? []).map((e) => suggestNext(e.exerciseId, history, { targetReps: e.targetReps, sets: e.sets.length, custom: state.customExercises, units })),
+    [shape, history, state.customExercises, units], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   if (!w) {
     return (
@@ -237,9 +322,44 @@ export default function WorkoutScreen() {
         </PressScale>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: insets.bottom + 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView {...scrollProps} contentContainerStyle={{ padding: spacing.md, paddingBottom: insets.bottom + 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {w.exercises.length === 0 && <EmptyState icon="barbell-outline" title="Add your first exercise" body="Pick from 60+ exercises or create your own." />}
-        {w.exercises.map((e, ei) => {
+        {reorder ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.sm }}>
+              <T size={13} muted style={{ flex: 1 }}>Drag the grip to change the order.</T>
+              <PressScale onPress={() => setReorder(null)} accessibilityRole="button" style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill }}>
+                <T size={14} weight="800" color={colors.onPrimary}>Done</T>
+              </PressScale>
+            </View>
+            <DragList
+              data={w.exercises.map((e, i) => ({ e, k: reorder[i] ?? `x${i}` }))}
+              keyOf={(x) => x.k}
+              scroll={dragScroll}
+              labelOf={(x) => findExercise(x.e.exerciseId, state.customExercises)?.name ?? 'exercise'}
+              onReorder={(from, to) => {
+                setReorder((k) => (k ? moveItem(k, from, to) : k));
+                update({ ...w, exercises: moveItem(w.exercises, from, to) });
+              }}
+              renderItem={({ e }, { active, handle }) => {
+                const x = findExercise(e.exerciseId, state.customExercises);
+                const done = e.sets.filter((s) => s.done).length;
+                return (
+                  <Card style={{ padding: 10, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: active ? 1.5 : 0, borderColor: colors.primary }}>
+                    <View style={{ borderRadius: 12, backgroundColor: colors.cardAlt, padding: 2 }}>
+                      <ExerciseFigure exerciseId={e.exerciseId} customExercises={state.customExercises} size={40} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <T weight="800" numberOfLines={1}>{x?.name ?? 'Exercise'}</T>
+                      <T size={12} muted>{e.sets.length} sets{done ? ` · ${done} done` : ''}</T>
+                    </View>
+                    <DragHandle handle={handle} active={active} />
+                  </Card>
+                );
+              }}
+            />
+          </>
+        ) : w.exercises.map((e, ei) => {
           const x = findExercise(e.exerciseId, state.customExercises);
           const prev = previousSets(e.exerciseId, history);
           return (
@@ -250,6 +370,11 @@ export default function WorkoutScreen() {
                     onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId } })}
                     accessibilityRole="button"
                     accessibilityLabel={`About ${x?.name ?? 'this exercise'}`}
+                    onLongPress={() => {
+                      if (w.exercises.length < 2) return;
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                      setReorder(w.exercises.map((_, i) => `x${i}`));
+                    }}
                     style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}
                   >
                     <View style={{ borderRadius: 12, backgroundColor: colors.cardAlt, padding: 2 }}>
@@ -262,6 +387,7 @@ export default function WorkoutScreen() {
                   </Pressable>
                   <IconButton label="Exercise options" icon="ellipsis-horizontal" color={colors.textMuted} size={20} onPress={() => setMenuFor(ei)} />
                 </View>
+                {!pro && suggestions[ei] ? <LockedHint /> : null}
                 <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 0, marginBottom: 2 }}>
                   <T size={10} weight="800" muted center style={{ width: 26 }}>SET</T>
                   <T size={10} weight="800" muted style={{ flex: 1.3 }}>PREVIOUS</T>
@@ -277,11 +403,21 @@ export default function WorkoutScreen() {
                     prev={prev[si]}
                     units={units}
                     bodyweight={x?.bodyweight}
+                    hint={pro ? suggestions[ei]?.sets[si] : undefined}
+                    quiet={si !== e.sets.findIndex((x) => !x.done)}
+                    onHint={() => {
+                      const h = suggestions[ei]?.sets[si];
+                      if (!h) return;
+                      Haptics.selectionAsync().catch(() => {});
+                      if (Math.abs(h.kg - s.kg) > 0.01 || h.reps !== s.reps) setSet(ei, si, { ...s, kg: h.kg, reps: h.reps });
+                      setWhy(ei);
+                    }}
                     onChange={(ns) => setSet(ei, si, ns)}
                     onToggle={() => toggle(ei, si)}
                     onRemove={() => update({ ...w, exercises: w.exercises.map((b, i) => (i === ei ? { ...b, sets: b.sets.filter((_, j) => j !== si) } : b)) })}
                   />
                 ))}
+                {pro && why === ei && suggestions[ei] ? <WhyNote s={suggestions[ei]!} onClose={() => setWhy(null)} /> : null}
                 <Pressable
                   onPress={() => {
                     const last = e.sets[e.sets.length - 1];
@@ -297,7 +433,7 @@ export default function WorkoutScreen() {
         })}
         <Button title="Add exercise" icon="add" variant="secondary" onPress={() => router.push('/exercise-picker')} style={{ marginTop: spacing.sm }} />
         <T size={12} muted center style={{ marginTop: spacing.md }}>
-          Check a set to start the {restSeconds}s rest timer. Long-press a set number to remove it.
+          Check a set to start the {restSeconds}s rest timer. Long-press a set number to remove it, or an exercise name to reorder.
         </T>
       </ScrollView>
 
@@ -326,18 +462,9 @@ export default function WorkoutScreen() {
               if (e) router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId } });
             },
           },
-          ...([-1, 1] as const)
-            .filter((d) => menuFor !== null && menuFor + d >= 0 && menuFor + d < w.exercises.length)
-            .map((d) => ({
-              label: d < 0 ? 'Move up' : 'Move down',
-              icon: (d < 0 ? 'arrow-up' : 'arrow-down') as 'arrow-up' | 'arrow-down',
-              onPress: () => {
-                const i = menuFor ?? 0;
-                const list = [...w.exercises];
-                [list[i + d], list[i]] = [list[i], list[i + d]];
-                update({ ...w, exercises: list });
-              },
-            })),
+          ...(w.exercises.length > 1
+            ? [{ label: 'Reorder exercises', icon: 'reorder-three' as const, subtitle: 'Drag them into the order you want', onPress: () => setReorder(w.exercises.map((_, i) => `x${i}`)) }]
+            : []),
           { label: 'Remove exercise', icon: 'trash-outline', destructive: true, onPress: () => update({ ...w, exercises: w.exercises.filter((_, i) => i !== menuFor) }) },
         ]}
       />

@@ -100,6 +100,9 @@ export function TodayPlan() {
   const day = planDay(state, today);
   const trainedToday = trainedOn(state, today);
   const week = weekOf(today);
+  // Trained something other than the planned session? Say so: it still counts.
+  const todaysNames = state.workouts.filter((w) => w.date === today && doneSets(w) > 0).map((w) => w.name.trim());
+  const otherToday = day.kind === 'train' && todaysNames.length && !todaysNames.some((n) => n.toLowerCase() === day.session.name.toLowerCase()) ? [...new Set(todaysNames)].join(' and ') : '';
 
   const stats = useMemo(() => {
     const ws = state.workouts.filter((w) => w.date >= week[0] && w.date <= week[6] && doneSets(w) > 0);
@@ -152,10 +155,14 @@ export function TodayPlan() {
             <View style={{ flex: 1 }}>
               <T size={11} weight="800" muted style={{ letterSpacing: 1.2 }}>TODAY · {DAY_NAMES[weekdayIndex(today)].toUpperCase()}</T>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                <T size={38} weight="800" style={{ letterSpacing: -1.2 }}>{day.kind === 'train' ? day.session.name : 'Rest'}</T>
+                <T size={38} weight="800" style={{ letterSpacing: -1.2 }}>{otherToday ? todaysNames[todaysNames.length - 1] : day.kind === 'train' ? day.session.name : 'Rest'}</T>
                 <T size={18} weight="600" muted>{trainedToday ? 'done' : 'day'}</T>
               </View>
-              {day.kind === 'train' ? (
+              {day.kind === 'train' && trainedToday && otherToday ? (
+                <T size={13} muted style={{ marginTop: 4, lineHeight: 19 }}>
+                  {day.session.name} was planned. Any workout counts as today's training.
+                </T>
+              ) : day.kind === 'train' ? (
                 <SessionPreview session={day.session} />
               ) : (
                 <T size={13} muted style={{ marginTop: 4, lineHeight: 19 }}>

@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Button, Card, IconButton, T } from '@/components/ui';
 import { ExerciseFigure } from '@/components/exercise/ExerciseFigure';
-import { FadeIn, PressScale } from '@/components/motion';
+import { PressScale } from '@/components/motion';
+import { DragHandle, DragList, moveItem, useDragScroll } from '@/components/DragList';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { findExercise } from '@/lib/training';
@@ -15,7 +16,11 @@ import { takeDraft, usePendingDraft } from '@/lib/routineDraft';
 import { font, radius, spacing, useTheme } from '@/theme';
 import type { Routine } from '@/lib/types';
 
-type Row = Routine['exercises'][number];
+type Row = Routine['exercises'][number] & { k: string };
+
+let nextKey = 0;
+/** A stable key per row so a dragged row keeps its identity. */
+const withKey = (x: Routine['exercises'][number]): Row => ({ ...x, k: `row${nextKey++}` });
 
 /** Quick names; picking one on an empty workout fills in a starting point you can change. */
 const STARTERS = ['push', 'pull', 'legs', 'upper', 'lower', 'full'];
@@ -52,22 +57,6 @@ function Count({ value, onChange, min, max, label }: { value: number; onChange: 
   );
 }
 
-function MoveButton({ icon, onPress, disabled, label }: { icon: 'arrow-up' | 'arrow-down'; onPress: () => void; disabled: boolean; label: string }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      hitSlop={4}
-      style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.primarySoft : colors.cardAlt, opacity: disabled ? 0.3 : 1 })}
-    >
-      <Ionicons name={icon} size={17} color={colors.text} />
-    </Pressable>
-  );
-}
-
 /** Build or edit a saved workout (Push, Pull, …) before you ever train it. */
 export default function RoutineBuilder() {
   const { state, dispatch } = useStore();
@@ -78,14 +67,14 @@ export default function RoutineBuilder() {
   const starter = preset ? SESSIONS.find((s) => s.name.toLowerCase() === preset.toLowerCase()) : undefined;
 
   const [name, setName] = useState(existing?.name ?? starter?.name ?? '');
-  const [rows, setRows] = useState<Row[]>(existing?.exercises ?? starter?.routine.exercises.map((x) => ({ ...x })) ?? []);
+  const [rows, setRows] = useState<Row[]>(() => (existing?.exercises ?? starter?.routine.exercises ?? []).map(withKey));
   const pending = usePendingDraft();
 
   // Exercises picked on the picker screen.
   useEffect(() => {
     if (!pending) return;
     const ids = takeDraft();
-    setRows((r) => [...r, ...ids.map((exerciseId) => ({ exerciseId, sets: 3, reps: 10 }))]);
+    setRows((r) => [...r, ...ids.map((exerciseId) => withKey({ exerciseId, sets: 3, reps: 10 }))]);
   }, [pending]);
 
   // Leftovers from an abandoned builder shouldn't leak into this one.
@@ -97,17 +86,10 @@ export default function RoutineBuilder() {
     const s = SESSIONS.find((x) => x.id === sid)!;
     Haptics.selectionAsync().catch(() => {});
     setName(s.name);
-    if (!rows.length) setRows(s.routine.exercises.map((x) => ({ ...x })));
+    if (!rows.length) setRows(s.routine.exercises.map(withKey));
   };
   const update = (i: number, patch: Partial<Row>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const move = (i: number, d: number) =>
-    setRows((r) => {
-      const j = i + d;
-      if (j < 0 || j >= r.length) return r;
-      const next = [...r];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
+  const { scrollProps, dragScroll } = useDragScroll();
 
   const cleanName = name.trim();
   const clash = state.routines.some((r) => r.id !== existing?.id && r.name.trim().toLowerCase() === cleanName.toLowerCase());
@@ -116,7 +98,7 @@ export default function RoutineBuilder() {
 
   const save = () => {
     if (!canSave) return;
-    dispatch({ type: 'saveRoutine', routine: { id: existing?.id ?? uid(), name: cleanName, exercises: rows } });
+    dispatch({ type: 'saveRoutine', routine: { id: existing?.id ?? uid(), name: cleanName, exercises: rows.map(({ k: _k, ...x }) => x) } });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     router.back();
   };
@@ -131,7 +113,7 @@ export default function RoutineBuilder() {
         <IconButton label="Close" icon="close" color={colors.text} onPress={() => router.back()} />
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }} keyboardShouldPersistTaps="handled">
+      <ScrollView {...scrollProps} style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }} keyboardShouldPersistTaps="handled">
         <T size={13} weight="700" muted style={{ marginBottom: 6 }}>Name</T>
         <TextInput
           value={name}
@@ -162,6 +144,7 @@ export default function RoutineBuilder() {
           <T size={17} weight="800" style={{ flex: 1 }}>Exercises</T>
           {rows.length > 0 && <T size={12} weight="700" muted>{rows.length} exercises · {totalSets} sets · ~{Math.round(totalSets * 2.8 + 5)} min</T>}
         </View>
+        {rows.length > 1 && <T size={12} muted style={{ marginTop: -4, marginBottom: spacing.sm }}>Drag the grip on the right to change the order.</T>}
 
         {rows.length === 0 ? (
           <View style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, alignItems: 'center', gap: 4 }}>
@@ -170,11 +153,16 @@ export default function RoutineBuilder() {
             <T size={13} muted center>Pick a starter above or add your own exercises. You can set sets and reps for each.</T>
           </View>
         ) : (
-          rows.map((row, i) => {
-            const ex = findExercise(row.exerciseId, state.customExercises);
-            return (
-              <FadeIn key={`${row.exerciseId}-${i}`} delay={Math.min(i, 6) * 30}>
-                <Card style={{ padding: spacing.md, marginBottom: spacing.sm }}>
+          <DragList
+            data={rows}
+            keyOf={(row) => row.k}
+            scroll={dragScroll}
+            labelOf={(row) => findExercise(row.exerciseId, state.customExercises)?.name ?? 'exercise'}
+            onReorder={(from, to) => setRows((r) => moveItem(r, from, to))}
+            renderItem={(row, { index: i, active, handle }) => {
+              const ex = findExercise(row.exerciseId, state.customExercises);
+              return (
+                <Card style={{ padding: spacing.md, marginBottom: spacing.sm, borderWidth: active ? 1.5 : 0, borderColor: colors.primary }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <Pressable onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: row.exerciseId } })} accessibilityLabel={`About ${ex?.name ?? 'this exercise'}`} style={{ borderRadius: 14, backgroundColor: colors.cardAlt, padding: 2 }}>
                       <ExerciseFigure exerciseId={row.exerciseId} customExercises={state.customExercises} size={52} />
@@ -183,8 +171,7 @@ export default function RoutineBuilder() {
                       <T size={11} weight="800" muted style={{ letterSpacing: 0.8 }}>{i + 1} OF {rows.length}</T>
                       <T weight="800" numberOfLines={2}>{ex?.name ?? 'Exercise'}</T>
                     </View>
-                    <MoveButton icon="arrow-up" label={`Move ${ex?.name ?? 'exercise'} up`} disabled={i === 0} onPress={() => move(i, -1)} />
-                    <MoveButton icon="arrow-down" label={`Move ${ex?.name ?? 'exercise'} down`} disabled={i === rows.length - 1} onPress={() => move(i, 1)} />
+                    <DragHandle handle={handle} active={active} />
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.md }}>
                     <Count value={row.sets} onChange={(sets) => update(i, { sets })} min={1} max={10} label="sets" />
@@ -193,9 +180,9 @@ export default function RoutineBuilder() {
                     <IconButton label={`Remove ${ex?.name ?? 'exercise'}`} icon="trash-outline" color={colors.textMuted} onPress={() => setRows((r) => r.filter((_, j) => j !== i))} />
                   </View>
                 </Card>
-              </FadeIn>
-            );
-          })
+              );
+            }}
+          />
         )}
 
         <Button title="Add exercises" icon="add" variant="secondary" onPress={() => router.push({ pathname: '/exercise-picker', params: { for: 'routine' } })} style={{ marginTop: spacing.md }} />

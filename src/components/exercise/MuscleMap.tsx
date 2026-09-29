@@ -114,7 +114,25 @@ function Figure({ shapes, x, fills, line, body, outline, back }: { shapes: Shape
 }
 
 /** Front and back body with primary (strong) and secondary (soft) muscles highlighted. */
-export function MuscleMap({ primary, secondary = [], size = 200, side = 'both', style }: { primary: MuscleRegion[]; secondary?: MuscleRegion[]; size?: number; side?: 'both' | 'front' | 'back'; style?: StyleProp<ViewStyle> }) {
+export function MuscleMap({
+  primary,
+  secondary = [],
+  size = 200,
+  side = 'both',
+  style,
+  colors: custom,
+  label,
+}: {
+  primary: MuscleRegion[];
+  secondary?: MuscleRegion[];
+  size?: number;
+  side?: 'both' | 'front' | 'back';
+  style?: StyleProp<ViewStyle>;
+  /** Per-muscle fills that win over the primary/secondary highlight (e.g. a recovery map). */
+  colors?: Partial<Record<MuscleRegion, string>>;
+  /** Accessibility label; defaults to the primary muscles. */
+  label?: string;
+}) {
   const { colors, dark } = useTheme();
   const accent = muscleAccent(colors);
   const body = mix(colors.text, colors.card, dark ? 0.1 : 0.075);
@@ -124,7 +142,7 @@ export function MuscleMap({ primary, secondary = [], size = 200, side = 'both', 
   const soft = mix(accent, muscle, dark ? 0.42 : 0.38);
   const p = new Set(primary);
   const s = new Set(secondary);
-  const fills = (r?: MuscleRegion) => (r && p.has(r) ? accent : r && s.has(r) ? soft : muscle);
+  const fills = (r?: MuscleRegion) => (r && custom?.[r] ? custom[r]! : r && p.has(r) ? accent : r && s.has(r) ? soft : muscle);
 
   const labels = size >= 110;
   const labelH = labels ? Math.max(14, Math.round(size * 0.08)) : 0;
@@ -139,7 +157,7 @@ export function MuscleMap({ primary, secondary = [], size = 200, side = 'both', 
     <View
       style={[{ width, height: size, alignItems: 'center' }, style]}
       accessibilityRole="image"
-      accessibilityLabel={primary.length ? `Muscles worked: ${primary.join(', ')}` : 'Body map'}
+      accessibilityLabel={label ?? (primary.length ? `Muscles worked: ${primary.join(', ')}` : 'Body map')}
     >
       <Svg width={w} height={h} viewBox={`0 -1 ${vbW} 222`}>
         {figures.map((f, i) => (

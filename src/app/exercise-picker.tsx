@@ -10,6 +10,8 @@ import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { addToDraft } from '@/lib/routineDraft';
 import { useStartWithExercises } from '@/lib/useStartWorkout';
+import { applySuggestions } from '@/lib/progression-suggest';
+import { isPro } from '@/lib/pro';
 import { EXERCISE_LIBRARY, MUSCLES, newBlock, personalRecords } from '@/lib/training';
 import { formatWeight } from '@/lib/units';
 import { font, radius, spacing, useTheme } from '@/theme';
@@ -69,7 +71,11 @@ export default function ExercisePicker() {
       return;
     }
     const w = state.activeWorkout;
-    if (w) dispatch({ type: 'setActiveWorkout', workout: { ...w, exercises: [...w.exercises, ...picked.map((id) => newBlock(id, state.workouts))] } });
+    if (w) {
+      const added = { ...w, exercises: picked.map((id) => newBlock(id, state.workouts)) };
+      const extra = (isPro(state) ? applySuggestions(added, state.workouts, state.customExercises, state.settings.units) : added).exercises;
+      dispatch({ type: 'setActiveWorkout', workout: { ...w, exercises: [...w.exercises, ...extra] } });
+    }
     router.back();
   };
 

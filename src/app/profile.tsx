@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, ScrollView, Share, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Share, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Badge, Button, Card, Field, ListRow, Screen, Segmented, Sheet, T } from '@/components/ui';
@@ -18,7 +18,7 @@ import { getApiKey, maskKey, setApiKey } from '@/lib/secrets';
 import { hasBuiltInAi } from '@/lib/ai';
 import { isPro, mascotSkin, petName, petSpecies, PREVIEW } from '@/lib/pro';
 import { Kettle, type Species } from '@/components/Mascot';
-import { Pressable } from 'react-native';
+import { HealthRow } from '@/components/HealthRow';
 import { spacing, useTheme } from '@/theme';
 import type { AvatarConfig, FoodRegion, ThemePref, UnitSystem } from '@/lib/types';
 
@@ -139,6 +139,7 @@ export default function ProfileScreen() {
           onPress={() => router.push('/reminders')}
           right={chevron(colors.textMuted)}
         />
+        <HealthRow />
       </Card>
 
       <Card>

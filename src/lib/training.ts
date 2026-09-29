@@ -184,7 +184,7 @@ export function workoutFromRoutine(r: Routine, workouts: Workout[], id: string, 
       const b = newBlock(x.exerciseId, workouts, x.sets, x.reps);
       // Keep the routine's set count even if last time had more or fewer.
       while (b.sets.length < x.sets) b.sets.push({ ...(b.sets[b.sets.length - 1] ?? { reps: x.reps, kg: 0 }), done: false });
-      return { ...b, sets: b.sets.slice(0, x.sets) };
+      return { ...b, sets: b.sets.slice(0, x.sets), targetReps: x.reps };
     }),
   };
 }

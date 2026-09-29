@@ -106,6 +106,8 @@ export type Action =
   | { type: 'reachTier'; tier: number }
   | { type: 'setPlan'; plan: TrainingPlan | null }
   | { type: 'setCheckin'; date: string; id: string; on: boolean }
+  | { type: 'setMealPlan'; plan: AppState['mealPlan'] | null }
+  | { type: 'toggleShoppingItem'; id: string }
   | { type: 'reset' };
 
 const EMPTY_SOCIAL: SocialState = { friends: [], chats: {}, read: {} };
@@ -308,6 +310,14 @@ export function reducer(state: AppState, action: Action): AppState {
       const had = all[action.date] ?? [];
       const next = action.on ? [...new Set([...had, action.id])] : had.filter((x) => x !== action.id);
       return { ...state, checkins: { ...all, [action.date]: next } };
+    }
+    case 'setMealPlan':
+      return { ...state, mealPlan: action.plan ?? undefined };
+    case 'toggleShoppingItem': {
+      const mp = state.mealPlan;
+      if (!mp) return state;
+      const on = mp.checked.includes(action.id);
+      return { ...state, mealPlan: { ...mp, checked: on ? mp.checked.filter((x) => x !== action.id) : [...mp.checked, action.id] } };
     }
     case 'reset':
       return initialState;

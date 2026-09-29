@@ -63,7 +63,37 @@
           "cameraPermission": "Fitness Buddy uses the camera to scan barcodes and photograph meals for AI nutrition estimates."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.jonathanxjarvis.fitnessbuddy.widgets",
+          "groupIdentifier": "group.com.jonathanxjarvis.fitnessbuddy",
+          "widgets": [
+            {
+              "name": "CalorieWidget",
+              "displayName": "Track your calories",
+              "description": "Calories left today, protein, and a nudge to log your next meal.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryRectangular",
+                  "accessoryCircular"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Fitness Buddy reads your steps, active energy, body weight and workouts from Apple Health so your daily numbers stay up to date without typing them in.",
+          "NSHealthUpdateUsageDescription": "Fitness Buddy saves your finished strength workouts and the weigh-ins you log to Apple Health.",
+          "background": false
+        }
+      ]
     ],
     "splash": {
       "image": "./assets/splash-icon.png",

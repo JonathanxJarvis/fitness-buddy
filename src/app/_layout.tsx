@@ -14,6 +14,10 @@ import { StoreProvider, useStore } from '@/store/StoreProvider';
 import { font, useTheme } from '@/theme';
 import { MascotToast } from '@/components/MascotToast';
 import { CelebrationProvider } from '@/components/Celebrate';
+import { NativeBridges } from '@/components/NativeBridges';
+
+// Deep links (widget, Live Activity) open on top of the tabs, so Back/close lands on Today.
+export const unstable_settings = { initialRouteName: '(tabs)' };
 
 function RootNavigator() {
   const { ready } = useStore();
@@ -89,11 +93,14 @@ function RootNavigator() {
         <Stack.Screen name="rank" options={{ headerShown: false }} />
         <Stack.Screen name="pro" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="progress" options={{ title: 'Progress' }} />
+        <Stack.Screen name="meal-plan" options={{ headerShown: false }} />
+        <Stack.Screen name="recovery" options={{ title: 'Recovery' }} />
         <Stack.Screen name="pets" options={{ title: 'Your pet', presentation: 'modal' }} />
         <Stack.Screen name="friend/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
       </Stack>
       <MascotToast />
+      <NativeBridges />
       </CelebrationProvider>
     </ThemeProvider>
   );

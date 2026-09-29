@@ -23,6 +23,10 @@ const REASON: Record<string, string> = {
   friends: 'Your friends list is full',
   skins: 'Outfits are a Pro feature',
   pets: 'That pet comes with Pro',
+  progression: 'Smart progression is a Pro feature',
+  stats: 'Deep stats are a Pro feature',
+  recovery: 'The recovery map is a Pro feature',
+  mealplan: 'Meal plans are a Pro feature',
 };
 
 export default function ProScreen() {

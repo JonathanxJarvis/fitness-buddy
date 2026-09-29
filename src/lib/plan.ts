@@ -104,6 +104,25 @@ export function findSession(state: Pick<AppState, 'routines'>, id: string | null
   return mine ? { ...s, routine: mine } : s;
 }
 
+/**
+ * The workouts a plan is made of, in the order they first appear in the week
+ * (Push, Pull, Legs). Always derived from the plan, so changing the plan
+ * changes this list; your own saved routine replaces a built-in of the same name.
+ */
+export function planSessions(state: Pick<AppState, 'plan' | 'routines'>): Session[] {
+  const plan = state.plan;
+  if (!plan) return [];
+  const split = findSplit(plan.split);
+  const inWeek = plan.week.filter((x): x is string => !!x);
+  const ids = split.id === 'custom' ? inWeek : [...split.sessions.filter((id) => inWeek.includes(id)), ...inWeek, ...split.sessions];
+  const out: Session[] = [];
+  for (const id of ids) {
+    const s = findSession(state, id);
+    if (s && !out.some((o) => o.id === s.id)) out.push(s);
+  }
+  return out;
+}
+
 /** Monday = 0 … Sunday = 6. */
 export const weekdayIndex = (date: string) => (fromKey(date).getDay() + 6) % 7;
 

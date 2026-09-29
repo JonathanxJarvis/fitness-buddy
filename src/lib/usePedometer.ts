@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { Pedometer } from 'expo-sensors';
 import { useStore } from '@/store/StoreProvider';
@@ -13,7 +13,10 @@ export function usePedometer(enabled: boolean) {
   const { state, dispatch } = useStore();
   const [available, setAvailable] = useState<boolean | null>(null);
   const stored = useRef(0);
-  stored.current = state.steps[todayKey()] ?? 0;
+  const todaySteps = state.steps[todayKey()] ?? 0;
+  useLayoutEffect(() => {
+    stored.current = todaySteps;
+  }, [todaySteps]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -39,7 +42,8 @@ export function usePedometer(enabled: boolean) {
         }
         if (cancelled) return;
         sub = Pedometer.watchStepCount((r) => {
-          dispatch({ type: 'setSteps', date: day, steps: base + r.steps });
+          // Never lower the count: Apple Health sync may have raised it (e.g. Watch steps).
+          dispatch({ type: 'setSteps', date: day, steps: Math.max(stored.current, base + r.steps) });
         });
       } catch {
         setAvailable(false);

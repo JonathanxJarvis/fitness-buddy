@@ -10,6 +10,9 @@ import { totalsByDate } from '@/lib/selectors';
 import { waterValue, waterUnit, weightValue, weightUnit, formatWeight } from '@/lib/units';
 import { workoutVolume } from '@/lib/training';
 import { DAILY_TIPS, tipForDate } from '@/lib/tips';
+import { isPro } from '@/lib/pro';
+import { MuscleVolumeCard, StrengthCards, StrengthHeader, StrengthPreview } from '@/components/stats/StrengthStats';
+import { RecoveryCard } from '@/components/recovery/RecoveryCard';
 import { nutrientColors, spacing, useTheme } from '@/theme';
 
 type Range = 'week' | 'month' | 'quarter';
@@ -130,6 +133,17 @@ export default function ProgressScreen() {
         </View>
         <BarChart key={range} data={volumeBars} color={nutrientColors.protein} height={120} format={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v)))} />
       </Card>
+
+      <RecoveryCard />
+      <StrengthHeader />
+      {isPro(state) ? (
+        <>
+          <StrengthCards today={today} />
+          <MuscleVolumeCard today={today} />
+        </>
+      ) : (
+        <StrengthPreview />
+      )}
 
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>

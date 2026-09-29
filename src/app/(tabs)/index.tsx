@@ -8,6 +8,7 @@ import { ActionSheet, Card, CountUp, IconButton, IconTile, Screen, SectionTitle,
 import { FadeIn, PressScale, usePulse } from '@/components/motion';
 import { Ring } from '@/components/Ring';
 import { NutritionPanel } from '@/components/today/NutritionPanel';
+import { MealPlanCard } from '@/components/today/MealPlanCard';
 import { MealCard } from '@/components/today/MealCard';
 import { MEAL_ACCENT } from '@/components/today/MealIcons';
 import { greetingFor, nextMealHint, waterGoalMl, type MealHint } from '@/components/today/dayContext';
@@ -250,6 +251,10 @@ export default function Today() {
           units={units}
           onSetWater={setWater}
         />
+      </FadeIn>
+
+      <FadeIn delay={next()}>
+        <MealPlanCard />
       </FadeIn>
 
       {isToday && (
