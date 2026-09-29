@@ -79,7 +79,7 @@ describe('Open Food Facts mapping', () => {
       nutriments: { 'energy-kcal_100g': 450, proteins_100g: 10, carbohydrates_100g: 60, fat_100g: 20, sodium_100g: 0.3, 'vitamin-d_100g': 0.000002 },
     })!;
     expect(food.brand).toBe('Acme');
-    expect(food.servings[0].label).toBe('serving (1 bar (40 g))');
+    expect(food.servings[0].label).toBe('1 bar (40 g)');
     expect(food.nutrients.calories).toBeCloseTo(180);
     expect(food.nutrients.sodium).toBeCloseTo(120);
     expect(food.nutrients.vitaminD).toBeCloseTo(0.8);

@@ -47,8 +47,20 @@ export function PortionPicker({
 
   const servingChips = food.servings.map((s, i) => ({ s, i })).filter(({ s }) => !/^(1 g|1 oz|100 g)$/.test(s.label));
 
+  const tap = (i: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    onChange(i, i === servingIndex ? quantity : 1);
+  };
+
   return (
     <View>
+      {servingChips.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0, flexShrink: 0, marginBottom: spacing.xs }}>
+          {servingChips.map(({ s, i }) => (
+            <Chip key={s.label} label={s.label} active={i === servingIndex} onPress={() => tap(i)} />
+          ))}
+        </ScrollView>
+      )}
       {gIdx >= 0 && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.cardAlt, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 6 }}>
           <Ionicons name="scale-outline" size={22} color={colors.primary} />
@@ -73,20 +85,9 @@ export function PortionPicker({
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 6, paddingVertical: spacing.sm }} style={{ flexGrow: 0, flexShrink: 0 }}>
-        {servingChips.map(({ s, i }) => (
-          <Chip
-            key={s.label}
-            label={s.label}
-            active={i === servingIndex}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChange(i, i === servingIndex ? quantity : 1);
-            }}
-          />
-        ))}
-        {gIdx >= 0 &&
-          GRAM_PRESETS.map((g) => (
+      {gIdx >= 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: spacing.sm }} style={{ flexGrow: 0, flexShrink: 0 }}>
+          {GRAM_PRESETS.map((g) => (
             <Chip
               key={g}
               label={`${g} g`}
@@ -97,7 +98,8 @@ export function PortionPicker({
               }}
             />
           ))}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {!isGram && (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -107,7 +109,7 @@ export function PortionPicker({
           <Stepper value={quantity} onChange={(q) => onChange(servingIndex, q)} step={0.5} />
         </View>
       )}
-      {gIdx >= 0 && isGram && <T size={12} muted>Type the weight from your kitchen scale, or tap a serving.</T>}
+      {gIdx >= 0 && isGram && <T size={12} muted>Type the weight from your scale, or tap a portion.</T>}
     </View>
   );
 }

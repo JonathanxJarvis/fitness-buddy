@@ -1,10 +1,11 @@
 import type { Food, FoodRegion, Nutrients, Serving } from './types';
+import { packPortions } from './packPortions';
 
 // Open Food Facts is a free, open database of ~3M packaged foods. No API key needed,
 // but they ask apps to identify themselves with a User-Agent.
 const BASE = 'https://world.openfoodfacts.org';
 const HEADERS = { 'User-Agent': 'FitnessBuddy/1.0 (React Native; open-source hobby app)' };
-const FIELDS = 'code,product_name,product_name_en,product_name_de,generic_name,generic_name_de,brands,nutriments,serving_size,serving_quantity';
+const FIELDS = 'code,product_name,product_name_en,product_name_de,generic_name,generic_name_de,brands,nutriments,serving_size,serving_quantity,quantity,product_quantity,product_quantity_unit,categories_tags';
 
 /**
  * Country subdomains filter search to that country's products and prefer its
@@ -28,6 +29,10 @@ export interface OffProduct {
   nutriments?: Nutriments;
   serving_size?: string;
   serving_quantity?: number | string;
+  quantity?: string;
+  product_quantity?: number | string;
+  product_quantity_unit?: string;
+  categories_tags?: string[];
 }
 
 function num(v: unknown): number | undefined {
@@ -85,18 +90,41 @@ export function nutrientsPer100g(n: Nutriments = {}): Nutrients | null {
   return out;
 }
 
-/** Convert an OFF product to our Food shape. Base serving is the package serving, else 100 g. */
+/** Rebuilds per-100 g values from per-serving ones for products that only list those. */
+function per100FromServing(n: Nutriments = {}, grams: number | undefined): Nutriments {
+  if (!grams) return {};
+  const out: Nutriments = {};
+  for (const [k, v] of Object.entries(n)) {
+    const x = num(v);
+    if (k.endsWith('_serving') && x !== undefined) out[k.replace(/_serving$/, '_100g')] = (x * 100) / grams;
+  }
+  return out;
+}
+
+/**
+ * Convert an OFF product to our Food shape. The base serving is one unit of the
+ * pack (a bar, a can, the label serving) when known, else 100 g.
+ */
 export function productToFood(p: OffProduct, region: FoodRegion = 'us'): Food | null {
-  const per100 = nutrientsPer100g(p.nutriments);
   const names = region === 'de' ? [p.product_name_de, p.product_name, p.generic_name_de, p.product_name_en] : [p.product_name_en, p.product_name, p.generic_name];
   const name = (names.find((n) => n && n.trim()) ?? '').trim();
+  const portions = packPortions({
+    name: [p.product_name, p.product_name_de, p.product_name_en].filter(Boolean).join(' '),
+    categories: p.categories_tags,
+    servingSize: p.serving_size,
+    servingQuantity: p.serving_quantity,
+    quantity: p.quantity,
+    productQuantity: p.product_quantity,
+    productQuantityUnit: p.product_quantity_unit,
+  });
+  const per100 = nutrientsPer100g(p.nutriments) ?? nutrientsPer100g(per100FromServing(p.nutriments, num(p.serving_quantity)));
   if (!per100 || !name) return null;
 
-  const grams = num(p.serving_quantity);
-  const base = grams && grams > 0 ? grams : 100;
-  const servings: Serving[] = [];
-  if (base !== 100) servings.push({ label: p.serving_size ? `serving (${p.serving_size})` : `serving (${base} g)`, factor: 1 });
-  servings.push({ label: '100 g', factor: 100 / base }, { label: '1 oz', factor: 28.3495 / base }, { label: '1 g', factor: 1 / base });
+  const { unit, pack } = portions;
+  const base = unit?.grams ?? 100;
+  const servings: Serving[] = unit ? [{ label: unit.label, factor: 1 }, { label: '100 g', factor: 100 / base }] : [{ label: '100 g', factor: 1 }];
+  if (pack) servings.push({ label: pack.label, factor: pack.grams / base });
+  servings.push({ label: '1 oz', factor: 28.3495 / base }, { label: '1 g', factor: 1 / base });
 
   return {
     id: `off:${p.code ?? name}`,
