@@ -7,10 +7,9 @@
  *   npm run photos -- --only shakshuka,lasagna
  *   npm run photos -- --list       print the search queries, no network
  *
- * Source 1: Openverse (api.openverse.org), only CC0 and Public Domain Mark
- * images, which may be used commercially without attribution.
- * Source 2 (optional): Pexels, when PEXELS_API_KEY is set (free key at
- * pexels.com/api). The Pexels license also allows commercial use.
+ * Pexels first when PEXELS_API_KEY is set (free key at pexels.com/api; the
+ * Pexels license allows commercial use). Openverse (only CC0 and Public
+ * Domain Mark) fills gaps, or is the only source without a key.
  *
  * Writes assets/meals/<mealId>.jpg, assets/meals/credits.json (for our
  * records) and src/components/meal/mealPhotos.ts, which the app imports.
@@ -376,15 +375,14 @@ export async function main(argv) {
     process.stdout.write(`[${i + 1}/${meals.length}] ${meal.id} … `);
     let got = null;
     try {
-      for (const q of queriesFor(meal)) {
-        got = await tryCandidates(await searchOpenverse(q), file);
-        if (got) break;
-      }
-      if (!got && pexelsKey) {
+      // Pexels first when there's a key: its food photos are far more reliable than Openverse's.
+      const sources = pexelsKey ? [(q) => searchPexels(q, pexelsKey), searchOpenverse] : [searchOpenverse];
+      for (const search of sources) {
         for (const q of queriesFor(meal)) {
-          got = await tryCandidates(await searchPexels(q, pexelsKey), file);
+          got = await tryCandidates(await search(q), file);
           if (got) break;
         }
+        if (got) break;
       }
     } catch (e) {
       console.log(`error: ${e.message}`);
