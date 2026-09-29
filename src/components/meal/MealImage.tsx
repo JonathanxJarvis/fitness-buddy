@@ -6,8 +6,9 @@ import { T, type IconName } from '@/components/ui';
 import { mixHex } from '@/components/FoodThumb';
 import { findMeal, type Meal } from '@/lib/meals';
 import { radius as radii, useTheme } from '@/theme';
+import { MEAL_PHOTOS } from './mealPhotos';
 
-export const MEAL_PHOTOS: Record<string, number> = {};
+export { MEAL_PHOTOS };
 
 type Family = { tint: string; icon: IconName };
 
@@ -74,7 +75,9 @@ export function MealImage({
   const frame = { width: width ?? '100%', aspectRatio, borderRadius: rounded, overflow: 'hidden' } as const;
   const box: StyleProp<ViewStyle> = [frame, style];
   const photo = MEAL_PHOTOS[mealId];
-  if (photo) return <Image source={photo} resizeMode="cover" accessibilityIgnoresInvertColors style={[frame, style as StyleProp<ImageStyle>]} />;
+  if (photo) {
+    return <Image source={photo} resizeMode="cover" accessibilityIgnoresInvertColors style={[frame, { backgroundColor: colors.cardAlt }, style as StyleProp<ImageStyle>]} />;
+  }
   const meal = findMeal(mealId);
   const { tint, icon } = meal ? mealFamily(meal) : FAMILIES.veg;
   const top = mixHex(tint, dark ? colors.card : '#FFFFFF', dark ? 0.34 : 0.2);

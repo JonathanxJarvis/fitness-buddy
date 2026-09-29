@@ -54,7 +54,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "photos": "node scripts/fetch-meal-photos.mjs"
   },
   "private": true,
   "jest": {

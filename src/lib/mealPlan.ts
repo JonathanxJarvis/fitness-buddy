@@ -1,4 +1,4 @@
-import { INGREDIENTS, MEALS, findMeal, type Meal } from './meals';
+import { INGREDIENTS, MEALS, findMeal, normalizeText, type Meal } from './meals';
 import type { Food, MealType, Nutrients } from './types';
 
 /*
@@ -68,6 +68,10 @@ export interface MealPlanState {
   /** Missing on plans saved before modes existed (treated as 'varied'). */
   mode?: PlanMode;
   days: PlanDay[];
+  /** What the user typed as favorite meals, kept so a new plan reuses it. */
+  favorites?: string;
+  /** Library meals matched to the favorites (locally, plus AI picks when available). */
+  favoriteIds?: string[];
   /** Shopping list item ids ticked off. */
   checked: string[];
   createdAt: number;
@@ -126,13 +130,14 @@ export function fitsDiet(meal: Meal, diet: MealDiet): boolean {
   });
 }
 
-function plannable(meal: Meal, diet: MealDiet): boolean {
-  return !meal.tags.includes('treat') && !meal.ingredients.some((i) => SKIP_INGREDIENTS.has(i.key)) && fitsDiet(meal, diet);
+function plannable(meal: Meal, diet: MealDiet, favs?: ReadonlySet<string>): boolean {
+  // A favorite treat (Döner, pancakes) is welcome; the portions still keep the day on target.
+  return (!meal.tags.includes('treat') || !!favs?.has(meal.id)) && !meal.ingredients.some((i) => SKIP_INGREDIENTS.has(i.key)) && fitsDiet(meal, diet);
 }
 
 /** Library meals the planner may put in a slot. */
-export function slotPool(slot: MealType, diet: MealDiet): Meal[] {
-  return MEALS.filter((m) => m.meals.includes(slot) && plannable(m, diet));
+export function slotPool(slot: MealType, diet: MealDiet, favs?: ReadonlySet<string>): Meal[] {
+  return MEALS.filter((m) => m.meals.includes(slot) && plannable(m, diet, favs));
 }
 
 const MEDITERRANEAN = new Set([
@@ -163,11 +168,159 @@ export function fitsStyle(meal: Meal, style: PlanStyle = 'mix'): boolean {
   return styleFit(meal, style) > 1;
 }
 
-/** How often a meal gets picked: German and international dishes first, then the plan style. */
-function weightOf(meal: Meal, proteinRatio: number, style: PlanStyle = 'mix', strength = 1): number {
+/** How often a meal gets picked: German and international dishes first, then the plan style, then favorites. */
+function weightOf(meal: Meal, proteinRatio: number, style: PlanStyle = 'mix', strength = 1, favs?: ReadonlySet<string>, favBoost = 0): number {
   let w = meal.cuisine === 'de' ? 1.6 : meal.cuisine === 'intl' ? 1.2 : 0.7;
   if (meal.tags.includes('high-protein')) w *= proteinRatio > 0.22 ? 1.8 : 1.2;
-  return w * Math.pow(styleFit(meal, style), strength);
+  w *= Math.pow(styleFit(meal, style), strength);
+  return favs?.has(meal.id) ? w * (1 + 12 * favBoost) : w;
+}
+
+// ---------- favorite meals ----------
+
+/** Filler words in "chicken with rice" or "Nudeln mit Soße". */
+const STOP = new Set([
+  'with', 'and', 'or', 'the', 'a', 'an', 'of', 'in', 'on', 'my', 'some', 'style', 'homemade', 'plate', 'bowl', 'dish',
+  'mit', 'und', 'oder', 'der', 'die', 'das', 'den', 'dem', 'ein', 'eine', 'vom', 'von', 'auf', 'im', 'art', 'teller', 'selbstgemacht',
+]);
+
+/** German ↔ English and everyday names, all normalized (see normalizeText). Each group is one idea. */
+const SYNONYM_GROUPS: string[][] = [
+  ['pasta', 'nudel', 'noodle', 'spaghetti', 'penne', 'fusilli', 'tagliatelle', 'makkaroni', 'macaroni', 'lasagn'],
+  ['chicken', 'hahnchen', 'huhn', 'huhnchen', 'hanchen', 'poulet', 'geflugel'],
+  ['turkey', 'pute', 'puten', 'truthahn'],
+  ['beef', 'rind', 'rinder'],
+  ['pork', 'schwein'],
+  ['mince', 'ground', 'hack', 'hackfleisch', 'gehacktes'],
+  ['rice', 'reis'],
+  ['potato', 'kartoffel', 'erdapfel'],
+  ['fries', 'pommes', 'chips'],
+  ['salmon', 'lachs'],
+  ['fish', 'fisch', 'seelachs', 'kabeljau', 'cod', 'pollock'],
+  ['tuna', 'thunfisch'],
+  ['shrimp', 'prawn', 'garnele', 'scampi', 'krabbe'],
+  ['egg', 'ei', 'eier', 'omelet', 'omelett', 'ruhrei', 'scrambled'],
+  ['pancake', 'pfannkuchen', 'eierkuchen', 'crepe', 'kaiserschmarrn'],
+  ['doner', 'kebab', 'kebap', 'durum', 'gyros'],
+  ['cheese', 'kase'],
+  ['vegetable', 'veggie', 'veg', 'gemuse'],
+  ['salad', 'salat'],
+  ['soup', 'suppe', 'eintopf', 'stew'],
+  ['bread', 'brot', 'toast', 'sandwich', 'stulle', 'brotchen'],
+  ['oats', 'oat', 'porridge', 'oatmeal', 'hafer', 'haferflocken', 'haferbrei', 'muesli', 'musli'],
+  ['yogurt', 'joghurt', 'jogurt', 'yoghurt'],
+  ['beans', 'bean', 'bohne'],
+  ['lentil', 'linse', 'dal', 'dhal'],
+  ['chickpea', 'kichererbse'],
+  ['sausage', 'wurst', 'wurstchen'],
+  ['steak', 'rindersteak'],
+  ['burger', 'hamburger', 'cheeseburger'],
+  ['stir', 'wok', 'stirfry'],
+  ['spinach', 'spinat'],
+  ['broccoli', 'brokkoli'],
+  ['mushroom', 'pilz', 'champignon'],
+  ['tomato', 'tomate'],
+  ['apple', 'apfel'],
+  ['berries', 'berry', 'beere', 'heidelbeere', 'blueberry', 'erdbeere', 'strawberry'],
+  ['banana', 'banane'],
+  ['peanut', 'erdnuss'],
+  ['sweet potato', 'susskartoffel'],
+  ['bowl', 'poke'],
+  ['schnitzel', 'escalope'],
+  ['spatzle', 'spaetzle', 'kasespatzle'],
+  ['quark', 'magerquark', 'curd'],
+];
+
+const SYNONYMS = new Map<string, string[]>();
+for (const group of SYNONYM_GROUPS) {
+  const g = group.map(normalizeText);
+  for (const w of g) SYNONYMS.set(w, [...new Set([...(SYNONYMS.get(w) ?? []), ...g])]);
+}
+
+/** "pancakes" → "pancake", "tomatoes" → "tomato", "Nudeln" → "nudel". */
+function stem(w: string): string {
+  if (w.length > 4 && w.endsWith('oes')) return w.slice(0, -2);
+  if (w.length >= 4 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  if (w.length > 5 && w.endsWith('n')) return w.slice(0, -1);
+  return w;
+}
+
+function alternatives(word: string): string[] {
+  const out = new Set<string>([word, stem(word)]);
+  for (const w of [...out]) for (const s of SYNONYMS.get(w) ?? []) out.add(s);
+  return [...out];
+}
+
+/** Splits "Pasta, Döner; pancakes\nchicken with rice" into single favorites. */
+export function splitFavorites(text: string): string[] {
+  return [...new Set(text.split(/[,;\n/|•]+/).map((x) => x.trim()).filter((x) => x.length > 1))].slice(0, 20);
+}
+
+const words = (s: string) => normalizeText(s).split(/[^a-z0-9]+/).filter(Boolean);
+
+interface MealHay {
+  meal: Meal;
+  names: string[];
+  ingredients: string[];
+}
+
+let HAY: MealHay[] | null = null;
+function hay(): MealHay[] {
+  HAY ??= MEALS.map((meal) => ({
+    meal,
+    names: words(`${meal.name} ${meal.nameDe} ${meal.id.replace(/-/g, ' ')}`),
+    ingredients: words(meal.ingredients.map((i) => `${i.name} ${i.nameDe} ${i.key.replace(/([A-Z])/g, ' $1')}`).join(' ')),
+  }));
+  return HAY;
+}
+
+const hit = (alts: string[], hayWords: string[]) =>
+  alts.some((a) => (a.includes(' ') ? hayWords.join(' ').includes(a) : hayWords.some((w) => w.startsWith(a) || (a.length >= 5 && w.includes(a)))));
+
+export interface FavoriteMatch {
+  favorite: string;
+  mealIds: string[];
+}
+
+/**
+ * Library meals for each favorite, best first, offline. Every word of a
+ * favorite must show up in a meal's name or ingredients (in English or German,
+ * with simple synonyms like Nudeln = pasta); meals that have the words in their
+ * name win, and ingredient-only matches count only when no name matches.
+ */
+export function matchFavorites(text: string, max = 6): FavoriteMatch[] {
+  return splitFavorites(text).map((favorite) => {
+    const toks = words(favorite).filter((w) => !STOP.has(w) && (w.length > 1 || w === 'ei'));
+    if (!toks.length) return { favorite, mealIds: [] };
+    const alts = toks.map(alternatives);
+    const literal = toks.map((t) => [t, stem(t)]);
+    const scored: { id: string; score: number; inName: boolean }[] = [];
+    for (const h of hay()) {
+      let score = 0;
+      let inName = false;
+      let ok = true;
+      for (const [i, a] of alts.entries()) {
+        if (hit(a, h.names)) {
+          score += hit(literal[i], h.names) ? 2.5 : 2;
+          inName = true;
+        } else if (hit(a, h.ingredients)) score += 1;
+        else {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) scored.push({ id: h.meal.id, score, inName });
+    }
+    const named = scored.filter((x) => x.inName);
+    const pick = named.length ? named : scored;
+    return { favorite, mealIds: pick.sort((a, b) => b.score - a.score).slice(0, max).map((x) => x.id) };
+  });
+}
+
+/** All meal ids matched by the favorites, locally. */
+export function favoriteMealIds(text: string | undefined): string[] {
+  if (!text?.trim()) return [];
+  return [...new Set(matchFavorites(text).flatMap((m) => m.mealIds))];
 }
 
 // ---------- nutrients ----------
@@ -324,6 +477,10 @@ export interface PlanOptions {
   seed: string;
   startDate: string;
   days?: number;
+  /** Free text, e.g. "Pasta, Döner, pancakes". Stored with the plan. */
+  favorites?: string;
+  /** Matched meal ids; defaults to the local match of `favorites`. */
+  favoriteIds?: string[];
 }
 
 const MAX_USES: Record<MealType, number> = { breakfast: 2, lunch: 2, dinner: 2, snacks: 3 };
@@ -343,7 +500,7 @@ function pickWeighted<T>(rng: () => number, items: T[], weight: (t: T) => number
 
 const signature = (day: PlanDay) => day.meals.map((m) => `${m.slot}:${m.mealId}`).sort().join('|');
 
-type Resolved = Required<Omit<PlanOptions, 'mode'>> & { strength: number };
+type Resolved = Required<Omit<PlanOptions, 'mode' | 'favorites' | 'favoriteIds'>> & { strength: number; favs: ReadonlySet<string>; favBoost: number };
 
 /** Worst day's miss on calories or protein. */
 export function planError(plan: Pick<MealPlanState, 'days' | 'calories' | 'protein'>): number {
@@ -357,27 +514,42 @@ export function planError(plan: Pick<MealPlanState, 'days' | 'calories' | 'prote
  */
 export function generateMealPlan(opts: PlanOptions): MealPlanState {
   const { calories, protein, seed, startDate, diet = 'any', style = 'mix', mode = 'varied', days = 7 } = opts;
+  const favorites = opts.favorites?.trim() || undefined;
+  const ids = (opts.favoriteIds ?? favoriteMealIds(favorites)).filter((id) => !!findMeal(id));
+  const favs: ReadonlySet<string> = new Set(ids);
   const gen = mode === 'simple' ? generateSimplePlan : generateVariedPlan;
   let best: MealPlanState | null = null;
-  for (const strength of style === 'mix' ? [1] : [1, 0.5, 0]) {
-    const plan = gen({ calories, protein, seed, startDate, diet, style, days, strength });
-    const err = planError(plan);
-    if (!best || err < planError(best)) best = plan;
-    if (err <= TOLERANCE) break;
+  // Favorites and style only bias the picks; they are softened, then dropped, before a day may miss the goals.
+  const boosts = favs.size ? [1, 0.4, 0] : [0];
+  outer: for (const favBoost of boosts) {
+    for (const strength of style === 'mix' ? [1] : [1, 0.5, 0]) {
+      const plan = gen({ calories, protein, seed, startDate, diet, style, days, strength, favs: favBoost ? favs : new Set(), favBoost });
+      const err = planError(plan);
+      if (!best || err < planError(best) - 1e-9) best = plan;
+      if (err <= TOLERANCE) break outer;
+    }
   }
-  return best!;
+  return favs.size || favorites ? { ...best!, favorites, favoriteIds: ids } : best!;
+}
+
+/** Favorite meals that made it into the plan, most planned first. */
+export function plannedFavorites(plan: Pick<MealPlanState, 'days' | 'favoriteIds'>): Meal[] {
+  const favs = new Set(plan.favoriteIds ?? []);
+  const count = new Map<string, number>();
+  for (const d of plan.days) for (const m of d.meals) if (favs.has(m.mealId)) count.set(m.mealId, (count.get(m.mealId) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => findMeal(id)).filter((m): m is Meal => !!m);
 }
 
 function generateVariedPlan(opts: Resolved): MealPlanState {
-  const { calories, protein, seed, startDate, diet, style, days, strength } = opts;
-  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}${style === 'mix' ? '' : `|${style}`}`);
+  const { calories, protein, seed, startDate, diet, style, days, strength, favs, favBoost } = opts;
+  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}${style === 'mix' ? '' : `|${style}`}${favs.size ? `|fav${favBoost}` : ''}`);
   const ratio = (protein * 4) / Math.max(1, calories);
   const slots = calories >= 2000 ? SLOTS_2 : SLOTS_1;
   const pools: Record<MealType, Meal[]> = {
-    breakfast: slotPool('breakfast', diet),
-    lunch: slotPool('lunch', diet),
-    dinner: slotPool('dinner', diet),
-    snacks: slotPool('snacks', diet),
+    breakfast: slotPool('breakfast', diet, favs),
+    lunch: slotPool('lunch', diet, favs),
+    dinner: slotPool('dinner', diet, favs),
+    snacks: slotPool('snacks', diet, favs),
   };
   const uses = new Map<string, number>();
   const seen = new Set<string>();
@@ -399,7 +571,7 @@ function generateVariedPlan(opts: Resolved): MealPlanState {
         });
         // Relax the weekly cap rather than fail when a pool runs dry (strict diets).
         const from = pool.length ? pool : pools[slot].filter((m) => !chosen.includes(m));
-        const m = pickWeighted(rng, from, (x) => weightOf(x, ratio, style, strength) / (1 + (uses.get(x.id) ?? 0)));
+        const m = pickWeighted(rng, from, (x) => weightOf(x, ratio, style, strength, favs, favBoost) / (1 + (uses.get(x.id) ?? 0)));
         if (!m) {
           ok = false;
           break;
@@ -413,7 +585,8 @@ function generateVariedPlan(opts: Resolved): MealPlanState {
       const repeats = chosen.reduce((a, m) => a + (uses.get(m.id) ?? 0), 0);
       // Accuracy first; then natural portions, fewer repeats, and a pinch of chance.
       const offStyle = style === 'mix' ? 0 : chosen.filter((m) => !fitsStyle(m, style)).length * 0.012 * strength;
-      const score = Math.max(0, built.err - 0.03) * 10 + built.err + 0.1 * built.stretch + 0.015 * repeats + offStyle + 0.01 * rng();
+      const fav = favBoost * 0.02 * chosen.filter((m) => favs.has(m.id)).length;
+      const score = Math.max(0, built.err - 0.03) * 10 + built.err + 0.1 * built.stretch + 0.015 * repeats + offStyle - fav + 0.01 * rng();
       if (!best || score < best.score) best = { day: built.day, score };
     }
     if (!best) break;
@@ -439,13 +612,13 @@ export function simplePairing(d: number): [number, number] {
  * list, so sets that share ingredients score a little better.
  */
 function generateSimplePlan(opts: Resolved): MealPlanState {
-  const { calories, protein, seed, startDate, diet, style, days, strength } = opts;
-  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}|${style}|simple`);
+  const { calories, protein, seed, startDate, diet, style, days, strength, favs, favBoost } = opts;
+  const rng = makeRng(`${seed}|${diet}|${calories}|${protein}|${style}|simple${favs.size ? `|fav${favBoost}` : ''}`);
   const ratio = (protein * 4) / Math.max(1, calories);
   const slots = SLOTS_1;
-  const pool = (slot: MealType) => slotPool(slot, diet);
+  const pool = (slot: MealType) => slotPool(slot, diet, favs);
   const pools = { breakfast: pool('breakfast'), lunch: pool('lunch'), dinner: pool('dinner'), snacks: pool('snacks') };
-  const w = (m: Meal) => weightOf(m, ratio, style, strength);
+  const w = (m: Meal) => weightOf(m, ratio, style, strength, favs, favBoost);
   const combos = Math.min(4, days);
 
   let best: { days: PlanDay[]; score: number } | null = null;
@@ -474,7 +647,8 @@ function generateSimplePlan(opts: Resolved): MealPlanState {
     }
     const buys = new Set([b, s, l1, l2, d1, d2].flatMap((m) => m.ingredients.map((i) => buyInfo(i.key).id))).size;
     const offStyle = style === 'mix' ? 0 : [b, s, l1, l2, d1, d2].filter((m) => !fitsStyle(m, style)).length * 0.012 * strength;
-    const score = Math.max(0, err - 0.03) * 10 + err + 0.1 * stretch + 0.004 * buys + offStyle + 0.01 * rng();
+    const fav = favBoost * 0.03 * [b, s, l1, l2, d1, d2].filter((m) => favs.has(m.id)).length;
+    const score = Math.max(0, err - 0.03) * 10 + err + 0.1 * stretch + 0.004 * buys + offStyle - fav + 0.01 * rng();
     if (!best || score < best.score) best = { days: built, score };
   }
   const out = best ? Array.from({ length: days }, (_, d) => best.days[d % combos]) : [];
@@ -501,14 +675,15 @@ export function swapOptions(plan: MealPlanState, dayIndex: number, mealIndex: nu
   const seen = new Set(plan.days.filter((_, i) => i !== dayIndex).map(signature));
 
   const results: { day: PlanDay; score: number }[] = [];
-  for (const cand of slotPool(target.slot, plan.diet)) {
+  const favs = new Set(plan.favoriteIds ?? []);
+  for (const cand of slotPool(target.slot, plan.diet, favs)) {
     if (cand.id === target.mealId || others.has(cand.id)) continue;
     if (target.slot !== 'snacks' && otherMains.has(cand.ingredients[0].key)) continue;
     const meals = current.map((m, i) => (i === mealIndex ? cand : m));
     const built = buildDay(meals, slots, plan.calories, plan.protein);
     if (built.err > TOLERANCE || seen.has(signature(built.day))) continue;
     const jitter = (hashSeed(`${plan.seed}|${dayIndex}|${cand.id}`) % 1000) / 1000;
-    const fit = fitsStyle(cand, plan.style) ? -0.03 : 0;
+    const fit = (fitsStyle(cand, plan.style) ? -0.03 : 0) + (favs.has(cand.id) ? -0.03 : 0);
     results.push({ day: built.day, score: built.err + 0.1 * built.stretch + 0.03 * (weekUses.get(cand.id) ?? 0) + (cand.cuisine === 'us' ? 0.02 : 0) + 0.02 * jitter + fit });
   }
   return results.sort((a, b) => a.score - b.score).slice(0, n).map((r) => r.day);

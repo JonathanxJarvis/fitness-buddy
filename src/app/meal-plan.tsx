@@ -5,10 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Button, Card, IconButton, IconTile, ProgressBar, Segmented, Sheet, T, type IconName } from '@/components/ui';
+import { Button, Card, Field, IconButton, IconTile, ProgressBar, Segmented, Sheet, T, type IconName } from '@/components/ui';
 import { FadeIn, PressScale } from '@/components/motion';
 import { ProMark } from '@/components/ProMark';
 import { MealImage } from '@/components/meal/MealImage';
+import { resolveFavoriteIds } from '@/components/meal/favoritesAi';
 import { MEAL_ACCENT } from '@/components/today/MealIcons';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
@@ -22,9 +23,11 @@ import {
   DIETS,
   generateMealPlan,
   itemsNutrients,
+  matchFavorites,
   newSeed,
   PLAN_MODES,
   PLAN_STYLES,
+  plannedFavorites,
   plannedMealFood,
   shoppingAmount,
   shoppingList,
@@ -305,6 +308,38 @@ interface PlanChoice {
   mode: PlanMode;
   style: PlanStyle;
   diet: MealDiet;
+  favorites: string;
+}
+
+const listNames = (names: string[], max = 3) => names.slice(0, max).join(', ') + (names.length > max ? ` +${names.length - max} more` : '');
+
+function FavoritesField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const matches = useMemo(() => matchFavorites(value), [value]);
+  const found = [...new Set(matches.flatMap((m) => m.mealIds.slice(0, 2)))].map((id) => findMeal(id)?.name).filter((n): n is string => !!n);
+  const missing = matches.filter((m) => !m.mealIds.length).map((m) => m.favorite);
+  return (
+    <>
+      <T size={15} weight="800" style={{ marginBottom: spacing.sm, marginTop: spacing.lg }}>Your favorite meals</T>
+      <Field
+        value={value}
+        onChangeText={onChange}
+        placeholder="Pasta, Döner, pancakes, chicken with rice"
+        autoCapitalize="none"
+        autoCorrect={false}
+        maxLength={200}
+        returnKeyType="done"
+        accessibilityLabel="Your favorite meals"
+        style={{ marginBottom: 6 }}
+      />
+      <T size={12} muted numberOfLines={2}>
+        {!value.trim()
+          ? 'Optional. We’ll plan more of what you like.'
+          : found.length
+            ? `Using: ${listNames(found)}${missing.length ? `. No match for ${listNames(missing, 2)}` : ''}`
+            : 'No match in our recipes yet. Try another name.'}
+      </T>
+    </>
+  );
 }
 
 function PlanChoices({ value, onChange }: { value: PlanChoice; onChange: (v: PlanChoice) => void }) {
@@ -327,11 +362,12 @@ function PlanChoices({ value, onChange }: { value: PlanChoice; onChange: (v: Pla
       <T size={12} muted style={{ marginTop: 6, marginBottom: spacing.lg }}>{style?.blurb}</T>
       <T size={15} weight="800" style={{ marginBottom: spacing.sm }}>What do you eat?</T>
       <DietChips value={value.diet} onChange={(d) => onChange({ ...value, diet: d })} />
+      <FavoritesField value={value.favorites} onChange={(favorites) => onChange({ ...value, favorites })} />
     </>
   );
 }
 
-const choiceOf = (plan: MealPlanState): PlanChoice => ({ mode: plan.mode ?? 'varied', style: plan.style ?? 'mix', diet: plan.diet });
+const choiceOf = (plan: MealPlanState): PlanChoice => ({ mode: plan.mode ?? 'varied', style: plan.style ?? 'mix', diet: plan.diet, favorites: plan.favorites ?? '' });
 
 function PlanSummary({ plan, onPress }: { plan: MealPlanState; onPress: () => void }) {
   const { colors } = useTheme();
@@ -351,6 +387,20 @@ function PlanSummary({ plan, onPress }: { plan: MealPlanState; onPress: () => vo
       <T size={13} weight="600" muted style={{ flex: 1 }} numberOfLines={1}>{parts.filter(Boolean).join(' · ')}</T>
       <T size={13} weight="700" color={colors.primary}>Change</T>
     </Pressable>
+  );
+}
+
+function FavoritesLine({ plan }: { plan: MealPlanState }) {
+  const { colors } = useTheme();
+  if (!plan.favorites) return null;
+  const used = plannedFavorites(plan).map((m) => m.name);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+      <Ionicons name="heart" size={14} color={used.length ? colors.primary : colors.textMuted} />
+      <T size={12} muted numberOfLines={1} style={{ flex: 1 }}>
+        {used.length ? `Using: ${listNames(used)}` : 'None of your favorites fit your goals this week.'}
+      </T>
+    </View>
   );
 }
 
@@ -512,18 +562,30 @@ export default function MealPlanScreen() {
   const plan = state.mealPlan;
   const today = todayKey();
   const [tab, setTab] = useState<'meals' | 'shop'>('meals');
-  const [choice, setChoice] = useState<PlanChoice>(() => (plan ? choiceOf(plan) : { mode: 'simple', style: 'mix', diet: defaultDiet(state) }));
+  const [choice, setChoice] = useState<PlanChoice>(() => (plan ? choiceOf(plan) : { mode: 'simple', style: 'mix', diet: defaultDiet(state), favorites: '' }));
+  const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
   const todayIndex = plan ? Math.round((fromKey(today).getTime() - fromKey(plan.startDate).getTime()) / 86400000) : -1;
   const [selected, setSelected] = useState(() => (todayIndex >= 0 && todayIndex < (plan?.days.length ?? 0) ? todayIndex : 0));
   const [swap, setSwap] = useState<{ day: number; meal: number } | null>(null);
 
-  const make = (c: PlanChoice = choice) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  const make = async (c: PlanChoice = choice) => {
+    if (busy) return;
     setChoice(c);
-    const next = generateMealPlan({ ...goals, ...c, seed: newSeed(), startDate: today });
+    const favorites = c.favorites.trim();
+    let favoriteIds: string[] | undefined;
+    if (favorites && plan?.favorites === favorites && plan.diet === c.diet && plan.favoriteIds) favoriteIds = plan.favoriteIds;
+    else if (favorites) {
+      setBusy(true);
+      favoriteIds = await resolveFavoriteIds(favorites, c.diet);
+      setBusy(false);
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    const next = generateMealPlan({ ...goals, ...c, favorites, favoriteIds, seed: newSeed(), startDate: today });
     dispatch({ type: 'setMealPlan', plan: next });
     setSelected(0);
+    setSettings(false);
+    setTab('meals');
   };
 
   const loggedIds = useMemo(() => new Set(state.entries.filter((e) => e.date === today).map((e) => e.food.id)), [state.entries, today]);
@@ -554,7 +616,7 @@ export default function MealPlanScreen() {
             <Card>
               <PlanChoices value={choice} onChange={setChoice} />
             </Card>
-            <Button title="Create my plan" icon="sparkles" onPress={() => make()} style={{ marginTop: spacing.sm }} />
+            <Button title={busy ? 'Matching your favorites…' : 'Create my plan'} icon="sparkles" disabled={busy} onPress={() => make()} style={{ marginTop: spacing.sm }} />
             <T size={12} muted center style={{ marginTop: spacing.md }}>Works offline. You can swap any meal later.</T>
           </FadeIn>
         </ScrollView>
@@ -608,6 +670,7 @@ export default function MealPlanScreen() {
         {tab === 'meals' && day ? (
           <>
             <PlanSummary plan={plan} onPress={openSettings} />
+            <FavoritesLine plan={plan} />
             <WeekStrip plan={plan} selected={selected} onSelect={setSelected} />
             <FadeIn key={`sum-${selected}-${plan.seed}`} offset={6}>
               <DaySummary plan={plan} index={selected} />
@@ -623,7 +686,7 @@ export default function MealPlanScreen() {
                 {offDays === 1 ? 'One day' : `${offDays} days`} couldn’t quite reach your goals with {DIETS.find((x) => x.key === plan.diet)?.label.toLowerCase()} meals, so we got as close as we could.
               </T>
             )}
-            <Button title="Make a new plan" icon="refresh" variant="secondary" onPress={() => make(choiceOf(plan))} style={{ marginTop: spacing.sm }} />
+            <Button title="Make a new plan" icon="refresh" variant="secondary" disabled={busy} onPress={() => make(choiceOf(plan))} style={{ marginTop: spacing.sm }} />
           </>
         ) : null}
 
@@ -674,13 +737,10 @@ export default function MealPlanScreen() {
       <Sheet visible={settings} onClose={() => setSettings(false)} title="Plan settings">
         <PlanChoices value={choice} onChange={setChoice} />
         <Button
-          title="Make a new plan"
+          title={busy ? 'Matching your favorites…' : 'Make a new plan'}
           icon="sparkles"
-          onPress={() => {
-            setSettings(false);
-            setTab('meals');
-            make(choice);
-          }}
+          disabled={busy}
+          onPress={() => make(choice)}
           style={{ marginTop: spacing.xl }}
         />
       </Sheet>

@@ -8,8 +8,12 @@ import {
   distinctMeals,
   fitsDiet,
   fitsStyle,
+  favoriteMealIds,
   generateMealPlan,
+  matchFavorites,
   planError,
+  plannedFavorites,
+  splitFavorites,
   PLAN_STYLES,
   plannedMealFood,
   shoppingAmount,
@@ -246,5 +250,77 @@ describe('plan styles', () => {
       const kcal = m!.ingredients.reduce((a, i) => a + (INGREDIENTS[i.key].per100.calories * i.grams) / 100, 0);
       expect(m!.nutrients.calories).toBeCloseTo(kcal, 0);
     }
+  });
+});
+
+describe('favorite meals', () => {
+  const ids = (text: string) => favoriteMealIds(text);
+
+  it('splits a free-text list', () => {
+    expect(splitFavorites('Pasta, Döner; pancakes\nchicken with rice, ,pasta')).toEqual(['Pasta', 'Döner', 'pancakes', 'chicken with rice', 'pasta']);
+  });
+
+  it('matches English and German names, case and accents ignored', () => {
+    expect(ids('spaghetti bolognese')).toEqual(['spaghetti-bolognese']);
+    expect(ids('SPAGHETTI BOLOGNESE')).toEqual(['spaghetti-bolognese']);
+    expect(ids('Döner')).toEqual(expect.arrayContaining(['doner-kebab', 'doner-plate-rice']));
+    expect(ids('doener')).toEqual(expect.arrayContaining(['doner-kebab']));
+    expect(ids('Käsespätzle')).toContain('kaesespaetzle');
+    expect(ids('Currywurst')).toEqual(expect.arrayContaining(['currywurst-fries', 'currywurst-roll']));
+  });
+
+  it('knows simple synonyms and plurals', () => {
+    const [nudeln] = matchFavorites('Nudeln');
+    expect(nudeln.mealIds.length).toBeGreaterThan(2);
+    for (const id of nudeln.mealIds) expect(findMeal(id)!.ingredients.some((i) => /pasta|spaetzle/i.test(i.key))).toBe(true);
+    expect([...ids('Hähnchen mit Reis')].sort()).toEqual([...ids('chicken with rice')].sort());
+    expect(ids('chicken with rice')).toContain('chicken-rice-broccoli');
+    expect(ids('pancakes')).toEqual(expect.arrayContaining(['protein-pancakes', 'pancakes-syrup']));
+    expect(ids('Lachs')).toContain('salmon-rice-bowl');
+  });
+
+  it('uses ingredients when no meal is named after the favorite', () => {
+    expect(ids('Garnelen')).toEqual(expect.arrayContaining(['shrimp-fried-rice', 'garlic-shrimp-pasta']));
+  });
+
+  it('returns nothing for unknown or empty favorites', () => {
+    expect(ids('')).toEqual([]);
+    expect(ids('xyzzy')).toEqual([]);
+    expect(matchFavorites('Pasta, blorp').map((m) => m.mealIds.length > 0)).toEqual([true, false]);
+  });
+
+  it('puts favorites in the plan and still hits the goals', () => {
+    const favorites = 'Spaghetti bolognese, Döner, chicken burrito bowl';
+    for (const g of [GOALS[0], GOALS[1], GOALS[3], GOALS[7]]) {
+      for (const mode of ['simple', 'varied'] as const) {
+        const base = generateMealPlan({ ...g, mode, seed: 'fav', startDate: '2026-09-28' });
+        const p = generateMealPlan({ ...g, mode, favorites, seed: 'fav', startDate: '2026-09-28' });
+        expect(p.favorites).toBe(favorites);
+        expect(planError(p)).toBeLessThanOrEqual(Math.max(TOLERANCE, planError(base)));
+        const favs = new Set(p.favoriteIds);
+        const count = (x: typeof p) => x.days.flatMap((d) => d.meals).filter((m) => favs.has(m.mealId)).length;
+        expect(plannedFavorites(p).length).toBeGreaterThan(0);
+        expect(count(p)).toBeGreaterThan(count(base));
+      }
+    }
+  });
+
+  it('respects the diet even for favorites', () => {
+    const p = generateMealPlan({ ...GOALS[5], favorites: 'Döner, spaghetti bolognese', seed: 'veg', startDate: '2026-09-28' });
+    for (const d of p.days) for (const m of d.meals) expect(fitsDiet(findMeal(m.mealId)!, 'vegetarian')).toBe(true);
+    expect(planError(p)).toBeLessThanOrEqual(TOLERANCE);
+  });
+
+  it('keeps AI-matched ids and ignores unknown ones', () => {
+    const p = generateMealPlan({ ...GOALS[1], favorites: 'something fancy', favoriteIds: ['shakshuka', 'not-a-meal'], seed: 'ai', startDate: '2026-09-28' });
+    expect(p.favoriteIds).toEqual(['shakshuka']);
+    expect(p.days.some((d) => d.meals.some((m) => m.mealId === 'shakshuka'))).toBe(true);
+  });
+
+  it('leaves plans without favorites unchanged', () => {
+    const a = generateMealPlan({ ...GOALS[1], seed: 'same', startDate: '2026-09-28' });
+    const b = generateMealPlan({ ...GOALS[1], favorites: '  ', seed: 'same', startDate: '2026-09-28' });
+    expect(b.days).toEqual(a.days);
+    expect(a.favorites).toBeUndefined();
   });
 });
