@@ -11,7 +11,7 @@ import { EVOLUTION } from '@/components/pet/Gear';
 import { usePetLook } from '@/components/pet/usePetLook';
 import { useStore } from '@/store/StoreProvider';
 import { isPro } from '@/lib/pro';
-import { PRO_GOLD, ProMark } from '@/components/ProMark';
+import { ProMark } from '@/components/ProMark';
 import { AURAS, CATALOG, hasItem, itemById, RARITY, type ItemKind, type LootItem } from '@/lib/loot';
 import { TIERS } from '@/lib/progression';
 import { shortDate } from '@/lib/dates';
@@ -272,7 +272,7 @@ function OwnedTile({ item, equipped, species, skin, onPress }: { item: LootItem;
     );
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.name}, ${rar.label}${equipped ? ', equipped' : ''}`} style={{ width: '22.8%' }}>
-      <View style={{ borderRadius: 14, backgroundColor: equipped ? rar.color + '1F' : colors.card, borderWidth: equipped ? 1.5 : 1, borderColor: equipped ? rar.color : item.source === 'pro' ? PRO_GOLD + 'B3' : colors.border, alignItems: 'center', paddingTop: 5, paddingBottom: 6, overflow: 'hidden' }}>
+      <View style={{ borderRadius: 14, backgroundColor: equipped ? rar.color + '1F' : colors.card, borderWidth: equipped ? 1.5 : 1, borderColor: equipped ? rar.color : colors.border, alignItems: 'center', paddingTop: 5, paddingBottom: 6, overflow: 'hidden' }}>
         <View style={{ position: 'absolute', top: 0, left: 10, right: 10, height: 2.5, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, backgroundColor: rar.color, opacity: 0.85 }} />
         {item.source === 'pro' && <ProMark size={9} style={{ position: 'absolute', top: 6, right: 6 }} />}
         {preview}
@@ -299,7 +299,7 @@ function ItemCard({ item, got, equipped, species, skin, onPress }: { item: LootI
     );
   return (
     <PressScale onPress={onPress} accessibilityRole="button" accessibilityLabel={`${item.name}, ${rar.label}${got ? (equipped ? ', equipped' : '') : ', locked'}`} style={{ width: '31.4%' }}>
-      <View style={{ borderRadius: 16, backgroundColor: colors.card, borderWidth: equipped ? 2 : 1, borderColor: equipped ? rar.color : item.source === 'pro' ? PRO_GOLD + 'B3' : colors.border, overflow: 'hidden', paddingBottom: 8 }}>
+      <View style={{ borderRadius: 16, backgroundColor: colors.card, borderWidth: equipped ? 2 : 1, borderColor: equipped ? rar.color : colors.border, overflow: 'hidden', paddingBottom: 8 }}>
         <LinearGradient colors={[rar.color + (got ? '38' : '14'), 'transparent']} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 80 }} />
         <View style={{ height: 3, backgroundColor: rar.color, opacity: got ? 1 : 0.4 }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingTop: 6 }}>

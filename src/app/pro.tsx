@@ -33,7 +33,7 @@ export default function ProScreen() {
   const [plan, setPlan] = useState<string>('yearly');
   const [note, setNote] = useState<string | null>(null);
   const [skin, setSkin] = useState(0);
-  const skins = Object.keys(SKINS);
+  const skins = Object.keys(SKINS).filter((k) => SKINS[k].source === 'pro');
 
   const buy = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -65,7 +65,7 @@ export default function ProScreen() {
               Fitness Buddy <T size={30} weight="800" color={GOLD}>Pro</T>
             </T>
             <T size={14} color="rgba(255,255,255,0.7)" center style={{ marginTop: 6, maxWidth: 300 }}>
-              Everything you need is free. Pro adds the AI, all your friends and a little style.
+              Subscribe to Pro for the full experience.
             </T>
           </FadeIn>
         </LinearGradient>

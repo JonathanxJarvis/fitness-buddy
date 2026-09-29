@@ -15,7 +15,7 @@ import { useStore } from '@/store/StoreProvider';
 import { useSocial } from '@/lib/useSocial';
 import { addFriend, DEMO, OFFLINE, OFFLINE_MESSAGE, formatCode, levelsGained, makeSnapshot, scoreGained, sendMessage } from '@/lib/social';
 import { FREE_FRIEND_LIMIT, isPro } from '@/lib/pro';
-import { ProMark, proOutline } from '@/components/ProMark';
+import { ProMark } from '@/components/ProMark';
 import { STAGES } from '@/lib/progression';
 import { radius, spacing, useTheme } from '@/theme';
 import type { SocialEvent, SocialSnapshot } from '@/lib/types';
@@ -381,7 +381,7 @@ export default function FriendsScreen() {
           Ask your friend for their code. They’ll find it under Friends → Invite.
         </T>
         {!pro && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.lg, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, ...proOutline }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.lg, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: colors.cardAlt }}>
             <ProMark />
             <T size={13} muted>
               {social.friends.length}/{FREE_FRIEND_LIMIT} free friends used · unlimited with Pro

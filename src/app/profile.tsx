@@ -145,7 +145,7 @@ export default function ProfileScreen() {
         <ListRow
           icon={pro ? 'diamond' : 'diamond-outline'}
           title={pro ? (PREVIEW ? 'Pro · unlocked in preview' : 'Fitness Buddy Pro') : 'Upgrade to Pro'}
-          subtitle={pro ? 'AI coach, snap a meal, unlimited friends, all pets' : 'AI coach, snap a meal, unlimited friends and 5 more pets'}
+          subtitle={pro ? 'AI coach, snap a meal, unlimited friends, Pro pets' : 'Subscribe for the full experience'}
           onPress={() => router.push('/pro')}
           right={pro ? <Badge label="PRO" color={colors.primary} /> : chevron(colors.textMuted)}
         />

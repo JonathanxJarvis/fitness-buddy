@@ -19,8 +19,8 @@ export const PRO_FEATURES: { icon: string; title: string; body: string }[] = [
   { icon: 'camera', title: 'Snap a meal', body: 'Photograph your plate. AI finds every food, weighs the portions and logs the macros.' },
   { icon: 'sparkles', title: 'AI Coach', body: 'Chat with an AI coach that sees your log, workouts and rank, and breaks down meal photos.' },
   { icon: 'people', title: 'Unlimited friends', body: `Link up with as many friends as you want (free: ${FREE_FRIEND_LIMIT}) and race them up the ranks.` },
-  { icon: 'paw', title: '5 more pets + outfits', body: 'Unlock Dumbo, Avo, Broc, Plato and Blaze, dress any pet in Gold, Midnight, Cherry or Neon, and get a little extra chest luck.' },
-  { icon: 'heart', title: 'Support an indie app', body: 'No ads, no data selling. Pro keeps it that way.' },
+  { icon: 'paw', title: 'Pro pets and outfits', body: 'Dumbo and Blaze join your pets, Gold and Midnight join your wardrobe, and your chests get a little extra luck.' },
+  { icon: 'heart', title: 'Support a growing app', body: 'No ads and no selling your data. Pro pays for everything that comes next.' },
 ];
 
 export const PLANS = [

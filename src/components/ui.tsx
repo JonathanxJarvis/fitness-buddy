@@ -18,7 +18,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { ProMark, proOutline } from './ProMark';
+import { ProMark } from './ProMark';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -205,7 +205,6 @@ export function Button({
           borderColor: variant === 'danger' ? colors.danger : colors.primary + '40',
           overflow: 'hidden',
         },
-        pro && proOutline,
         primary && {
           shadowColor: colors.hero[1],
           shadowOpacity: dark ? 0.5 : 0.35,
@@ -627,7 +626,7 @@ export function ActionSheet({
               onClose();
               setTimeout(a.onPress, 180);
             }}
-            style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11 }, a.pro && { ...proOutline, borderRadius: 16, paddingHorizontal: 8, marginHorizontal: -9, marginVertical: 2 }]}
+            style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11 }]}
           >
             <IconTile icon={a.icon} color={color} size={42} />
             <View style={{ flex: 1 }}>

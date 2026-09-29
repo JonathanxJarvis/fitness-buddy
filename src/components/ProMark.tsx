@@ -4,7 +4,6 @@ import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 /** Soft gold for the thin outline around Pro features. */
 export const PRO_GOLD = '#C9A24A';
-export const proOutline = { borderWidth: 1, borderColor: PRO_GOLD + 'B3' } as const;
 
 /**
  * The small cut-diamond that marks a Pro feature. Deliberately quiet: a
