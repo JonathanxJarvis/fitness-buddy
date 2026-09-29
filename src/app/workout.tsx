@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { ActionSheet, Badge, Button, Card, EmptyState, IconButton, Sheet, T } from '@/components/ui';
+import { ActionSheet, Button, Card, EmptyState, IconButton, Sheet, T } from '@/components/ui';
+import { ExerciseFigure } from '@/components/exercise/ExerciseFigure';
 import { FadeIn, PressScale } from '@/components/motion';
 import { Ring } from '@/components/Ring';
 import { useStore } from '@/store/StoreProvider';
@@ -209,7 +210,7 @@ export default function WorkoutScreen() {
     if (saveRoutine && done.exercises.length) dispatch({ type: 'saveRoutine', routine: routineFromWorkout(done, uid()) });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setFinishOpen(false);
-    router.replace({ pathname: '/workout-detail', params: { id: done.id, fresh: '1' } });
+    router.replace({ pathname: '/workout-summary', params: { id: done.id } });
   };
 
   const volume = workoutVolume(w);
@@ -244,9 +245,21 @@ export default function WorkoutScreen() {
           return (
             <FadeIn key={e.exerciseId + ei} delay={ei * 40}>
               <Card style={{ padding: spacing.md, marginBottom: spacing.sm }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <T weight="800" style={{ flex: 1 }} numberOfLines={1}>{x?.name ?? 'Exercise'}</T>
-                  {x && <Badge label={x.muscle.toUpperCase()} color={nutrientColors.protein} />}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId } })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`About ${x?.name ?? 'this exercise'}`}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}
+                  >
+                    <View style={{ borderRadius: 12, backgroundColor: colors.cardAlt, padding: 2 }}>
+                      <ExerciseFigure exerciseId={e.exerciseId} customExercises={state.customExercises} size={40} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <T weight="800" numberOfLines={1}>{x?.name ?? 'Exercise'}</T>
+                      {x && <T size={12} weight="700" color={nutrientColors.protein}>{x.muscle[0].toUpperCase() + x.muscle.slice(1)}</T>}
+                    </View>
+                  </Pressable>
                   <IconButton label="Exercise options" icon="ellipsis-horizontal" color={colors.textMuted} size={20} onPress={() => setMenuFor(ei)} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 0, marginBottom: 2 }}>
@@ -306,16 +319,25 @@ export default function WorkoutScreen() {
         title={menuFor !== null ? findExercise(w.exercises[menuFor]?.exerciseId ?? '', state.customExercises)?.name : undefined}
         actions={[
           {
-            label: 'Move up',
-            icon: 'arrow-up',
+            label: 'About this exercise',
+            icon: 'information-circle-outline',
             onPress: () => {
-              const i = menuFor ?? 0;
-              if (i === 0) return;
-              const list = [...w.exercises];
-              [list[i - 1], list[i]] = [list[i], list[i - 1]];
-              update({ ...w, exercises: list });
+              const e = menuFor !== null ? w.exercises[menuFor] : undefined;
+              if (e) router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId } });
             },
           },
+          ...([-1, 1] as const)
+            .filter((d) => menuFor !== null && menuFor + d >= 0 && menuFor + d < w.exercises.length)
+            .map((d) => ({
+              label: d < 0 ? 'Move up' : 'Move down',
+              icon: (d < 0 ? 'arrow-up' : 'arrow-down') as 'arrow-up' | 'arrow-down',
+              onPress: () => {
+                const i = menuFor ?? 0;
+                const list = [...w.exercises];
+                [list[i + d], list[i]] = [list[i], list[i + d]];
+                update({ ...w, exercises: list });
+              },
+            })),
           { label: 'Remove exercise', icon: 'trash-outline', destructive: true, onPress: () => update({ ...w, exercises: w.exercises.filter((_, i) => i !== menuFor) }) },
         ]}
       />

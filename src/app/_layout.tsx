@@ -81,6 +81,11 @@ function RootNavigator() {
         <Stack.Screen name="exercise-picker" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="routine-builder" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="workout-detail" options={{ title: 'Workout' }} />
+        <Stack.Screen name="workout-summary" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="plan" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="train-search" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="exercise/[id]" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="history" options={{ title: 'History' }} />
         <Stack.Screen name="rank" options={{ headerShown: false }} />
         <Stack.Screen name="pro" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="progress" options={{ title: 'Progress' }} />

@@ -4,7 +4,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Button, IconButton, T } from '@/components/ui';
+import { Button, Card, IconButton, T } from '@/components/ui';
+import { ExerciseFigure } from '@/components/exercise/ExerciseFigure';
 import { FadeIn, PressScale } from '@/components/motion';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
@@ -28,19 +29,42 @@ function Count({ value, onChange, min, max, label }: { value: number; onChange: 
       onChange(n);
     }
   };
+  const btn = (d: number) => (
+    <Pressable
+      onPress={() => step(d)}
+      disabled={d < 0 ? value <= min : value >= max}
+      accessibilityRole="button"
+      accessibilityLabel={`${d < 0 ? 'Fewer' : 'More'} ${label}`}
+      style={({ pressed }) => ({ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.primarySoft : colors.card, opacity: (d < 0 ? value <= min : value >= max) ? 0.4 : 1 })}
+    >
+      <Ionicons name={d < 0 ? 'remove' : 'add'} size={18} color={colors.text} />
+    </Pressable>
+  );
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardAlt, borderRadius: radius.pill }}>
-      <Pressable onPress={() => step(-1)} accessibilityLabel={`Fewer ${label}`} hitSlop={6} style={{ paddingHorizontal: 9, paddingVertical: 6 }}>
-        <Ionicons name="remove" size={14} color={colors.textMuted} />
-      </Pressable>
-      <View style={{ alignItems: 'center', minWidth: 30 }}>
-        <T size={15} weight="800">{value}</T>
-        <T size={9} weight="700" muted style={{ marginTop: -2, letterSpacing: 0.6 }}>{label.toUpperCase()}</T>
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.cardAlt, borderRadius: radius.pill, padding: 4 }}>
+      {btn(-1)}
+      <View style={{ alignItems: 'center' }}>
+        <T size={18} weight="800">{value}</T>
+        <T size={10} weight="700" muted style={{ marginTop: -3, letterSpacing: 0.6 }}>{label.toUpperCase()}</T>
       </View>
-      <Pressable onPress={() => step(1)} accessibilityLabel={`More ${label}`} hitSlop={6} style={{ paddingHorizontal: 9, paddingVertical: 6 }}>
-        <Ionicons name="add" size={14} color={colors.textMuted} />
-      </Pressable>
+      {btn(1)}
     </View>
+  );
+}
+
+function MoveButton({ icon, onPress, disabled, label }: { icon: 'arrow-up' | 'arrow-down'; onPress: () => void; disabled: boolean; label: string }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={4}
+      style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.primarySoft : colors.cardAlt, opacity: disabled ? 0.3 : 1 })}
+    >
+      <Ionicons name={icon} size={17} color={colors.text} />
+    </Pressable>
   );
 }
 
@@ -107,7 +131,7 @@ export default function RoutineBuilder() {
         <IconButton label="Close" icon="close" color={colors.text} onPress={() => router.back()} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 110 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }} keyboardShouldPersistTaps="handled">
         <T size={13} weight="700" muted style={{ marginBottom: 6 }}>Name</T>
         <TextInput
           value={name}
@@ -118,7 +142,7 @@ export default function RoutineBuilder() {
           style={{ backgroundColor: colors.cardAlt, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, color: colors.text, fontSize: 17, ...font('700') }}
         />
         {clash && <T size={12} color={colors.danger} style={{ marginTop: 6 }}>You already have a workout called {cleanName}.</T>}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm, marginHorizontal: -spacing.lg, flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingHorizontal: spacing.lg }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.sm }}>
           {STARTERS.map((sid) => {
             const s = SESSIONS.find((x) => x.id === sid)!;
             const on = cleanName.toLowerCase() === s.name.toLowerCase();
@@ -129,7 +153,7 @@ export default function RoutineBuilder() {
               </PressScale>
             );
           })}
-        </ScrollView>
+        </View>
         <T size={12} muted style={{ marginTop: 6 }}>
           Name it Push, Pull, Legs, Upper, Lower or Full body and it replaces that day in your training plan.
         </T>
@@ -150,25 +174,25 @@ export default function RoutineBuilder() {
             const ex = findExercise(row.exerciseId, state.customExercises);
             return (
               <FadeIn key={`${row.exerciseId}-${i}`} delay={Math.min(i, 6) * 30}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
-                  <View style={{ alignItems: 'center' }}>
-                    <Pressable onPress={() => move(i, -1)} disabled={i === 0} accessibilityLabel="Move up" hitSlop={4}>
-                      <Ionicons name="chevron-up" size={16} color={i === 0 ? colors.track : colors.textMuted} />
+                <Card style={{ padding: spacing.md, marginBottom: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Pressable onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: row.exerciseId } })} accessibilityLabel={`About ${ex?.name ?? 'this exercise'}`} style={{ borderRadius: 14, backgroundColor: colors.cardAlt, padding: 2 }}>
+                      <ExerciseFigure exerciseId={row.exerciseId} customExercises={state.customExercises} size={52} />
                     </Pressable>
-                    <T size={11} weight="800" muted>{i + 1}</T>
-                    <Pressable onPress={() => move(i, 1)} disabled={i === rows.length - 1} accessibilityLabel="Move down" hitSlop={4}>
-                      <Ionicons name="chevron-down" size={16} color={i === rows.length - 1 ? colors.track : colors.textMuted} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <T weight="800" numberOfLines={1}>{ex?.name ?? 'Exercise'}</T>
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-                      <Count value={row.sets} onChange={(sets) => update(i, { sets })} min={1} max={10} label="sets" />
-                      <Count value={row.reps} onChange={(reps) => update(i, { reps })} min={1} max={50} label="reps" />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <T size={11} weight="800" muted style={{ letterSpacing: 0.8 }}>{i + 1} OF {rows.length}</T>
+                      <T weight="800" numberOfLines={2}>{ex?.name ?? 'Exercise'}</T>
                     </View>
+                    <MoveButton icon="arrow-up" label={`Move ${ex?.name ?? 'exercise'} up`} disabled={i === 0} onPress={() => move(i, -1)} />
+                    <MoveButton icon="arrow-down" label={`Move ${ex?.name ?? 'exercise'} down`} disabled={i === rows.length - 1} onPress={() => move(i, 1)} />
                   </View>
-                  <IconButton label={`Remove ${ex?.name ?? 'exercise'}`} icon="trash-outline" color={colors.textMuted} onPress={() => setRows((r) => r.filter((_, j) => j !== i))} />
-                </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.md }}>
+                    <Count value={row.sets} onChange={(sets) => update(i, { sets })} min={1} max={10} label="sets" />
+                    <T size={15} weight="800" muted>×</T>
+                    <Count value={row.reps} onChange={(reps) => update(i, { reps })} min={1} max={50} label="reps" />
+                    <IconButton label={`Remove ${ex?.name ?? 'exercise'}`} icon="trash-outline" color={colors.textMuted} onPress={() => setRows((r) => r.filter((_, j) => j !== i))} />
+                  </View>
+                </Card>
               </FadeIn>
             );
           })
@@ -188,7 +212,7 @@ export default function RoutineBuilder() {
         )}
       </ScrollView>
 
-      <View style={{ position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: insets.bottom + spacing.md }}>
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}>
         <Button title={existing ? 'Save changes' : 'Save workout'} onPress={save} disabled={!canSave} />
       </View>
     </KeyboardAvoidingView>

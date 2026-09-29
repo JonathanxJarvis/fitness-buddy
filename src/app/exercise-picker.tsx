@@ -4,25 +4,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Button, Chip, EmptyState, Field, IconButton, IconTile, Sheet, T } from '@/components/ui';
+import { Button, Chip, EmptyState, Field, IconButton, Sheet, T } from '@/components/ui';
+import { ExerciseFigure } from '@/components/exercise/ExerciseFigure';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
 import { addToDraft } from '@/lib/routineDraft';
+import { useStartWithExercises } from '@/lib/useStartWorkout';
 import { EXERCISE_LIBRARY, MUSCLES, newBlock, personalRecords } from '@/lib/training';
 import { formatWeight } from '@/lib/units';
-import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
+import { font, radius, spacing, useTheme } from '@/theme';
 import type { Equipment, Exercise, Muscle } from '@/lib/types';
 
-const EQUIPMENT_ICON: Record<Equipment, React.ComponentProps<typeof Ionicons>['name']> = {
-  barbell: 'barbell',
-  dumbbell: 'barbell-outline',
-  machine: 'cog-outline',
-  cable: 'git-pull-request-outline',
-  bodyweight: 'body-outline',
-  kettlebell: 'fitness-outline',
-  band: 'infinite-outline',
-  cardio: 'heart-outline',
-};
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 const EQUIPMENT: Equipment[] = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell'];
 
@@ -30,8 +23,13 @@ export default function ExercisePicker() {
   const { state, dispatch } = useStore();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  /** "routine" when picking for the routine builder instead of the live workout. */
+  /**
+   * Where the picks go: "routine" for the routine builder, "new" to start a
+   * workout with them, otherwise the running workout.
+   */
   const { for: target } = useLocalSearchParams<{ for?: string }>();
+  const startWith = useStartWithExercises();
+  const starting = target === 'new';
   const [query, setQuery] = useState('');
   const [muscle, setMuscle] = useState<Muscle | 'all'>('all');
   const [picked, setPicked] = useState<string[]>([]);
@@ -61,6 +59,10 @@ export default function ExercisePicker() {
   };
 
   const add = () => {
+    if (starting) {
+      startWith(picked);
+      return;
+    }
     if (target === 'routine') {
       addToDraft(picked);
       router.back();
@@ -82,24 +84,39 @@ export default function ExercisePicker() {
   };
 
   const renderItem = ({ item }: { item: Exercise }) => {
-    const on = picked.includes(item.id);
+    const order = picked.indexOf(item.id);
+    const on = order >= 0;
     const pr = prs[item.id];
     return (
       <Pressable
         onPress={() => toggle(item.id)}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: on }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: 14, backgroundColor: on ? colors.primarySoft : 'transparent' }}
+        accessibilityLabel={item.name}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: spacing.sm, borderRadius: 16, backgroundColor: on ? colors.primarySoft : 'transparent' }}
       >
-        <IconTile icon={EQUIPMENT_ICON[item.equipment]} color={on ? colors.primary : nutrientColors.protein} size={38} />
-        <View style={{ flex: 1 }}>
+        <View style={{ borderRadius: 13, backgroundColor: on ? colors.card : colors.cardAlt, padding: 3 }}>
+          <ExerciseFigure exerciseId={item.id} customExercises={state.customExercises} size={44} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <T weight="700" numberOfLines={1}>{item.name}</T>
           <T size={12} muted numberOfLines={1}>
-            {item.muscle[0].toUpperCase() + item.muscle.slice(1)} · {item.equipment}
+            {cap(item.muscle)} · {cap(item.equipment)}
             {pr ? ` · best ${item.bodyweight || !pr.kg ? `${pr.reps} reps` : formatWeight(pr.kg, state.settings.units, 0) + ' × ' + pr.reps}` : ''}
           </T>
         </View>
-        <Ionicons name={on ? 'checkmark-circle' : 'add-circle-outline'} size={24} color={on ? colors.primary : colors.textMuted} />
+        <Pressable
+          onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: item.id } })}
+          accessibilityRole="button"
+          accessibilityLabel={`About ${item.name}`}
+          hitSlop={8}
+          style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.5 : 1 })}
+        >
+          <Ionicons name="information-circle-outline" size={24} color={colors.textMuted} />
+        </Pressable>
+        <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? colors.primary : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: colors.border }}>
+          {on ? <T size={13} weight="800" color={colors.onPrimary}>{order + 1}</T> : <Ionicons name="add" size={18} color={colors.textMuted} />}
+        </View>
       </Pressable>
     );
   };
@@ -107,9 +124,12 @@ export default function ExercisePicker() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ paddingTop: spacing.md, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <T size={20} weight="800" style={{ flex: 1 }}>Add exercises</T>
+        <View style={{ flex: 1 }}>
+          <T size={20} weight="800">{starting ? 'Choose your exercises' : 'Add exercises'}</T>
+          {starting ? <T size={13} muted>Pick what you'll train. You can add more during the workout.</T> : null}
+        </View>
         <IconButton label="New custom exercise" icon="create-outline" color={colors.primary} onPress={() => setCreating(true)} />
-        <IconButton label="Close" icon="close" color={colors.text} onPress={() => router.back()} />
+        <IconButton label={starting ? 'Cancel' : 'Close'} icon="close" color={colors.text} onPress={() => router.back()} />
       </View>
       <View style={{ marginHorizontal: spacing.lg, marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 14 }}>
         <Ionicons name="search" size={17} color={colors.textMuted} />
@@ -132,12 +152,22 @@ export default function ExercisePicker() {
         keyExtractor={(e) => e.id}
         renderItem={renderItem}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: spacing.sm + 2, paddingBottom: insets.bottom + 100 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.sm + 2, paddingBottom: insets.bottom + spacing.xl }}
         ListEmptyComponent={<EmptyState icon="search" title="No match" body="Create it as a custom exercise with the pencil button." />}
       />
-      {picked.length > 0 && (
-        <View style={{ position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: insets.bottom + spacing.md }}>
-          <Button title={`Add ${picked.length} exercise${picked.length > 1 ? 's' : ''}`} icon="add" onPress={add} />
+      {(picked.length > 0 || starting) && (
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: insets.bottom + spacing.md, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border }}>
+          {starting ? (
+            <Button
+              title={picked.length ? `Start workout · ${picked.length} exercise${picked.length > 1 ? 's' : ''}` : 'Pick at least one exercise'}
+              icon={picked.length ? 'play' : undefined}
+              onPress={add}
+              disabled={!picked.length}
+            />
+          ) : (
+            <Button title={`Add ${picked.length} exercise${picked.length > 1 ? 's' : ''}`} icon="add" onPress={add} />
+          )}
         </View>
       )}
 

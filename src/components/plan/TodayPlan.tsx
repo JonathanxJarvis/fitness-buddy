@@ -1,17 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Card, T } from '../ui';
 import { FadeIn, nativeDriver, PressScale } from '../motion';
-import { BarbellGlyph, MiniMoon, MoonGlyph, WeekRhythm } from './Glyphs';
-import { DaySheet } from './DaySheet';
-import { hasParkedPlan, PlanEditor } from './PlanEditor';
+import { BarbellGlyph, MiniMoon, MoonGlyph } from './Glyphs';
 import { useStore } from '@/store/StoreProvider';
 import { useStartWorkout } from '@/lib/useStartWorkout';
 import { addDays, todayKey } from '@/lib/dates';
-import { DAY_NAMES, planDay, planName, swapDays, SPLITS, trainedOn, weekdayIndex, weekOf, withDay, type Session } from '@/lib/plan';
+import { DAY_NAMES, planDay, planName, swapDays, trainedOn, weekdayIndex, weekOf, withDay, type Session } from '@/lib/plan';
 import { findExercise, doneSets, durationMinutes } from '@/lib/training';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -98,9 +96,6 @@ export function TodayPlan() {
   const start = useStartWorkout();
   const today = todayKey();
   const tomorrow = addDays(today, 1);
-  const [editing, setEditing] = useState(false);
-  const [editSplit, setEditSplit] = useState<string | undefined>();
-  const [dayOpen, setDayOpen] = useState<string | null>(null);
   const plan = state.plan;
   const day = planDay(state, today);
   const trainedToday = trainedOn(state, today);
@@ -113,47 +108,33 @@ export function TodayPlan() {
     return { planned, done, minutes: ws.reduce((n, w) => n + durationMinutes(w), 0) };
   }, [state, week]);
 
-  const openEditor = (split?: string) => {
-    setEditSplit(split);
-    setEditing(true);
-  };
+  const openPlan = (day?: number) => router.push({ pathname: '/plan', params: day === undefined ? {} : { day: String(day) } });
   const tap = () => Haptics.selectionAsync().catch(() => {});
-  // Back from building a workout inside the plan editor: reopen it where you left off.
-  useFocusEffect(
-    React.useCallback(() => {
-      if (hasParkedPlan()) setEditing(true);
-    }, []),
-  );
 
   if (!plan) {
     return (
       <FadeIn delay={40}>
-        <Card style={{ padding: spacing.lg }}>
-          <T size={11} weight="800" muted style={{ letterSpacing: 1.2 }}>TRAINING PLAN</T>
-          <T size={24} weight="800" style={{ marginTop: 4 }}>Plan your week</T>
-          <T size={13} muted style={{ marginTop: 4, marginBottom: spacing.md }}>
-            Pick a split and your rest days. Your daily quests adapt: gym on training days, proper recovery on rest days.
-          </T>
-          {SPLITS.map((s, i) => (
+        <Card style={{ padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <T size={11} weight="800" muted style={{ letterSpacing: 1.2 }}>TRAINING PLAN</T>
+            <T size={22} weight="800" style={{ marginTop: 2 }}>Plan your week</T>
+            <T size={13} muted style={{ marginTop: 4, marginBottom: spacing.md, lineHeight: 19 }}>
+              Pick a split and your rest days. Each day then shows what to train.
+            </T>
             <PressScale
-              key={s.id}
               onPress={() => {
                 tap();
-                if (s.id === 'custom') openEditor('custom');
-                else openEditor(s.id);
+                openPlan();
               }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}
+              accessibilityRole="button"
+              style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: radius.pill, paddingVertical: 11, paddingHorizontal: 18 }}
             >
-              <WeekRhythm week={s.week} color={colors.primary} rest={colors.track} height={18} />
-              <View style={{ flex: 1 }}>
-                <T size={14} weight="800">{s.name}</T>
-                <T size={12} muted>{s.blurb}</T>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              <T weight="800" color={colors.onPrimary}>Choose your plan</T>
+              <Ionicons name="arrow-forward" size={16} color={colors.onPrimary} />
             </PressScale>
-          ))}
+          </View>
+          <BarbellGlyph color={colors.primary} track={colors.textMuted} size={78} />
         </Card>
-        <PlanEditor visible={editing} onClose={() => setEditing(false)} initialSplit={editSplit} />
       </FadeIn>
     );
   }
@@ -218,7 +199,7 @@ export function TodayPlan() {
                   <Ionicons name="walk" size={16} color={colors.onPrimary} />
                   <T weight="800" color={colors.onPrimary}>Log a walk</T>
                 </PressScale>
-                <PressScale onPress={() => setDayOpen(today)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.pill, paddingVertical: 13, paddingHorizontal: 16, backgroundColor: colors.cardAlt }}>
+                <PressScale onPress={() => router.push('/train-search')} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.pill, paddingVertical: 13, paddingHorizontal: 16, backgroundColor: colors.cardAlt }}>
                   <Ionicons name="barbell" size={15} color={colors.text} />
                   <T weight="800" size={14}>Train anyway</T>
                 </PressScale>
@@ -244,22 +225,22 @@ export function TodayPlan() {
         {/* This week */}
         <View style={{ backgroundColor: colors.cardAlt, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, paddingHorizontal: 4 }}>
-            <T size={12} weight="800" style={{ flex: 1 }}>
-              This week <T size={12} weight="700" muted>· {planName(plan)} · {stats.done}/{stats.planned} sessions{stats.minutes ? ` · ${stats.minutes} min` : ''}</T>
-            </T>
-            <T size={12} weight="800" color={colors.primary} onPress={() => openEditor()}>
-              Edit plan
-            </T>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <T size={13} weight="800">This week · {stats.done}/{stats.planned} done</T>
+              <T size={12} weight="600" muted numberOfLines={1}>{planName(plan)}{stats.minutes ? ` · ${stats.minutes} min trained` : ''}</T>
+            </View>
+            <PressScale onPress={() => openPlan()} accessibilityRole="button" accessibilityLabel="Edit plan" hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.card }}>
+              <Ionicons name="create-outline" size={13} color={colors.primary} />
+              <T size={12} weight="800" color={colors.primary}>Edit plan</T>
+            </PressScale>
           </View>
           <View style={{ flexDirection: 'row' }}>
             {week.map((d, i) => (
-              <DayCapsule key={d} date={d} index={i} today={today} onPress={() => setDayOpen(d)} />
+              <DayCapsule key={d} date={d} index={i} today={today} onPress={() => openPlan(i)} />
             ))}
           </View>
         </View>
       </Card>
-      <DaySheet date={dayOpen} onClose={() => setDayOpen(null)} onEditPlan={() => openEditor()} />
-      <PlanEditor visible={editing} onClose={() => setEditing(false)} initialSplit={editSplit} />
     </FadeIn>
   );
 }

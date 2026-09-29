@@ -196,3 +196,14 @@ export function routineFromWorkout(w: Workout, id: string, name = w.name): Routi
     exercises: w.exercises.map((e) => ({ exerciseId: e.exerciseId, sets: Math.max(1, e.sets.length), reps: e.sets[0]?.reps || 10 })),
   };
 }
+
+/** "Morning workout" etc., for a workout started without a routine. */
+export function defaultWorkoutName(d: Date): string {
+  const h = d.getHours();
+  return h < 11 ? 'Morning workout' : h < 17 ? 'Afternoon workout' : 'Evening workout';
+}
+
+/** A new workout with the chosen exercises, each pre-filled from last time. */
+export function workoutWithExercises(exerciseIds: string[], workouts: Workout[], id: string, date: string, now = Date.now()): Workout {
+  return { id, date, name: defaultWorkoutName(new Date(now)), startedAt: now, exercises: exerciseIds.map((x) => newBlock(x, workouts)) };
+}

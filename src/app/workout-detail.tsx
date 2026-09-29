@@ -1,37 +1,33 @@
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Badge, Button, Card, EmptyState, Screen, T } from '@/components/ui';
-import { FadeIn } from '@/components/motion';
+import { Button, EmptyState, Screen } from '@/components/ui';
+import { CompareCard, ExerciseResults, MusclesWorked, WorkoutHero } from '@/components/workout/Summary';
 import { useStore } from '@/store/StoreProvider';
 import { uid } from '@/store/reducer';
-import { durationMinutes, findExercise, oneRepMax, prExercises, routineFromWorkout, workoutFromRoutine, workoutVolume, doneSets } from '@/lib/training';
-import { prettyDate, todayKey } from '@/lib/dates';
-import { formatWeight, kgToLb, weightUnit, weightValue } from '@/lib/units';
-import { nutrientColors, radius, spacing, useTheme } from '@/theme';
+import { prExercises, routineFromWorkout, workoutFromRoutine } from '@/lib/training';
+import { previousSameWorkout, workoutMuscleRegions } from '@/lib/workoutSummary';
+import { todayKey } from '@/lib/dates';
+import { spacing } from '@/theme';
 
+/** A past workout from history: the same summary as after finishing, plus repeat / save / delete. */
 export default function WorkoutDetail() {
-  const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch } = useStore();
-  const { colors } = useTheme();
   const [saved, setSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const units = state.settings.units;
   const w = state.workouts.find((x) => x.id === id);
 
-  const prs = useMemo(() => (w ? prExercises(w, state.workouts.filter((x) => x.startedAt < w.startedAt)) : []), [w, state.workouts]);
+  const info = useMemo(() => {
+    if (!w) return null;
+    return {
+      prs: prExercises(w, state.workouts.filter((x) => x.startedAt < w.startedAt)),
+      prev: previousSameWorkout(w, state.workouts),
+      muscles: workoutMuscleRegions(w, state.customExercises),
+    };
+  }, [w, state.workouts, state.customExercises]);
 
-  if (!w) return <Screen><EmptyState icon="barbell-outline" title="Workout not found" /></Screen>;
-
-  const volume = workoutVolume(w);
-  const stats: [string, string][] = [
-    ['Time', `${durationMinutes(w)} min`],
-    ['Volume', `${Math.round(units === 'us' ? kgToLb(volume) : volume).toLocaleString()} ${weightUnit(units)}`],
-    ['Sets', String(doneSets(w))],
-    ['Burned', `${w.calories ?? 0} kcal`],
-  ];
+  if (!w || !info) return <Screen><EmptyState icon="barbell-outline" title="Workout not found" /></Screen>;
 
   const repeat = () => {
     if (state.activeWorkout) return router.push('/workout');
@@ -42,59 +38,11 @@ export default function WorkoutDetail() {
 
   return (
     <Screen>
-      <FadeIn>
-        <LinearGradient colors={[colors.hero[0], colors.hero[2]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md }}>
-          {fresh ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <Ionicons name="trophy" size={18} color="#FFD66B" />
-              <T size={13} weight="800" color="#FFD66B">
-                {prs.length ? `Workout done · ${prs.length} new PR${prs.length > 1 ? 's' : ''}` : 'Workout done · nice work'}
-              </T>
-            </View>
-          ) : null}
-          <T size={24} weight="800" color="#fff">{w.name}</T>
-          <T size={13} color="rgba(255,255,255,0.75)">{prettyDate(w.date)}</T>
-          <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
-            {stats.map(([l, v]) => (
-              <View key={l} style={{ flex: 1 }}>
-                <T size={11} weight="700" color="rgba(255,255,255,0.65)">{l.toUpperCase()}</T>
-                <T size={15} weight="800" color="#fff" numberOfLines={1}>{v}</T>
-              </View>
-            ))}
-          </View>
-        </LinearGradient>
-      </FadeIn>
-
-      {w.exercises.map((e, i) => {
-        const x = findExercise(e.exerciseId, state.customExercises);
-        const best = e.sets.reduce((b, s) => (oneRepMax(s.kg, s.reps) > oneRepMax(b.kg, b.reps) ? s : b), e.sets[0]);
-        return (
-          <FadeIn key={e.exerciseId + i} delay={60 + i * 40}>
-            <Card style={{ padding: spacing.md, marginBottom: spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <T weight="800" style={{ flex: 1 }} numberOfLines={1}>{x?.name ?? 'Exercise'}</T>
-                {prs.includes(e.exerciseId) && <Badge label="PR" icon="trophy" color={nutrientColors.carbs} solid />}
-              </View>
-              {e.sets.map((s, si) => (
-                <View key={si} style={{ flexDirection: 'row', paddingVertical: 3 }}>
-                  <T size={13} muted weight="700" style={{ width: 26 }}>{si + 1}</T>
-                  <T size={14} weight={s === best ? '800' : '500'} style={{ flex: 1 }}>
-                    {x?.bodyweight || !s.kg ? `${s.reps} reps` : `${+weightValue(s.kg, units).toFixed(1)} ${weightUnit(units)} × ${s.reps}`}
-                  </T>
-                  {s.kg > 0 && s.reps > 1 && (
-                    <T size={12} muted>e1RM {formatWeight(oneRepMax(s.kg, s.reps), units, 0)}</T>
-                  )}
-                </View>
-              ))}
-            </Card>
-          </FadeIn>
-        );
-      })}
-
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+      <WorkoutHero w={w} prCount={info.prs.length} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
         <Button title="Repeat" icon="refresh" onPress={repeat} style={{ flex: 1 }} small />
         <Button
-          title={saved ? 'Saved' : 'Save routine'}
+          title={saved ? 'Saved' : 'Save as workout'}
           icon={saved ? 'checkmark' : 'bookmark-outline'}
           variant="secondary"
           disabled={saved}
@@ -106,6 +54,9 @@ export default function WorkoutDetail() {
           small
         />
       </View>
+      <CompareCard w={w} prev={info.prev} />
+      <MusclesWorked primary={info.muscles.primary} secondary={info.muscles.secondary} />
+      <ExerciseResults w={w} prs={info.prs} showSets />
       <Button
         title={confirmDelete ? 'Tap again to delete' : 'Delete workout'}
         variant={confirmDelete ? 'danger' : 'ghost'}
@@ -116,7 +67,6 @@ export default function WorkoutDetail() {
           router.back();
         }}
       />
-      {fresh ? <Button title="Done" variant="secondary" onPress={() => router.back()} /> : null}
     </Screen>
   );
 }
