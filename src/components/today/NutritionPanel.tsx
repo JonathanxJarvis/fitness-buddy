@@ -11,11 +11,13 @@ import type { DiaryEntry, Goals, NutrientKey, Nutrients, UnitSystem } from '@/li
 import { formatWater } from '@/lib/units';
 import { macroSplit, sodiumToSaltG } from './dayContext';
 
-const MACROS = [
-  { key: 'protein', label: 'Protein', color: nutrientColors.protein },
-  { key: 'carbs', label: 'Carbs', color: nutrientColors.carbs },
-  { key: 'fat', label: 'Fat', color: nutrientColors.fat },
-] as const;
+// Read at render: the Simple look swaps nutrient colors after the module has loaded.
+const macros = () =>
+  [
+    { key: 'protein', label: 'Protein', color: nutrientColors.protein },
+    { key: 'carbs', label: 'Carbs', color: nutrientColors.carbs },
+    { key: 'fat', label: 'Fat', color: nutrientColors.fat },
+  ] as const;
 
 /**
  * The calorie dial. The filled arc is split by where the calories came from
@@ -39,7 +41,7 @@ function EnergyDial({ eaten, budget, totals, size }: { eaten: number; budget: nu
     if (!hasSplit) segs.push({ color: nutrientColors.calories, start: 0, len: first });
     else {
       let at = 0;
-      for (const m of MACROS) {
+      for (const m of macros()) {
         const len = first * split[m.key];
         if (len > 0.001) segs.push({ color: m.color, start: at, len });
         at += len;
@@ -170,7 +172,7 @@ function MacroColumn({ label, color, value, goal, delay }: { label: string; colo
 }
 
 const MICROS: { key: NutrientKey; short?: string; color: string }[] = [
-  { key: 'fiber', color: nutrientColors.fiber },
+  { key: 'fiber', color: '' },
   { key: 'sugar', color: '#E0689A' },
   { key: 'sodium', short: 'Salt', color: '#8C97A6' },
   { key: 'potassium', color: '#7E9C3A' },
@@ -449,7 +451,7 @@ export function NutritionPanel({
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 14, marginTop: spacing.md }}>
-              {MACROS.map((m, i) => (
+              {macros().map((m, i) => (
                 <MacroColumn key={m.key} label={m.label} color={m.color} value={totals[m.key]} goal={goals[m.key]} delay={250 + i * 90} />
               ))}
             </View>
@@ -463,7 +465,7 @@ export function NutritionPanel({
                   key={m.key}
                   k={m.key}
                   short={m.short}
-                  color={m.color}
+                  color={m.color || nutrientColors.fiber}
                   value={totals[m.key] ?? 0}
                   goal={goals[m.key as keyof Goals] as number}
                   known={known(m.key)}
