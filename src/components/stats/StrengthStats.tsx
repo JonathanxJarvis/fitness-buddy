@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Card, Segmented, T } from '@/components/ui';
-import { ProMark } from '@/components/ProMark';
 import { useStore } from '@/store/StoreProvider';
 import { addDays, shortDate } from '@/lib/dates';
 import { REGION_LABEL } from '@/lib/exerciseInfo';
@@ -10,7 +9,6 @@ import { E1RM_FORMULA, liftSummary, mainLifts, SET_TARGET, VOLUME_LABEL, weeklyB
 import { weightUnit, weightValue } from '@/lib/units';
 import { nutrientColors, radius, spacing, useTheme, type Colors } from '@/theme';
 import { TrendChart } from './TrendChart';
-import { ProPreview } from './ProPreview';
 
 type Months = 3 | 6 | 12;
 
@@ -19,16 +17,6 @@ const Eyebrow = ({ children }: { children: React.ReactNode }) => (
     {children}
   </T>
 );
-
-/** Section header for Strength on the Progress screen. */
-export function StrengthHeader() {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md, marginBottom: spacing.sm }}>
-      <T size={18} weight="800">Strength</T>
-      <ProMark size={11} />
-    </View>
-  );
-}
 
 /** Estimated 1RM trend for one lift at a time, plus the top-lifts list. */
 export function StrengthCards({ today }: { today: string }) {
@@ -260,31 +248,5 @@ function VolumeRow({ m, scaleMax, open, onPress, weeks }: { m: MuscleVolume; sca
         </View>
       )}
     </Pressable>
-  );
-}
-
-/** A static sample for the free preview: shapes only, no numbers of yours. */
-export function StrengthPreview() {
-  const { colors } = useTheme();
-  const today = '2026-09-28';
-  const pts = [100, 101, 103, 102.5, 105, 106, 108, 107.5, 110, 112, 111.5, 114].map((value, i) => ({ date: addDays(today, -7 * (11 - i)), value }));
-  return (
-    <Card>
-      <ProPreview feature="stats" title="Deep stats" body="Estimated 1-rep max per lift, weekly volume per muscle, and strength trends over months.">
-        <View>
-          <Eyebrow>Estimated 1RM · Bench press</Eyebrow>
-          <T size={32} weight="800" style={{ marginTop: 2 }}>114 <T size={15} muted weight="700">kg</T></T>
-          <TrendChart points={pts} from={addDays(today, -84)} to={today} color={nutrientColors.protein} height={130} />
-          {['Chest', 'Back', 'Quads'].map((r, i) => (
-            <View key={r} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
-              <T size={13} style={{ width: 60 }}>{r}</T>
-              <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.track }}>
-                <View style={{ width: `${[62, 48, 30][i]}%`, height: 8, borderRadius: 4, backgroundColor: [colors.success, colors.success, colors.warning][i] }} />
-              </View>
-            </View>
-          ))}
-        </View>
-      </ProPreview>
-    </Card>
   );
 }

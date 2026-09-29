@@ -11,7 +11,9 @@ import { waterValue, waterUnit, weightValue, weightUnit, formatWeight } from '@/
 import { workoutVolume } from '@/lib/training';
 import { DAILY_TIPS, tipForDate } from '@/lib/tips';
 import { isPro } from '@/lib/pro';
-import { MuscleVolumeCard, StrengthCards, StrengthHeader, StrengthPreview } from '@/components/stats/StrengthStats';
+import { MuscleVolumeCard, StrengthCards } from '@/components/stats/StrengthStats';
+import { AdviceSection } from '@/components/stats/AdviceSection';
+import { Dropdown } from '@/components/Dropdown';
 import { RecoveryCard } from '@/components/recovery/RecoveryCard';
 import { nutrientColors, spacing, useTheme } from '@/theme';
 
@@ -134,15 +136,13 @@ export default function ProgressScreen() {
         <BarChart key={range} data={volumeBars} color={nutrientColors.protein} height={120} format={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v)))} />
       </Card>
 
+      <AdviceSection today={today} pro={isPro(state)} />
       <RecoveryCard />
-      <StrengthHeader />
-      {isPro(state) ? (
-        <>
+      {isPro(state) && (
+        <Dropdown detached title="Lift details" summary="Max and sets per muscle">
           <StrengthCards today={today} />
           <MuscleVolumeCard today={today} />
-        </>
-      ) : (
-        <StrengthPreview />
+        </Dropdown>
       )}
 
       <Card>

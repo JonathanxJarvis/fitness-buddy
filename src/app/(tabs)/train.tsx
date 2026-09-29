@@ -12,7 +12,7 @@ import { unreadCount } from '@/lib/social';
 import { RankBadge } from '@/components/RankBadge';
 import { TodayPlan } from '@/components/plan/TodayPlan';
 import { planDay, planSessions, type Session } from '@/lib/plan';
-import { doneSets, findExercise, routineFromWorkout } from '@/lib/training';
+import { doneSets, routineFromWorkout } from '@/lib/training';
 import type { Routine } from '@/lib/types';
 import { font, nutrientColors, radius, spacing, useTheme } from '@/theme';
 
@@ -71,46 +71,26 @@ function editSession(s: Session, routines: Routine[]) {
   router.push({ pathname: '/routine-builder', params: mine ? { id: mine.id } : { name: s.name } });
 }
 
-/** A workout you can start any day: its exercises at a glance, Start, and edit. */
-function WorkoutCard({ s, badge, onStart, onEdit }: { s: Session; badge?: { label: string; icon?: IconName }; onStart: () => void; onEdit?: () => void }) {
-  const { state } = useStore();
+/** One compact row per plan workout: name, size, edit and start. */
+function PlanRow({ s, badge, first, onStart, onEdit }: { s: Session; badge?: { label: string; icon?: IconName }; first: boolean; onStart: () => void; onEdit: () => void }) {
   const { colors } = useTheme();
   const ex = s.routine.exercises;
   const sets = ex.reduce((n, x) => n + x.sets, 0);
-  const names = ex.map((x) => findExercise(x.exerciseId, state.customExercises)?.name).filter(Boolean).join(' · ');
   return (
-    <Card style={{ padding: spacing.md, paddingLeft: spacing.md + 4, marginBottom: spacing.sm, overflow: 'hidden' }}>
-      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: s.color }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <T size={17} weight="800" numberOfLines={1} style={{ flexShrink: 1 }}>{s.name}</T>
-            {badge ? <Badge label={badge.label} icon={badge.icon} color={s.color} /> : null}
-          </View>
-          <T size={12} weight="700" color={s.color} style={{ marginTop: 1 }}>
-            {ex.length} exercises · {sets} sets · ~{Math.round(sets * 2.8 + 5)} min
-          </T>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: first ? 0 : 1, borderTopColor: colors.border }}>
+      <View style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: s.color }} />
+      <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`Edit ${s.name}`} style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <T size={16} weight="800" numberOfLines={1} style={{ flexShrink: 1 }}>{s.name}</T>
+          {badge ? <Badge label={badge.label} icon={badge.icon} color={s.color} /> : null}
         </View>
-        {onEdit ? (
-          <Pressable
-            onPress={onEdit}
-            accessibilityRole="button"
-            accessibilityLabel={`Edit ${s.name}`}
-            hitSlop={6}
-            style={({ pressed }) => ({ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardAlt, opacity: pressed ? 0.6 : 1 })}
-          >
-            <Ionicons name="create-outline" size={17} color={colors.text} />
-          </Pressable>
-        ) : null}
-        <PressScale onPress={onStart} accessibilityRole="button" accessibilityLabel={`Start ${s.name}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: s.color, borderRadius: radius.pill, paddingVertical: 9, paddingHorizontal: 14 }}>
-          <Ionicons name="play" size={13} color="#fff" />
-          <T size={14} weight="800" color="#fff">Start</T>
-        </PressScale>
-      </View>
-      {names ? (
-        <T size={12} muted numberOfLines={2} style={{ marginTop: 6, lineHeight: 17 }}>{names}</T>
-      ) : null}
-    </Card>
+        <T size={12} muted numberOfLines={1}>{ex.length} exercises · ~{Math.round(sets * 2.8 + 5)} min · tap to edit</T>
+      </Pressable>
+      <PressScale onPress={onStart} accessibilityRole="button" accessibilityLabel={`Start ${s.name}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: s.color, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 }}>
+        <Ionicons name="play" size={12} color="#fff" />
+        <T size={13} weight="800" color="#fff">Start</T>
+      </PressScale>
+    </View>
   );
 }
 
@@ -239,16 +219,18 @@ export default function Train() {
         <FadeIn delay={160}>
           <Heading
             title="Your plan's workouts"
-            hint="Start any of them, any day. It counts for today."
+            hint="Any of them counts for today."
             right={
               <Pressable onPress={() => router.push('/plan')} accessibilityRole="button" accessibilityLabel="Change plan" hitSlop={8}>
                 <T size={13} weight="800" color={colors.primary}>Change plan</T>
               </Pressable>
             }
           />
-          {planned.map((s) => (
-            <WorkoutCard key={s.id} s={s} badge={badgeFor(s)} onStart={() => startOrAsk(s.routine)} onEdit={() => editSession(s, state.routines)} />
-          ))}
+          <Card style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.md }}>
+            {planned.map((s, i) => (
+              <PlanRow key={s.id} s={s} first={i === 0} badge={badgeFor(s)} onStart={() => startOrAsk(s.routine)} onEdit={() => editSession(s, state.routines)} />
+            ))}
+          </Card>
         </FadeIn>
       )}
 
