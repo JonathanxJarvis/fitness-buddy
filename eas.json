@@ -9,22 +9,13 @@
       "distribution": "internal",
       "ios": {
         "simulator": false
-      },
-      "env": {
-        "EXPO_PUBLIC_AI_PROXY_URL": ""
       }
     },
     "preview": {
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_AI_PROXY_URL": ""
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_AI_PROXY_URL": ""
-      }
+      "autoIncrement": true
     }
   },
   "submit": {

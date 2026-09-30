@@ -100,6 +100,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#2E7D32"
     },
-    "description": "Calorie, macro and strength-training tracker with an AI coach."
+    "description": "Calorie, macro and strength-training tracker with an AI coach.",
+    "owner": "johnnyjarv",
+    "extra": {
+      "eas": {
+        "projectId": "6a020942-492d-4e43-aa3f-6ad996bd9cd5"
+      }
+    }
   }
 }
