@@ -1,25 +1,111 @@
 {
   "expo": {
-    "name": "fitness-buddy",
+    "name": "Fitness Buddy",
     "slug": "fitness-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Fitness Buddy uses the camera to scan food barcodes and photograph meals for nutrition estimates.",
+        "NSMotionUsageDescription": "Fitness Buddy reads your step count to track daily activity."
+      },
+      "bundleIdentifier": "com.jonathanxjarvis.fitnessbuddy",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E8F5E9",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACTIVITY_RECOGNITION"
+      ],
+      "package": "com.jonathanxjarvis.fitnessbuddy",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "scheme": "fitnessbuddy",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Fitness Buddy uses the camera to scan food barcodes."
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fitness Buddy uses your photos so AI can estimate the nutrition of your meals.",
+          "cameraPermission": "Fitness Buddy uses the camera to scan barcodes and photograph meals for AI nutrition estimates."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.jonathanxjarvis.fitnessbuddy.widgets",
+          "groupIdentifier": "group.com.jonathanxjarvis.fitnessbuddy",
+          "widgets": [
+            {
+              "name": "CalorieWidget",
+              "displayName": "Track your calories",
+              "description": "Calories left today, protein, and a nudge to log your next meal.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryRectangular",
+                  "accessoryCircular"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Fitness Buddy reads your steps, active energy, body weight and workouts from Apple Health so your daily numbers stay up to date without typing them in.",
+          "NSHealthUpdateUsageDescription": "Fitness Buddy saves your finished strength workouts and the weigh-ins you log to Apple Health.",
+          "background": false
+        }
+      ]
+    ],
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E7D32"
+    },
+    "description": "Calorie, macro and strength-training tracker with an AI coach.",
+    "owner": "johnnyjarv",
+    "extra": {
+      "eas": {
+        "projectId": "6a020942-492d-4e43-aa3f-6ad996bd9cd5"
+      }
     }
   }
 }
